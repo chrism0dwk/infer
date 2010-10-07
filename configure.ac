@@ -2,10 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 #AC_PREREQ([2.61])
-AC_INIT(airomania, 0.1, Chris Jewell <chris.jewell@warwick.ac.uk>)
+AC_INIT(brandenburg, 0.1, Chris Jewell <chris.jewell@warwick.ac.uk>)
 
 AC_CONFIG_HEADERS([config.h])
-AM_INIT_AUTOMAKE(airomania, 0.1)
+AM_INIT_AUTOMAKE(brandenburg, 0.1)
 
 # Checks for programs.
 AC_PROG_CXXCPP
@@ -31,11 +31,11 @@ AC_CHECK_HEADER([gsl/gsl_version.h], ,
 # Checks for library functions.
 
 # Get OpenMP flag - only for Autotools 2.63 apparently!
-#AC_OPENMP
+AC_OPENMP
 
 
 # Substitutions
-#AC_SUBST([OPENMP_CXXFLAGS])
+AC_SUBST([OPENMP_CXXFLAGS])
 AC_SUBST([GSL_LIBS])
 
 AC_OUTPUT(Makefile src/Makefile src/Framework/Makefile src/data/Makefile src/mcmc/Makefile)
