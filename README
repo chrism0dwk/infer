@@ -1,0 +1,8 @@
+InFER: Inference For Epidemic related Risk
+==========================================
+
+InFER master branch contains the backbone of the code for the InFER project.
+
+The code contained in this repository runs alongside research conducted between Warwick and Massey Universities.  The software is distributed under the GPLv3 license, allowing users to modify and redistribute the source code.  It is provided WITHOUT WARRANTY and is intended for academic research purposes.
+
+Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
