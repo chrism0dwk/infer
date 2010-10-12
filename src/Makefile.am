@@ -1,1 +1,1 @@
-SUBDIRS=data Framework mcmc
+SUBDIRS=data Framework mcmc unitTests
