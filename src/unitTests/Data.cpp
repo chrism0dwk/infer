@@ -36,6 +36,10 @@ PopDataImporter::PopDataImporter(const string filename)
       throw EpiRisk::data_exception("Cannot open population file for reading");
   }
 
+  // Take out header line
+  string row;
+  getline(dataFile_,row);
+
 }
 
 PopDataImporter::~PopDataImporter()
@@ -70,6 +74,7 @@ void
 PopDataImporter::reset()
 {
   dataFile_.seekg(0);
+  string row; getline(dataFile_,row);
 }
 
 
@@ -81,6 +86,9 @@ EpiDataImporter::EpiDataImporter(const string filename)
     if(!dataFile_.is_open()) {
         throw EpiRisk::data_exception("Cannot open population file for reading");
     }
+
+    string row;
+    getline(dataFile_,row);
 }
 
 EpiDataImporter::~EpiDataImporter()
@@ -99,6 +107,7 @@ EpiDataImporter::next()
   if(dataFile_.eof()) throw EpiRisk::fileEOF();
 
   getline(dataFile_,row);
+
   stlStrTok(tokens,row,",");
   if (tokens.size() != 4) throw EpiRisk::fileEOF();
 
@@ -115,4 +124,6 @@ void
 EpiDataImporter::reset()
 {
   dataFile_.seekg(0);
+  string row;
+  getline(dataFile_,row);
 }

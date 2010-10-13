@@ -33,12 +33,15 @@ int main(int argc, char* argv[])
 {
   // Unit test for SpatPointPop
 
-  PopDataImporter* popDataImporter = new PopDataImporter("testPopData.csv");
-  EpiDataImporter* epiDataImporter = new EpiDataImporter("testEpiData.ipt");
+  if (argc != 3) {
+      cerr << "Usage: testSpatPointPop <pop file> <epi file>" << endl;
+      return EXIT_FAILURE;
+  }
 
-  typedef Individual<TestCovars> TestIndividual;
+  PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
+  EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
 
-  Population< TestIndividual >* myPopulation = new Population< TestIndividual >();
+  Population<TestCovars>* myPopulation = new Population<TestCovars>;
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
@@ -47,9 +50,10 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Population< TestIndividual >::iterator iter = myPopulation->begin();
+  Population<TestCovars>::const_iterator iter = myPopulation->end();
   while(iter != myPopulation->end()) {
-      cout << iter->getCovariates()->x << "\t"
+      cout << iter->getId() << "\t"
+           << iter->getCovariates()->x << "\t"
            << iter->getCovariates()->y << "\t"
            << iter->getCovariates()->herdSize << "\t"
            << iter->getI() << "\t"
@@ -57,6 +61,18 @@ int main(int argc, char* argv[])
            << iter->getR() << endl;
       iter++;
   }
+
+  cout << "Total pop size: " << myPopulation->size() << endl;
+  cout << "Num infections: " << myPopulation->numInfected() << endl;
+  cout << "Num susceptibles: " << myPopulation->numSusceptible() << endl;
+  cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
+  cout << "I2 id: " << myPopulation->I2()->getId() << " " << myPopulation->I2()->getI() << endl;
+
+  myPopulation->moveInfectionTime(0,10.0);
+  cout << "Moved I1 to 10.0" << endl;
+  cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
+    cout << "I2 id: " << myPopulation->I2()->getId() << " " << myPopulation->I2()->getI() << endl;
+
 
 
   delete myPopulation;
