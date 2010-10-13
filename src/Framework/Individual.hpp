@@ -128,7 +128,7 @@ namespace EpiRisk
       bool
       operator<(Individual rhs) const
       {
-        return this->label < rhs.label;
+        return this->I_ < rhs.getI();
       }
       ;
 
