@@ -66,12 +66,12 @@ int main(int argc, char* argv[])
   cout << "Num infections: " << myPopulation->numInfected() << endl;
   cout << "Num susceptibles: " << myPopulation->numSusceptible() << endl;
   cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
-  cout << "I2 id: " << myPopulation->I2()->getId() << " " << myPopulation->I2()->getI() << endl;
-
+  cout << "I2 id: " << (++myPopulation->I1())->getId() << " " << (++myPopulation->I1())->getI() << endl;
   myPopulation->moveInfectionTime(0,10.0);
   cout << "Moved I1 to 10.0" << endl;
   cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
-    cout << "I2 id: " << myPopulation->I2()->getId() << " " << myPopulation->I2()->getI() << endl;
+  cout << "I2 id: " << (++myPopulation->I1())->getId() << " " << (++myPopulation->I1())->getI() << endl;
+
 
 
 

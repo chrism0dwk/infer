@@ -1,5 +1,5 @@
 /*************************************************************************
- *  ./src/unitTests/Data.cpp
+ *  ./src/data/Data.cpp
  *  Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
  *
  *  This file is part of InFER.
