@@ -18,9 +18,9 @@
  *  along with InFER.  If not, see <http://www.gnu.org/licenses/>.
  *************************************************************************/
 
-#include "Mcmc.cpp"
+#include "Mcmc.hpp"
 
-using EpiRisk::Population<TestCovars>;
+using namespace EpiRisk;
 
 double
 dist(const double x1, const double y1, const double x2, const double y2)
@@ -33,7 +33,7 @@ dist(const double x1, const double y1, const double x2, const double y2)
 
 Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters) : pop_(population),
                                                                          params_(parameters),
-                                                                         logLiklihood_(NEGINF)
+                                                                         logLikelihood_(NEGINF)
 {
    // Constructor
 }
@@ -46,38 +46,37 @@ Mcmc::~Mcmc()
 double
 Mcmc::getLikelihood() const
 {
-  return logLiklihood_;
+  return logLikelihood_;
 }
 
 double
-Mcmc::beta(const Population<TextCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const
+Mcmc::beta(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const
 {
-  return params_.beta1() * exp(-params_.phi() * dist(i->getX(),i->getY(),j->getX(),j->getY()));
+  return (*params_.beta1)() * exp(-(*params_.phi)() * dist(i->getCovariates()->x,i->getCovariates()->y,j->getCovariates()->x,j->getCovariates()->y));
 }
 
 double
 Mcmc::betastar(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const
 {
-  return params_.beta2() * exp(-params_.phi() * dist(i->getX(),i->getY(),j->getX(),j->getY()));
+  return (*params_.beta2)() * exp(-(*params_.phi)() * dist(i->getCovariates()->x,i->getCovariates()->y,j->getCovariates()->x,j->getCovariates()->y));
 }
 
 
 void
-Mcmc::calcLogLikelihood() const
+Mcmc::calcLogLikelihood()
 {
   // Calculates log likelihood
 
-  Infectives& infectives = pop_.getInfectives();
-  Infectives::iterator i = infectives.begin();
-  Infectives::iterator j = infectives.begin();
+  Population<TestCovars>::PopulationIndex::Iterator i = pop_.infecBegin();
+  Population<TestCovars>::PopulationIndex::Iterator j = pop_.infecBegin();
 
   logLikelihood_ = 0.0;
 
   // First calculate the log product
-  while(j != infectives.end()) {
+  while(j != pop_.infecEnd()) {
       double sumPressure = 0.0;
-      Infectives::iterator i = infectives.begin();
-      Infectives::iterator stop = infectives.upper_bound(j->getI()); // Don't need people infected after me.
+      Population<TestCovars>::PopulationIndex::Iterator i = pop_.infecBegin();
+      Population<TestCovars>::PopulationIndex::Iterator stop = pop_.infecUpperBound(j); // Don't need people infected after me.
       while(i != stop)
         {
           if(i->getN() > j->getI())
@@ -98,10 +97,3 @@ Mcmc::calcLogLikelihood() const
   // Now calculate the integral
 }
 
-
-
-
-
-
-
-}

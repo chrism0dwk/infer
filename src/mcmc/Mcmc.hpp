@@ -28,8 +28,9 @@
 
 
 #include "SpatPointPop.hpp"
+#include "Data.hpp"
 
-#define NEGINF (-numeric_limits<double>::infinity)
+#define NEGINF (-numeric_limits<double>::infinity())
 
 using namespace std;
 using namespace EpiRisk;
@@ -65,11 +66,11 @@ struct Parameters
     phi = new Parameter(0.6);
   }
 
-  Parameters&
   Parameters(Parameters& toCopy)
   {
-    Parameters newParms;
-    return newParms;
+    beta1 = new Parameter(*toCopy.beta1);
+    beta2 = new Parameter(*toCopy.beta2);
+    phi = new Parameter(*toCopy.phi);
   }
 
   ~Parameters()
@@ -86,8 +87,8 @@ class Mcmc {
   Population<TestCovars>& pop_;
   Parameters& params_;
   double logLikelihood_;
-  double beta(size_t i, size_t j);
-  double betastar(size_t i, size_t j);
+  double beta(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
+  double betastar(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
 
   void
   calcLogLikelihood();
