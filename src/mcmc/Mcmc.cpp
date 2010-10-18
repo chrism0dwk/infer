@@ -35,7 +35,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters) : pop_(po
                                                                          params_(parameters),
                                                                          logLikelihood_(NEGINF)
 {
-   // Constructor
+   calcLogLikelihood();
 }
 
 Mcmc::~Mcmc()
@@ -74,26 +74,48 @@ Mcmc::calcLogLikelihood()
 
   // First calculate the log product
   while(j != pop_.infecEnd()) {
-      double sumPressure = 0.0;
+      double sumPressure = 1.0;
       Population<TestCovars>::PopulationIndex::Iterator i = pop_.infecBegin();
       Population<TestCovars>::PopulationIndex::Iterator stop = pop_.infecUpperBound(j); // Don't need people infected after me.
-      while(i != stop)
+      while(i != pop_.infecEnd())
         {
-          if(i->getN() > j->getI())
-            {
-              sumPressure += beta(*i,*j);
+          if(i.base_iterator() != j.base_iterator()) { // Skip i==j
+
+              if(i->getN() > j->getI())
+                {
+                  //cout << "I->S infection:(i:" << i->getId() << ", j:" << j->getId() << "), Ii=" << i->getI() << ", Ni = " << i->getN() << ", Ij=" << j->getI() << endl;;
+                  sumPressure += beta(*i,*j);
+                }
+              else if (i->getR() > j->getI())
+                {
+                  //cout << "N->S infection\n";
+                  sumPressure += betastar(*i,*j);
+                }
             }
-          else if (i->getR() > j->getI())
-            {
-              sumPressure += betastar(*i,*j);
-            }
-          ++i;
-        }
+            ++i;
+          }
       logLikelihood_ += log(sumPressure);
       ++j;
   }
 
-
-  // Now calculate the integral
+//  // Now calculate the integral
+//  Population<TestCovars>::const_iterator k = pop_.begin();
+//  double totalIntegPress = 0.0;
+//  while (k != pop_.end()) {
+//      double integPressure = 0.0;
+//      i = pop_.infecBegin();
+//      while (i != pop_.infecEnd()) {
+//      // Infective -> Susceptible pressure
+//      integPressure += beta(*i, k) * min(i->getN(),k->getI()) - min(i->getI(),k->getI());
+//
+//      // Notified -> Susceptible pressure
+//      integPressure += betastar(*i, k) * min(i->getR(),k->getI()) - min(i->getN(), k->getI());
+//      ++i;
+//      }
+//      ++k;
+//      totalIntegPress -= integPressure;
+//  }
+//
+//  logLikelihood_ -= totalIntegPress;
 }
 
