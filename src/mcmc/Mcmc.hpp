@@ -61,9 +61,9 @@ struct Parameters
 
   Parameters()
   {
-    beta1 = new Parameter(0.5);
-    beta2 = new Parameter(0.3);
-    phi = new Parameter(0.6);
+    beta1 = new Parameter(0.02);
+    beta2 = new Parameter(0.01);
+    phi = new Parameter(0.2);
   }
 
   Parameters(Parameters& toCopy)
