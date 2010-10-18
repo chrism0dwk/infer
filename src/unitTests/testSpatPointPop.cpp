@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Population<TestCovars>::const_iterator iter = myPopulation->end();
+  Population<TestCovars>::const_iterator iter = myPopulation->begin();
   while(iter != myPopulation->end()) {
       cout << iter->getId() << "\t"
            << iter->getCovariates()->x << "\t"
@@ -65,12 +65,31 @@ int main(int argc, char* argv[])
   cout << "Total pop size: " << myPopulation->size() << endl;
   cout << "Num infections: " << myPopulation->numInfected() << endl;
   cout << "Num susceptibles: " << myPopulation->numSusceptible() << endl;
-  cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
-  cout << "I2 id: " << (++myPopulation->I1())->getId() << " " << (++myPopulation->I1())->getI() << endl;
-  myPopulation->moveInfectionTime(0,10.0);
+
+  Population<TestCovars>::PopulationIndex::Iterator infec = myPopulation->infecBegin();
+
+  cout << "I1 id: " << infec->getId() << " " << infec->getI() <<  endl;
+  infec++;
+  cout << "I2 id: " << infec->getId() << " " << infec->getI() << endl;
+  myPopulation->moveInfectionTime(2,10.0);
   cout << "Moved I1 to 10.0" << endl;
-  cout << "I1 id: " << myPopulation->I1()->getId() << " " << myPopulation->I1()->getI() <<  endl;
-  cout << "I2 id: " << (++myPopulation->I1())->getId() << " " << (++myPopulation->I1())->getI() << endl;
+
+  infec = myPopulation->infecBegin();
+  cout << "I1 id: " << infec->getId() << " " << infec->getI() <<  endl;
+  infec++;
+  cout << "I2 id: " << infec->getId() << " " << infec->getI() << endl;
+
+  iter = myPopulation->begin();
+  while(iter != myPopulation->end()) {
+      cout << iter->getId() << "\t"
+           << iter->getCovariates()->x << "\t"
+           << iter->getCovariates()->y << "\t"
+           << iter->getCovariates()->herdSize << "\t"
+           << iter->getI() << "\t"
+           << iter->getN() << "\t"
+           << iter->getR() << endl;
+      iter++;
+  }
 
 
 

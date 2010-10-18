@@ -42,6 +42,7 @@
 #include "types.hpp"
 #include "Individual.hpp"
 #include "DataImporter.hpp"
+#include "STLIndex.hpp"
 
 using namespace std;
 
@@ -68,27 +69,14 @@ namespace EpiRisk
       struct PopulationIndexCmp
       {
         bool
-        operator()(const iterator& lhs, const iterator& rhs) const
+        operator()(const Individual& lhs, const Individual& rhs) const
         {
-          return lhs->getI() < rhs->getI();
+          return lhs.getI() < rhs.getI();
         }
       };
 
-      typedef multiset<iterator, PopulationIndexCmp> PopulationIndex;
+      typedef STLIndex<PopulationContainer, PopulationIndexCmp> PopulationIndex;
       typedef map<string, iterator> IdMap;
-
-      class IndexIterator : public std::iterator<bidirectional_iterator_tag, const_iterator>
-      {
-         typename PopulationIndex::iterator p_;
-      public:
-         IndexIterator(const typename PopulationIndex::iterator& it) :p_(it) {}
-         IndexIterator& operator++() {++p_;return *this;}
-         IndexIterator& operator--() {--p_;return *this;}
-         bool operator==(const IndexIterator& rhs) {return p_==rhs.p_;}
-         bool operator!=(const IndexIterator& rhs) {return p_!=rhs.p_;}
-         Individual& operator*() {return **p_;}
-         const Individual* operator->() {return &(**p_);}
-      };
 
       // Ctor & Dtor
       Population();
@@ -210,12 +198,26 @@ namespace EpiRisk
       NTime(const size_t i) const; // Time for which i was notified
       double
       STime(const size_t i) const; // Time for which i was susceptible
-      IndexIterator
+      const_iterator
       I1() const
       {
-        return IndexIterator(infectives_.begin());
+        return *(infectives_.begin());
       } // Returns iterator to I1
-
+      typename PopulationIndex::Iterator
+      infecBegin() const
+      {
+        return infectives_.begin();
+      }
+      typename PopulationIndex::Iterator
+      infecEnd() const
+      {
+        return infectives_.end();
+      }
+      typename PopulationIndex::Iterator
+      infecUpperBound(typename PopulationIndex::Iterator& x)
+      {
+        return infectives_.upper_bound(x);
+      }
     private:
       // Private data
       PopulationContainer individuals_;
@@ -318,8 +320,7 @@ namespace EpiRisk
                 throw parse_exception(
                     "Key in epidemic data not found in population data");
 
-              susceptibles_.erase(find(susceptibles_.begin(),
-                  susceptibles_.end(), rv->second));
+              susceptibles_.erase(rv->second);
               rv->second->setEvents(record.data);
               infectives_.insert(rv->second);
 
@@ -439,9 +440,10 @@ namespace EpiRisk
     Population<Covars>::moveInfectionTime(const size_t index,
         const double newTime)
     {
-      typename PopulationIndex::iterator it = infectives_.begin();
+      assert(index < infectives_.size());
+      typename PopulationIndex::Iterator it = infectives_.begin();
       advance(it, index);
-      typename Population::iterator tmp = *it;
+      iterator tmp = *it;
       infectives_.erase(it);
       tmp->setI(newTime);
       infectives_.insert(tmp);
