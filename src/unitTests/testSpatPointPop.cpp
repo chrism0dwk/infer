@@ -45,52 +45,33 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(10.0);
+  myPopulation->setObsTime(100.0);
 
   delete popDataImporter;
   delete epiDataImporter;
 
-  Population<TestCovars>::const_iterator iter = myPopulation->begin();
-  while(iter != myPopulation->end()) {
-      cout << iter->getId() << "\t"
-           << iter->getCovariates()->x << "\t"
-           << iter->getCovariates()->y << "\t"
-           << iter->getCovariates()->herdSize << "\t"
-           << iter->getI() << "\t"
-           << iter->getN() << "\t"
-           << iter->getR() << endl;
-      iter++;
-  }
+//  Population<TestCovars>::const_iterator iter = myPopulation->begin();
+//  while(iter != myPopulation->end()) {
+//      cout << iter->getId() << "\t"
+//           << iter->getCovariates()->x << "\t"
+//           << iter->getCovariates()->y << "\t"
+//           << iter->getCovariates()->herdSize << "\t"
+//           << iter->getI() << "\t"
+//           << iter->getN() << "\t"
+//           << iter->getR() << endl;
+//      iter++;
+//  }
+
+  cout << "I1: " << myPopulation->I1().getId() << endl;
+  myPopulation->dumpInfected();
+
+  myPopulation->dumpInfected();
+
+  cout << "I1: " << myPopulation->I1().getId() << endl;
 
   cout << "Total pop size: " << myPopulation->size() << endl;
   cout << "Num infections: " << myPopulation->numInfected() << endl;
   cout << "Num susceptibles: " << myPopulation->numSusceptible() << endl;
-
-  Population<TestCovars>::PopulationIndex::Iterator infec = myPopulation->infecBegin();
-
-  cout << "I1 id: " << infec->getId() << " " << infec->getI() <<  endl;
-  infec++;
-  cout << "I2 id: " << infec->getId() << " " << infec->getI() << endl;
-  myPopulation->moveInfectionTime(2,10.0);
-  cout << "Moved I1 to 10.0" << endl;
-
-  infec = myPopulation->infecBegin();
-  cout << "I1 id: " << infec->getId() << " " << infec->getI() <<  endl;
-  infec++;
-  cout << "I2 id: " << infec->getId() << " " << infec->getI() << endl;
-
-  iter = myPopulation->begin();
-  while(iter != myPopulation->end()) {
-      cout << iter->getId() << "\t"
-           << iter->getCovariates()->x << "\t"
-           << iter->getCovariates()->y << "\t"
-           << iter->getCovariates()->herdSize << "\t"
-           << iter->getI() << "\t"
-           << iter->getN() << "\t"
-           << iter->getR() << endl;
-      iter++;
-  }
-
 
 
 
