@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(10.0);
+  myPopulation->setObsTime(100.0);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -39,7 +39,13 @@ int main(int argc, char* argv[])
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters);
 
-  cout << "Likelihood: " << myMcmc->getLikelihood() << endl;
+  for (size_t i=0; i<30; ++i) {
+    myMcmc->calcLogLikelihood();
+    cout << i << endl;
+  }
+
+  cout << "Likelihood: " << myMcmc->getLogLikelihood() << endl;
+
 
   delete myMcmc;
   delete myParameters;

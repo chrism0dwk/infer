@@ -32,6 +32,7 @@
 #include <set>
 #include <map>
 #include <iterator>
+#include <algorithm>
 #include <utility>
 #include <string>
 #include <limits>
@@ -39,12 +40,22 @@
 #include <fstream>
 #include <cassert>
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/identity.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/mem_fun.hpp>
+
 #include "types.hpp"
 #include "Individual.hpp"
 #include "DataImporter.hpp"
-#include "STLIndex.hpp"
+#include "EpiRiskException.hpp"
 
 using namespace std;
+using boost::multi_index_container;
+using namespace boost::multi_index;
 
 #define POSINF ( numeric_limits<double>::infinity() )
 
@@ -60,45 +71,62 @@ namespace EpiRisk
     {
 
     public:
-
       typedef Individual<Covars> Individual;
-      typedef vector<Individual> PopulationContainer;
-      typedef typename PopulationContainer::iterator iterator;
-      typedef typename PopulationContainer::const_iterator const_iterator;
 
-      struct PopulationIndexCmp
+    private:
+      // Index tags
+      struct bySeq {};
+      struct byI {};
+      struct byId {};
+      struct byN {};
+      struct byDiseaseStatus {};
+
+      // Population multi_index_container
+      typedef boost::multi_index_container<
+          Individual,
+          indexed_by<
+            sequenced< tag<bySeq> >,
+            hashed_unique< tag<byId>, const_mem_fun<Individual,string,&Individual::getId> >,
+            ordered_non_unique<tag<byI>,const_mem_fun<Individual,double,&Individual::getI> >,
+            hashed_non_unique<tag<byDiseaseStatus>,const_mem_fun<Individual,bool,&Individual::hasBeenInfected> >
+          >
+      >  PopulationContainer;
+
+
+      // Population Indices
+      typedef typename PopulationContainer::template index<byI>::type InfectiveIndex;
+      typedef typename PopulationContainer::template index<bySeq>::type PopulationIndex;
+      typedef typename PopulationContainer::template index<byId>::type IdIndex;
+
+    public:
+      // Iterators
+      typedef typename PopulationIndex::const_iterator PopulationIterator;
+      typedef typename InfectiveIndex::const_iterator InfectiveIterator;
+
+    private: // Comparison functors
+      struct cmpI
       {
-        bool
-        operator()(const Individual& lhs, const Individual& rhs) const
-        {
-          return lhs.getI() < rhs.getI();
-        }
+        bool operator()(const double l,const double r) const {
+          bool rv = l < r;
+          cout << "Rv=" << rv << endl;
+          return rv;}
       };
 
-      typedef STLIndex<PopulationContainer, PopulationIndexCmp> PopulationIndex;
-      typedef map<string, iterator> IdMap;
 
-      // Ctor & Dtor
+    public: // methods
+      /// \name Constructor and destructor
+      //@{
       Population();
       virtual
       ~Population();
-      void
-      resetEventTimes();
+      //@}
 
-      // Data management methods
+
+      /// \name Data management methods
+      //@{
       //! Sets the population observation time
       void
-      setObsTime(const double obsTime)
-      {
-        obsTime_ = obsTime;
-      }
-      //! Returns the population observation time
-      double
-      getObsTime() const
-      {
-        return obsTime_;
-      }
-
+      setObsTime(const double obsTime);
       /*! \brief Imports population data.
        *
        * Use this method to import population data.
@@ -118,6 +146,48 @@ namespace EpiRisk
       //! Imports contact tracing XML
       void
       importContactTracing(const string filename);
+      //@}
+
+
+
+      /// \name Population management methods
+      //@{
+      /*! \brief Creates an infection.
+       *
+       * This method effectively infects a susceptible.  Note that this should be a
+       * *known* infection, and *not* an occult infection.
+       * @param index the position of the infection to add in the susceptible index.
+       * @param I the infection time
+       * @param N the notification time
+       * @param R the removal time
+       */
+      bool
+      addInfec(size_t index, eventTime_t I, eventTime_t N = POSINF,
+          eventTime_t R = POSINF);
+      /*! \brief Deletes an infection
+       *
+       * This method deletes a *known* infection.
+       * @param index the position of the infection in the infectives index.
+       */
+      bool
+      delInfec(size_t index);
+
+      /*! /brief Moves an infection time
+       *
+       * This function moves an infection time.
+       * @param index the position of the infection time to move in the infectives index.
+       * @param newTime the infection time to move to.
+       */
+      bool
+      moveInfectionTime(const size_t index, const double newTime);
+      /*! /brief Moves an infection time
+       *
+       * This function moves an infection time.
+       * @param id the id of the infection time to move in the infectives index.
+       * @param newTime the infection time to move to.
+       */
+      bool
+      moveInfectionTime(const std::string id, const double newTime);
       /*! Adds an occult infection
        * @param susceptibleIndex the position of the susceptible to add in the susceptibles index.
        */
@@ -131,61 +201,90 @@ namespace EpiRisk
       //! Deletes all occult infections
       void
       resetOccults();
+      //! Clears all infected individuals
       void
       clear(); // Clears all infected individuals
+      /*! \brief Creates a connection graph
+       * \param predicate a functor whose operator() method returns true if two individuals are connected
+       */
+      template<class Predicate>
+      void
+      createConnectionGraph(Predicate predicate);
+      //@}
 
-      // Data access
-      /*! Returns a const_iterator to an individual
+      /// \name Data access methods
+      //@{
+      //! Returns the population observation time
+      double
+      getObsTime() const;
+      /*! Returns a reference to a const individual
        * @param pos the position of the individual in the population vector.
        */
-      const_iterator
+      const Individual&
       operator[](const size_t pos) const;
+      /*! Returns a reference to a const individual
+       * @param id the id of the individual
+       * @return A reference to a (const) individual
+       */
+      const Individual&
+      getById(const std::string id) const;
       /// Returns a const_iterator to the beginning of the population vector.
-      const_iterator
+      PopulationIterator
       begin() const;
       /// Returns a const_iterator to just past the end of the population vector.
-      const_iterator
+      PopulationIterator
       end() const;
       /// Returns the size of the population.
       size_t
       size() const;
       /// Returns the current number of susceptibles.
       size_t
-      numSusceptible() const;
+      numSusceptible();
       /// Returns the current number of infectives (including occults)
       size_t
-      numInfected() const;
-      /*! \brief Creates an infection.
-       *
-       * This method effectively infects a susceptible.  Note that this should be a
-       * *known* infection, and *not* an occult infection.
-       * @param index the position of the infection to add in the susceptible index.
-       * @param I the infection time
-       * @param N the notification time
-       * @param R the removal time
-       */
-      void
-      addInfec(size_t index, eventTime_t I, eventTime_t N = POSINF,
-          eventTime_t R = POSINF);
-      /*! \brief Deletes an infection
-       *
-       * This method deletes a *known* infection.
-       * @param index the position of the infection in the infectives index.
-       */
-      void
-      delInfec(size_t index);
+      numInfected();
+      /// Returns a const reference to I1
+      const Individual&
+      I1() const;
+      /// Returns an iterator to the beginning of the infectives
+      InfectiveIterator
+      infecBegin() const;
+      /// Returns an iterator to one past the end of the infectives
+      InfectiveIterator
+      infecEnd() const;
+      /// Returns an iterator to the infective with infection time <= I
+      InfectiveIterator
+      infecUpperBound(const double I);
+      /// Returns an iterator to the infectives with infection time < I
+      InfectiveIterator
+      infecLowerBound(const double I);
 
-      // Time functions
-      /*! /brief Moves an infection time
-       *
-       * This function moves an infection time.
-       * @param index the position of the infection time to move in the infectives index.
-       * @param newTime the infection time to move to.
-       */
+      //@}
+
+
+      /// \name Debug methods
+      //@{
+      /// Dumps the infection times to stderr
       void
-      moveInfectionTime(const size_t index, const double newTime);
+      dumpInfected()
+      {
+        InfectiveIndex& iIndex = population_.get<byI>();
+
+        typename InfectiveIndex::iterator it = iIndex.begin();
+        while(it->getI() < obsTime_) {
+            cerr << it->getId() << "\t"
+                << it->getI() << endl;
+            it++;
+        }
+      }
+      //@}
+
+
+      /// \name Time methods
+      //@{
+      /// Time for which j is exposed to i
       double
-      exposureI(const size_t i, const size_t j) const; // Time for which j is exposed to infected i
+      exposureI(const size_t i, const size_t j) const;
       double
       exposureIBeforeCT(const size_t i, const size_t j) const;
       double
@@ -198,32 +297,16 @@ namespace EpiRisk
       NTime(const size_t i) const; // Time for which i was notified
       double
       STime(const size_t i) const; // Time for which i was susceptible
-      const_iterator
-      I1() const
-      {
-        return *(infectives_.begin());
-      } // Returns iterator to I1
-      typename PopulationIndex::Iterator
-      infecBegin() const
-      {
-        return infectives_.begin();
-      }
-      typename PopulationIndex::Iterator
-      infecEnd() const
-      {
-        return infectives_.end();
-      }
-      typename PopulationIndex::Iterator
-      infecUpperBound(typename PopulationIndex::Iterator& x)
-      {
-        return infectives_.upper_bound(x);
-      }
+      //@}
+
+
     private:
       // Private data
-      PopulationContainer individuals_;
-      PopulationIndex infectives_;
-      PopulationIndex susceptibles_;
-      IdMap idIndex_;
+      PopulationContainer population_;
+
+      InfectiveIndex& infIndex_;
+      PopulationIndex& seqIndex_;
+      IdIndex& idIndex_;
 
       double obsTime_;
       size_t knownInfections_;
@@ -234,6 +317,39 @@ namespace EpiRisk
       void
       updateInfecMethod();
 
+      struct modifyEvents
+      {
+        modifyEvents(Events& events) : events_(events) {}
+        void operator()(Individual& i)
+        {
+          i.setEvents(events_);
+        }
+      private:
+        Events& events_;
+      };
+
+      struct modifyI
+      {
+        modifyI(double newI) : newI_(newI) {}
+        void operator()(Individual& i)
+        {
+          i.setI(newI_);
+        }
+      private:
+        double newI_;
+      };
+
+      struct modifyStatus
+      {
+        modifyStatus(InfecStatus_e newStatus) : newStatus(newStatus) {}
+        void operator()(Individual& i)
+        {
+          i.setStatus(newStatus);
+        }
+      private:
+        InfecStatus_e newStatus;
+      };
+
     };
 
   //////////////////////////////////////////////////////
@@ -242,7 +358,10 @@ namespace EpiRisk
 
   template<typename Covars>
     Population<Covars>::Population() :
-      obsTime_(POSINF), knownInfections_(0)
+      obsTime_(POSINF), knownInfections_(0),
+      idIndex_(population_.get<byId>()),
+      infIndex_(population_.get<byI>()),
+      seqIndex_(population_.get<bySeq>())
     {
 
     }
@@ -254,16 +373,18 @@ namespace EpiRisk
     }
 
   template<typename Covars>
-    void
-    Population<Covars>::resetEventTimes()
-    {
-      for (size_t i = 0; i < individuals_.size(); ++i)
-        {
-          individuals_[i].I = obsTime_;
-          individuals_[i].N = obsTime_;
-          individuals_[i].R = obsTime_;
-        }
-    }
+  void
+  Population<Covars>::setObsTime(const double obsTime)
+  {
+    obsTime_ = obsTime;
+  }
+
+  template<typename Covars>
+  double
+  Population<Covars>::getObsTime() const
+  {
+    return obsTime_;
+  }
 
   template<typename Covars>
     void
@@ -274,33 +395,16 @@ namespace EpiRisk
 
       try
         {
+          InfectiveIndex& index = population_.get<byI>();
           while (1)
             {
               record = popDataImporter.next();
-              individuals_.push_back(Individual(record.id, record.data));
+              index.insert( Individual(record.id, record.data) );
             }
         }
       catch (fileEOF& e)
         {
-          // Build indices
-          idIndex_.clear();
-          susceptibles_.clear();
-          infectives_.clear();
-          pair<typename IdMap::iterator, bool> rv;
-          iterator iter = individuals_.begin();
-          while (iter != individuals_.end())
-            {
-              // Add to id index
-              rv = idIndex_.insert(typename IdMap::value_type(iter->getId(),
-                  iter));
-              if (rv.second == false)
-                throw data_exception(
-                    "Duplicate id found in population dataset!");
-
-              // Add to susceptibles
-              susceptibles_.insert(iter);
-              iter++;
-            }
+          return;
         }
     }
 
@@ -312,18 +416,16 @@ namespace EpiRisk
       epiDataImporter.reset();
       try
         {
+          IdIndex& idIndex = population_.get<byId>();
           while (1)
             {
               record = epiDataImporter.next();
-              typename IdMap::iterator rv = idIndex_.find(record.id);
-              if (rv == idIndex_.end())
+              typename IdIndex::iterator ref = idIndex.find(record.id);
+              if (ref == idIndex.end())
                 throw parse_exception(
                     "Key in epidemic data not found in population data");
-
-              susceptibles_.erase(rv->second);
-              rv->second->setEvents(record.data);
-              infectives_.insert(rv->second);
-
+              Events oldEvents = ref->getEvents();
+              idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
             }
         }
       catch (fileEOF& e)
@@ -333,57 +435,66 @@ namespace EpiRisk
     }
 
   template<typename Covars>
-    typename Population<Covars>::const_iterator
+    void
+    Population<Covars>::importContactTracing(const string filename)
+    {
+      // Function associates infections with CT data
+      SAXContactParse(filename, population_);
+      updateInfecMethod();
+    }
+
+  template<typename Covars>
+    const typename Population<Covars>::Individual&
     Population<Covars>::operator[](const size_t pos) const
     {
-      // Returns a pointer (looked up in individuals_) to an individual
-      assert(pos < individuals_.size()); // Range check
-      return individuals_.begin() + pos;
+      // Returns a const reference to an individual
+      assert(pos < population_.size()); // Range check
+      return population_[pos];
     }
 
   template<typename Covars>
-    typename Population<Covars>::const_iterator
+  const typename Population<Covars>::Individual&
+  Population<Covars>::getById(const std::string id) const
+  {
+    return *(idIndex_.find(id));
+  }
+
+  template<typename Covars>
+    typename Population<Covars>::PopulationIterator
     Population<Covars>::begin() const
     {
-      return individuals_.begin();
+      return population_.begin();
     }
 
   template<typename Covars>
-    typename Population<Covars>::const_iterator
+    typename Population<Covars>::PopulationIterator
     Population<Covars>::end() const
     {
-      return individuals_.end();
+      return population_.end();
     }
 
   template<typename Covars>
     size_t
     Population<Covars>::size() const
     {
-      return individuals_.size();
+      return population_.size();
     }
 
   template<typename Covars>
     size_t
-    Population<Covars>::numInfected() const
+    Population<Covars>::numInfected()
     {
-      return infectives_.size();
+      return distance(infIndex_.begin(),infIndex_.upper_bound(obsTime_));
     }
 
   template<typename Covars>
     size_t
-    Population<Covars>::numSusceptible() const
+    Population<Covars>::numSusceptible()
     {
-      return susceptibles_.size();
+      return distance(infIndex_.upper_bound(obsTime_),infIndex_.end());
     }
 
-  template<typename Covars>
-    void
-    Population<Covars>::importContactTracing(const string filename)
-    {
-      // Function associates infections with CT data
-      SAXContactParse(filename, individuals_);
-      updateInfecMethod();
-    }
+
 
   template<typename Covars>
     void
@@ -392,61 +503,84 @@ namespace EpiRisk
       // Goes through infectives and finds if infected
       // by a contact or not.
 
-      for (typename PopulationIndex::iterator iter = infectives_.begin(); iter
-          != infectives_.end(); iter++)
+      for (typename InfectiveIndex::iterator iter = infIndex_.begin();
+           iter != infIndex_.end();
+           iter++)
         {
-          (*infectives_)->updateInfecByContact();
+          iter->updateInfecByContact();
         }
     }
 
   template<typename Covars>
-    void
+    bool
     Population<Covars>::addInfec(size_t index, eventTime_t I, eventTime_t N,
         eventTime_t R)
     {
-      assert(index < susceptibles_.size());
+      assert(index < numSusceptible());
 
-      typename PopulationIndex::iterator toAdd = susceptibles_.begin();
+      typename InfectiveIndex::iterator toAdd = infIndex_.upper_bound(obsTime_);
       advance(toAdd, index);
 
-      (*toAdd)->setI(I);
-      (*toAdd)->setStatus(INFECTED);
+      Events newEvents;
+      newEvents.I = I;
+      newEvents.N = N;
+      newEvents.R = R;
 
-      infectives_.insert(*toAdd);
-      susceptibles_.erase(toAdd);
+      Events oldEvents = toAdd->getEvents();
+
+      return  infIndex_.modify(toAdd,modifyEvents(newEvents),modifyEvents(oldEvents)) and
+              infIndex_.modify(toAdd,modifyStatus(INFECTED),modifyStatus(SUSCEPTIBLE));
     }
 
   template<typename Covars>
-    void
+    bool
     Population<Covars>::delInfec(size_t index)
     {
-      assert(index < infectives_.size());
+      assert(index < numInfected());
 
-      typename PopulationIndex::iterator toRemove = infectives_.begin();
+      typename InfectiveIndex::iterator toRemove = infIndex_.begin();
       advance(toRemove, index);
 
-      if ((*toRemove)->known)
+      if (toRemove->known)
         throw logic_error("Attempt to delete a known infection");
 
-      (*toRemove)->setStatus(SUSCEPTIBLE);
-      (*toRemove)->setI(POSINF);
+      Events newEvents;
+      newEvents.I = POSINF;
+      newEvents.N = POSINF;
+      newEvents.R = POSINF;
 
-      susceptibles_.insert(*toRemove);
-      infectives_.erase(toRemove);
+      Events oldEvents = toRemove->getEvents();
+
+      return infIndex_.modify(toRemove,modifyEvents(newEvents),modifyEvents(oldEvents)) and
+             infIndex_.modify(toRemove,modifyStatus(SUSCEPTIBLE),modifyStatus(INFECTED));
     }
 
   template<typename Covars>
-    void
+    bool
     Population<Covars>::moveInfectionTime(const size_t index,
         const double newTime)
     {
-      assert(index < infectives_.size());
-      typename PopulationIndex::Iterator it = infectives_.begin();
+      assert(index < numInfected());
+
+      typename InfectiveIndex::iterator it = infIndex_.begin();
       advance(it, index);
-      iterator tmp = *it;
-      infectives_.erase(it);
-      tmp->setI(newTime);
-      infectives_.insert(tmp);
+      double oldTime = it->getI();
+
+      return infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
+
+    }
+
+  template<typename Covars>
+    bool
+    Population<Covars>::moveInfectionTime(const std::string id, const double newTime)
+    {
+      typename IdIndex::iterator idIter = idIndex_.find(id);
+      if (idIter == idIndex_.end()) throw data_exception("Id not found");
+      typename InfectiveIndex::iterator infIter = population_.project<byI>(idIter);
+
+      size_t idPos = distance(infIndex_.begin(), infIter);
+      cout << "Moving id: " << infIter->getId() << ", position " << idPos <<  endl;
+      return moveInfectionTime(idPos, newTime);
     }
 
   template<typename Covars>
@@ -455,8 +589,8 @@ namespace EpiRisk
     {
       // NB: This gives time that susceptible j is exposed to infective i before becoming infected
       assert(i < size() and j < size());
-      return min(individuals_[i].N, individuals_[j].I) - min(individuals_[i].I,
-          individuals_[j].I);
+      return min(population_[i].N, population_[j].I) - min(population_[i].I,
+          population_[j].I);
     }
 
   template<typename Covars>
@@ -470,13 +604,13 @@ namespace EpiRisk
       double stopTime;
       double startTime;
       assert(i < size() and j < size());
-      double earliestContactStart = min(individuals_[i].getContactStart(),
-          individuals_[j].getContactStart());
+      double earliestContactStart = min(population_[i].getContactStart(),
+          population_[j].getContactStart());
 
-      stopTime = min(individuals_[i].getN(), individuals_[j].getI());
+      stopTime = min(population_[i].getN(), population_[j].getI());
       stopTime = min(earliestContactStart, stopTime);
 
-      startTime = min(individuals_[j].getI(), individuals_[i].getI());
+      startTime = min(population_[j].getI(), population_[i].getI());
       startTime = min(earliestContactStart, stopTime);
 
       return stopTime - startTime;
@@ -489,7 +623,7 @@ namespace EpiRisk
       // Returns the amount of time between I and start of CT window
       // Non-neg if CTstart > I, 0 otherwise
       assert(i < size());
-      double iTime = individuals_[i].getContactStart() - individuals_[i].getI();
+      double iTime = population_[i].getContactStart() - population_[i].getI();
 
       if (iTime > 0)
         return iTime;
@@ -503,8 +637,8 @@ namespace EpiRisk
     {
       // NB: This gives time that susceptible j is exposed to notified i before becoming infected
       assert(i < size() and j < size());
-      return min(individuals_[i].getR(), individuals_[j].getI()) - min(
-          individuals_[j].getI(), individuals_[i].getN());
+      return min(population_[i].getR(), population_[j].getI()) - min(
+          population_[j].getI(), population_[i].getN());
     }
 
   template<typename Covars>
@@ -513,7 +647,7 @@ namespace EpiRisk
     {
       // NB: Gives the time for which i was infectious but not notified
       assert(i < size());
-      return individuals_[i].getN() - individuals_[i].getI();
+      return population_[i].getN() - population_[i].getI();
     }
 
   template<typename Covars>
@@ -522,7 +656,7 @@ namespace EpiRisk
     {
       // NB: Gives the time for which i was notified
       assert(i < size());
-      return individuals_[i].getR() - individuals_[i].getN();
+      return population_[i].getR() - population_[i].getN();
     }
 
   template<typename Covars>
@@ -531,8 +665,44 @@ namespace EpiRisk
     {
       // NB: Gives the time for which i was susceptible
       assert(i < size());
-      return individuals_[i].getI() - individuals_[I1].getI();
+      return population_[i].getI() - population_[0].getI();
     }
 
-}
+  template<typename Covars>
+  const typename Population<Covars>::Individual&
+  Population<Covars>::I1() const
+  {
+    return *(infIndex_.begin());
+  }
+
+  template<typename Covars>
+  typename Population<Covars>::InfectiveIterator
+  Population<Covars>::infecBegin() const
+  {
+    return infIndex_.begin();
+  }
+
+  template<typename Covars>
+  typename Population<Covars>::InfectiveIterator
+  Population<Covars>::infecEnd() const
+  {
+    typename Population<Covars>::InfectiveIterator it = infIndex_.upper_bound(obsTime_);
+    return it;
+  }
+
+  template<typename Covars>
+  typename Population<Covars>::InfectiveIterator
+  Population<Covars>::infecUpperBound(const double I)
+  {
+    return infIndex_.upper_bound(min(I,obsTime_));
+  }
+
+  template<typename Covars>
+  typename Population<Covars>::InfectiveIterator
+  Population<Covars>::infecLowerBound(const double I)
+  {
+    return infIndex_.lower_bound(I);
+  }
+
+}  // Namespace EpiRisk
 #endif /* POPULATION_HPP_ */

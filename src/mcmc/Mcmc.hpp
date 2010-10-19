@@ -87,18 +87,18 @@ class Mcmc {
   Population<TestCovars>& pop_;
   Parameters& params_;
   double logLikelihood_;
-  double beta(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
-  double betastar(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
+  double beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+  double betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
 
-  void
-  calcLogLikelihood();
+
 
 public:
   Mcmc(Population<TestCovars>& population, Parameters& parameters);
   ~Mcmc();
-
+  void
+  calcLogLikelihood();
   double
-  getLikelihood() const;
+  getLogLikelihood() const;
 };
 
 #endif

@@ -22,6 +22,7 @@
 
 using namespace EpiRisk;
 
+inline
 double
 dist(const double x1, const double y1, const double x2, const double y2)
 {
@@ -43,22 +44,31 @@ Mcmc::~Mcmc()
   // Nothing to do at present
 }
 
+
 double
-Mcmc::getLikelihood() const
+Mcmc::getLogLikelihood() const
 {
   return logLikelihood_;
 }
 
+inline
 double
-Mcmc::beta(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const
+Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  return (*params_.beta1)() * exp(-(*params_.phi)() * dist(i->getCovariates()->x,i->getCovariates()->y,j->getCovariates()->x,j->getCovariates()->y));
+  double distance = dist(i.getCovariates().x,i.getCovariates().y,j.getCovariates().x,j.getCovariates().y);
+  distance *= distance;
+  double phisq = (*params_.phi)() * (*params_.phi)();
+  return (*params_.beta1)() * phisq / (phisq + distance);
 }
 
+inline
 double
-Mcmc::betastar(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const
+Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  return (*params_.beta2)() * exp(-(*params_.phi)() * dist(i->getCovariates()->x,i->getCovariates()->y,j->getCovariates()->x,j->getCovariates()->y));
+  double distance = dist(i.getCovariates().x,i.getCovariates().y,j.getCovariates().x,j.getCovariates().y);
+  distance *= distance;
+  double phisq = (*params_.phi)() * (*params_.phi)();
+  return (*params_.beta2)() * phisq / (phisq + distance);
 }
 
 
@@ -67,23 +77,23 @@ Mcmc::calcLogLikelihood()
 {
   // Calculates log likelihood
 
-  Population<TestCovars>::PopulationIndex::Iterator i = pop_.infecBegin();
-  Population<TestCovars>::PopulationIndex::Iterator j = pop_.infecBegin();
-
+  Population<TestCovars>::InfectiveIterator j = ++pop_.infecBegin();
+  Population<TestCovars>::InfectiveIterator stop;
   logLikelihood_ = 0.0;
 
   // First calculate the log product
   while(j != pop_.infecEnd()) {
-      double sumPressure = 1.0;
-      Population<TestCovars>::PopulationIndex::Iterator i = pop_.infecBegin();
-      Population<TestCovars>::PopulationIndex::Iterator stop = pop_.infecUpperBound(j); // Don't need people infected after me.
-      while(i != pop_.infecEnd())
+      double sumPressure = 0.0;
+      Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
+      stop = pop_.infecUpperBound(j->getI()); // Don't need people infected after me.
+
+      while(i != stop)
         {
-          if(i.base_iterator() != j.base_iterator()) { // Skip i==j
+          if(i != j) { // Skip i==j
 
               if(i->getN() > j->getI())
                 {
-                  //cout << "I->S infection:(i:" << i->getId() << ", j:" << j->getId() << "), Ii=" << i->getI() << ", Ni = " << i->getN() << ", Ij=" << j->getI() << endl;;
+                  //cout << "I->S infection:(i:" << i->getId() << "), Ii=" << i->getI() << ", Ni = " << i->getN() << ", Ij=" << j->getI() << endl;;
                   sumPressure += beta(*i,*j);
                 }
               else if (i->getR() > j->getI())
@@ -98,24 +108,27 @@ Mcmc::calcLogLikelihood()
       ++j;
   }
 
-//  // Now calculate the integral
-//  Population<TestCovars>::const_iterator k = pop_.begin();
-//  double totalIntegPress = 0.0;
-//  while (k != pop_.end()) {
-//      double integPressure = 0.0;
-//      i = pop_.infecBegin();
-//      while (i != pop_.infecEnd()) {
-//      // Infective -> Susceptible pressure
-//      integPressure += beta(*i, k) * min(i->getN(),k->getI()) - min(i->getI(),k->getI());
-//
-//      // Notified -> Susceptible pressure
-//      integPressure += betastar(*i, k) * min(i->getR(),k->getI()) - min(i->getN(), k->getI());
-//      ++i;
-//      }
-//      ++k;
-//      totalIntegPress -= integPressure;
-//  }
-//
-//  logLikelihood_ -= totalIntegPress;
-}
+  // Now calculate the integral
+  Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
+  Population<TestCovars>::PopulationIterator k = pop_.begin();
 
+  double totalIntegPress = 0.0;
+  while (k != pop_.end()) {
+      double integPressure = 0.0;
+
+      i = pop_.infecBegin();
+      stop = pop_.infecLowerBound(k->getI()); // Don't need people infected after k
+      while (i != stop) {
+      // Infective -> Susceptible pressure
+      integPressure += beta(*i, *k) * min(i->getN(),k->getI()) - min(i->getI(),k->getI());
+
+      // Notified -> Susceptible pressure
+      integPressure += betastar(*i, *k) * min(i->getR(),k->getI()) - min(i->getN(), k->getI());
+      ++i;
+      }
+      ++k;
+      totalIntegPress -= integPressure;
+  }
+
+  logLikelihood_ -= totalIntegPress;
+}
