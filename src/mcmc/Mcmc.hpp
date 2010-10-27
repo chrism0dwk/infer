@@ -29,56 +29,33 @@
 
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
+#include "Parameter.hpp"
 
 #define NEGINF (-numeric_limits<double>::infinity())
 
 using namespace std;
 using namespace EpiRisk;
 
-class Parameter
-{
-  double val_;
-
-public:
-  Parameter(double value)
-  {
-    val_ = value;
-  }
-
-  double
-  operator()() const
-  {
-    return val_;
-  }
-};
-
 
 struct Parameters
 {
-  Parameter* beta1;
-  Parameter* beta2;
-  Parameter* phi;
+  Parameter beta1;
+  Parameter beta2;
+  Parameter phi;
 
-  Parameters()
-  {
-    beta1 = new Parameter(0.5);
-    beta2 = new Parameter(0.3);
-    phi = new Parameter(0.6);
-  }
+  Parameters(const double beta1, const double beta2, const double phi) : beta1(beta1,Prior()),
+                                                                         beta2(beta2,Prior()),
+                                                                         phi(phi,Prior())
+  { }
 
-  Parameters(Parameters& toCopy)
-  {
-    beta1 = new Parameter(*toCopy.beta1);
-    beta2 = new Parameter(*toCopy.beta2);
-    phi = new Parameter(*toCopy.phi);
-  }
+  Parameters(Parameters& toCopy) :  beta1(toCopy.beta1),
+                                    beta2(toCopy.beta2),
+                                    phi(toCopy.phi)
+  { }
 
+  virtual
   ~Parameters()
-  {
-    delete beta1;
-    delete beta2;
-    delete phi;
-  }
+  { }
 };
 
 
@@ -87,18 +64,27 @@ class Mcmc {
   Population<TestCovars>& pop_;
   Parameters& params_;
   double logLikelihood_;
-  double beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
-  double betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
 
-
+  virtual
+  double
+  beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+  virtual
+  double
+  betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+  void
+  calcLogLikelihood();
+  void
+  updateTrans();
+  void
+  updateI(const size_t index);
 
 public:
   Mcmc(Population<TestCovars>& population, Parameters& parameters);
   ~Mcmc();
-  void
-  calcLogLikelihood();
   double
   getLogLikelihood() const;
+  void
+  run(const size_t numIterations);
 };
 
 #endif

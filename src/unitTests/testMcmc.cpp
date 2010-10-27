@@ -35,17 +35,17 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Parameters* myParameters = new Parameters();
+  Parameters* myParameters = new Parameters(0.4,0.5,0.6);
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters);
 
-  for (size_t i=0; i<30; ++i) {
-    myMcmc->calcLogLikelihood();
-    cout << i << endl;
+  char keyPress = 'c';
+  while(keyPress != 'x') {
+      //myMcmc->calcLogLikelihood();
+      cout << "Likelihood: " << myMcmc->getLogLikelihood() << endl;
+      cout << "\nPress a key (x to exit)...";
+      cin >> keyPress;
   }
-
-  cout << "Likelihood: " << myMcmc->getLogLikelihood() << endl;
-
 
   delete myMcmc;
   delete myParameters;
