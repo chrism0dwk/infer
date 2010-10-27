@@ -111,6 +111,22 @@ namespace EpiRisk {
 	  const char* msg_;
   };
 
+  class cholesky_error : public std::exception
+  {
+  public:
+          cholesky_error(const char* msg)
+          {
+                  msg_ = msg;
+          }
+          virtual const char* what() const throw()
+                {
+                  return msg_;
+                }
+
+  private:
+          const char* msg_;
+  };
+
   class fileEOF : public std::exception
   {
   public:
@@ -120,6 +136,9 @@ namespace EpiRisk {
       return "End of file";
     }
   };
+
+
+
 
 }
 

@@ -57,8 +57,8 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<TestCov
 {
   double distance = dist(i.getCovariates().x,i.getCovariates().y,j.getCovariates().x,j.getCovariates().y);
   distance *= distance;
-  double phisq = (*params_.phi)() * (*params_.phi)();
-  return (*params_.beta1)() * phisq / (phisq + distance);
+  double phisq = params_.phi() * params_.phi();
+  return params_.beta1() * phisq / (phisq + distance);
 }
 
 inline
@@ -67,8 +67,8 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<Tes
 {
   double distance = dist(i.getCovariates().x,i.getCovariates().y,j.getCovariates().x,j.getCovariates().y);
   distance *= distance;
-  double phisq = (*params_.phi)() * (*params_.phi)();
-  return (*params_.beta2)() * phisq / (phisq + distance);
+  double phisq = params_.phi() * params_.phi();
+  return params_.beta2() * phisq / (phisq + distance);
 }
 
 
@@ -93,12 +93,10 @@ Mcmc::calcLogLikelihood()
 
               if(i->getN() > j->getI())
                 {
-                  //cout << "I->S infection:(i:" << i->getId() << "), Ii=" << i->getI() << ", Ni = " << i->getN() << ", Ij=" << j->getI() << endl;;
                   sumPressure += beta(*i,*j);
                 }
               else if (i->getR() > j->getI())
                 {
-                  //cout << "N->S infection\n";
                   sumPressure += betastar(*i,*j);
                 }
             }
@@ -131,4 +129,18 @@ Mcmc::calcLogLikelihood()
   }
 
   logLikelihood_ -= totalIntegPress;
+}
+
+
+void
+Mcmc::updateTrans()
+{
+
+}
+
+
+void
+Mcmc::updateI(const size_t index)
+{
+
 }
