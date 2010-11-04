@@ -108,7 +108,6 @@ namespace EpiRisk
       {
         bool operator()(const double l,const double r) const {
           bool rv = l < r;
-          cout << "Rv=" << rv << endl;
           return rv;}
       };
 

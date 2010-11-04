@@ -25,11 +25,16 @@
 
 #include <math.h>
 #include <limits>
+#include <iostream>
+#include <fstream>
 
 
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
 #include "Parameter.hpp"
+#include "Random.hpp"
+#include "EmpCovar.hpp"
+#include "McmcWriter.hpp"
 
 #define NEGINF (-numeric_limits<double>::infinity())
 
@@ -37,26 +42,22 @@ using namespace std;
 using namespace EpiRisk;
 
 
-struct Parameters
+struct ExpTransform
 {
-  Parameter beta1;
-  Parameter beta2;
-  Parameter phi;
-
-  Parameters(const double beta1, const double beta2, const double phi) : beta1(beta1,Prior()),
-                                                                         beta2(beta2,Prior()),
-                                                                         phi(phi,Prior())
-  { }
-
-  Parameters(Parameters& toCopy) :  beta1(toCopy.beta1),
-                                    beta2(toCopy.beta2),
-                                    phi(toCopy.phi)
-  { }
-
-  virtual
-  ~Parameters()
-  { }
+  double operator()(const double x)
+  {
+    return exp(x);
+  }
 };
+
+struct LogTransform
+{
+  double operator()(const double x)
+  {
+    return log(x);
+  }
+};
+
 
 
 class Mcmc {
@@ -64,6 +65,11 @@ class Mcmc {
   Population<TestCovars>& pop_;
   Parameters& params_;
   double logLikelihood_;
+  Random* random_;
+  EmpCovar<LogTransform>* logTransCovar_;
+  ublas::matrix<double>* stdCov_;
+
+  ofstream mcmcOutput_;
 
   virtual
   double
@@ -71,20 +77,22 @@ class Mcmc {
   virtual
   double
   betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
-  void
+  double
   calcLogLikelihood();
-  void
+  bool
   updateTrans();
   void
   updateI(const size_t index);
+  void
+  dumpParms() const;
 
 public:
-  Mcmc(Population<TestCovars>& population, Parameters& parameters);
+  Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);
   ~Mcmc();
   double
   getLogLikelihood() const;
-  void
-  run(const size_t numIterations);
+  map<string,double>
+  run(const size_t numIterations, McmcWriter<Population<TestCovars> >& writer);
 };
 
 #endif

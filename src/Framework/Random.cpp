@@ -54,8 +54,7 @@ namespace EpiRisk
     return gsl_rng_uniform_int(rng_, n);
   }
   Random::Variates
-  Random::mvgauss(const Variates& mu,
-      const CovMatrix& covariance)
+  Random::mvgauss(const CovMatrix& covariance)
   {
 
     // Cholesky decomposition to get SD matrix
@@ -97,14 +96,18 @@ namespace EpiRisk
         sigma(i, i) = d(i);
       }
 
-    std::cout << "===========SIGMA MATRIX==========\n" << sigma << std::endl;
-
 
     // Generate the variates
     vector<double> variates(size);
     for(size_t i=0; i<size; ++i) variates(i) = gaussian(0,1);
 
-    return mu+prod(sigma,variates);
+    return prod(sigma,variates);
+  }
+  Random::Variates
+  Random::mvgauss(const Variates& mu, const CovMatrix& covariance)
+  {
+    // Generates MVN(0,Sigma) variates
+    return mu + mvgauss(covariance);
   }
 
 }

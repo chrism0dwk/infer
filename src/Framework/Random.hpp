@@ -17,6 +17,7 @@
 namespace EpiRisk
 {
   using namespace boost::numeric::ublas;
+  using namespace boost::numeric;
 
   class Random
   {
@@ -24,7 +25,7 @@ namespace EpiRisk
   public:
 
     typedef matrix<double> CovMatrix;
-    typedef vector<double> Variates;
+    typedef ublas::vector<double> Variates;
 
     Random(const unsigned long int seed);
     virtual
@@ -40,8 +41,9 @@ namespace EpiRisk
     size_t
     integer(const size_t n);
     Variates
+    mvgauss(const CovMatrix& covariance);
+    Variates
     mvgauss(const Variates& mu, const CovMatrix& covariance);
-
   };
 
 }
