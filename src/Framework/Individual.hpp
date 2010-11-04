@@ -63,8 +63,7 @@ namespace EpiRisk
     public:
 
     typedef Covars CovarsType;
-    typedef Individual<Covars> valType;
-    typedef Contact<valType> ContactType;
+    typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
     typedef vector<size_t> ConnectionList;
 

@@ -20,6 +20,8 @@
 
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
+#include <acml_mv.h>
+
 #include "Mcmc.hpp"
 
 using namespace EpiRisk;
@@ -91,10 +93,10 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  //if(distance <= 10) {
-      return params_(0) * exp(-params_(2) * (distance - 5));
-  //}
-  //else return 0.0;
+  if(distance <= 25) {
+      return params_(0) * fastexp(-params_(2) * (distance - 5));
+  }
+  else return 0.0;
 }
 
 inline
@@ -104,7 +106,9 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  return params_(1) * exp(-params_(2) * (distance - 5));
+  if(distance <= 25)
+	  return params_(1) * fastexp(-params_(2) * (distance - 5));
+  else return 0.0;
 }
 
 double
@@ -139,7 +143,7 @@ Mcmc::calcLogLikelihood()
             }
           ++i;
         }
-      logLikelihood += log(sumPressure+params_(3));
+      logLikelihood += fastlog(sumPressure+params_(3));
       ++j;
     }
 

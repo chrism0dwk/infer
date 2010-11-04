@@ -4,4 +4,5 @@ noinst_HEADERS = stlStrTok.hpp Random.hpp
 
 libstlstrtok_la_SOURCES = stlStrTok.cpp
 librandom_la_SOURCES = Random.cpp
-librandom_la_LDDADD = -lgsl -lgslcblas -lm
+
+librandom_la_LIBADD = -lgsl -lgslcblas -lacml

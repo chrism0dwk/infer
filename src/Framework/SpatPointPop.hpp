@@ -71,7 +71,7 @@ namespace EpiRisk
     {
 
     public:
-      typedef Individual<Covars> Individual;
+      typedef EpiRisk::Individual<Covars> Individual;
 
     private:
       // Index tags
