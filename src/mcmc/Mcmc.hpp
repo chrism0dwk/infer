@@ -78,6 +78,10 @@ class Mcmc {
   double
   betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
   double
+  instantPressureOn(const Population<TestCovars>::InfectiveIterator& j);
+  double
+  integPressureOn(const Population<TestCovars>::InfectiveIterator& j);
+  double
   calcLogLikelihood();
   bool
   updateTrans();

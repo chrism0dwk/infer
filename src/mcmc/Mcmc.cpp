@@ -111,6 +111,42 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   else return 0.0;
 }
 
+inline
+double
+Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j)
+{
+  double sumPressure = 0.0;
+  Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
+  Population<TestCovars>::InfectiveIterator stop = pop_.infecUpperBound(j->getI()); // Don't need people infected after me.
+
+  while (i != stop)
+          {
+            if (i != j)
+              { // Skip i==j
+
+                if (i->getN() > j->getI())
+                  {
+                    sumPressure += beta(*i, *j);
+                  }
+                else if (i->getR() > j->getI())
+                  {
+                    sumPressure += betastar(*i, *j);
+                  }
+              }
+            ++i;
+          }
+  sumPressure += params_(3);
+  return sumPressure;
+}
+
+inline
+double
+integPressureOn(const Population<TestCovars>::InfectiveIterator& j)
+{
+
+}
+
+
 double
 Mcmc::calcLogLikelihood()
 {
@@ -123,27 +159,7 @@ Mcmc::calcLogLikelihood()
   // First calculate the log product
   while (j != pop_.infecEnd())
     {
-      double sumPressure = 0.0;
-      Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
-      stop = pop_.infecUpperBound(j->getI()); // Don't need people infected after me.
-
-      while (i != stop)
-        {
-          if (i != j)
-            { // Skip i==j
-
-              if (i->getN() > j->getI())
-                {
-                  sumPressure += beta(*i, *j);
-                }
-              else if (i->getR() > j->getI())
-                {
-                  sumPressure += betastar(*i, *j);
-                }
-            }
-          ++i;
-        }
-      logLikelihood += fastlog(sumPressure+params_(3));
+      logLikelihood += fastlog(instantPressureOn(j));
       ++j;
     }
 
@@ -257,7 +273,7 @@ Mcmc::run(const size_t numIterations,
 
   for (size_t k = 0; k < numIterations; ++k)
     {
-      cout << "\rIteration " << k << flush;
+      if(k % 50 == 0) cout << "\rIteration " << k << flush;
       acceptance["transParms"] += updateTrans();
 
       // Update the adaptive mcmc
