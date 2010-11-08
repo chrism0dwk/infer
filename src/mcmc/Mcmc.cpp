@@ -141,9 +141,27 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j)
 
 inline
 double
-integPressureOn(const Population<TestCovars>::InfectiveIterator& j)
+Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j)
 {
+  double integPressure = 0.0;
+  double Ij = j->getI();
+  Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij);
+  for(Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
+      i != stop; // Don't need people infected after k
+      ++i)
+    {
+      // Infective -> Susceptible pressure
+      integPressure += beta(*i, *j) * ( min(i->getN(), Ij) - min(
+         i->getI(), Ij) );
 
+      // Notified -> Susceptible pressure
+      integPressure += betastar(*i, *j) * ( min(i->getR(), Ij) - min(
+          i->getN(), Ij) );
+    }
+
+  integPressure += params_(3)*( min(Ij,pop_.getObsTime()) - pop_.infecBegin()->getI() );
+
+  return integPressure;
 }
 
 
@@ -164,34 +182,12 @@ Mcmc::calcLogLikelihood()
     }
 
   // Now calculate the integral
-  Population<TestCovars>::InfectiveIterator i;
-  Population<TestCovars>::PopulationIterator k = pop_.begin();
-
-  double totalIntegPress = 0.0;
-  for (k = pop_.begin();
-       k != pop_.end();
-       ++k)
+  for(Population<TestCovars>::PopulationIterator j = pop_.begin();
+      j != pop_.end();
+      ++j)
     {
-      double integPressure = 0.0;
-      stop = pop_.infecLowerBound(k->getI());
-      for(i = pop_.infecBegin();
-          i != stop; // Don't need people infected after k
-          ++i)
-        {
-          // Infective -> Susceptible pressure
-          integPressure += beta(*i, *k) * ( min(i->getN(), k->getI()) - min(
-             i->getI(), k->getI()) );
-
-          // Notified -> Susceptible pressure
-          integPressure += betastar(*i, *k) * ( min(i->getR(), k->getI()) - min(
-              i->getN(), k->getI()) );
-        }
-
-      double bgPress = params_(3)*( min(k->getI(),pop_.getObsTime()) - pop_.infecBegin()->getI() );
-      totalIntegPress += integPressure + bgPress ;
+      logLikelihood -= integPressureOn(j);
     }
-
-  logLikelihood -= totalIntegPress;
 
   return logLikelihood;
 }

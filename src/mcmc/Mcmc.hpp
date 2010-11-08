@@ -80,7 +80,7 @@ class Mcmc {
   double
   instantPressureOn(const Population<TestCovars>::InfectiveIterator& j);
   double
-  integPressureOn(const Population<TestCovars>::InfectiveIterator& j);
+  integPressureOn(const Population<TestCovars>::PopulationIterator& j);
   double
   calcLogLikelihood();
   bool
