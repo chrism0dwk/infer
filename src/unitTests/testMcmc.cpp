@@ -94,9 +94,10 @@ int main(int argc, char* argv[])
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters,1);
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>("myParams.parms","myOccults.occ");
 
-  map<string,double> acceptance = myMcmc->run(1000, *writer);
+  map<string,double> acceptance = myMcmc->run(10, *writer);
 
-  cout << "Acceptance = " << acceptance["transParms"] << endl;
+  cout << "Parameter acceptance: " << acceptance["transParms"] << endl;
+  cout << "Infection acceptance: " << acceptance["I"] << endl;
   delete writer;
   delete myMcmc;
   delete myParameters;
