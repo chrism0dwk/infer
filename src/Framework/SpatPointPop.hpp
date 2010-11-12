@@ -178,7 +178,7 @@ namespace EpiRisk
        * @param newTime the infection time to move to.
        */
       bool
-      moveInfectionTime(const size_t index, const double newTime);
+      moveInfectionTime(const InfectiveIterator& it, const double newTime);
       /*! /brief Moves an infection time
        *
        * This function moves an infection time.
@@ -257,7 +257,20 @@ namespace EpiRisk
       /// Returns an iterator to the infectives with infection time < I
       InfectiveIterator
       infecLowerBound(const double I);
-
+      /// Converts an iterator to a PopulationIterator
+      template<typename IteratorType>
+      PopulationIterator
+      asPop(const IteratorType& it)
+      {
+        return population_.project<bySeq>(it);
+      }
+      /// Converts an iterator to an InfectiveIterator
+      template<typename IteratorType>
+      InfectiveIterator
+      asI(const IteratorType& it)
+      {
+        return population_.project<byI>(it);
+      }
       //@}
 
 
@@ -268,7 +281,6 @@ namespace EpiRisk
       dumpInfected()
       {
         InfectiveIndex& iIndex = population_.get<byI>();
-
         typename InfectiveIndex::iterator it = iIndex.begin();
         while(it->getI() < obsTime_) {
             cerr << it->getId() << "\t"
@@ -483,7 +495,7 @@ namespace EpiRisk
     size_t
     Population<Covars>::numInfected()
     {
-      return distance(infIndex_.begin(),infIndex_.upper_bound(obsTime_));
+      return distance(infIndex_.begin(),infIndex_.lower_bound(obsTime_));
     }
 
   template<typename Covars>
@@ -556,13 +568,9 @@ namespace EpiRisk
 
   template<typename Covars>
     bool
-    Population<Covars>::moveInfectionTime(const size_t index,
+    Population<Covars>::moveInfectionTime(const InfectiveIterator& it,
         const double newTime)
     {
-      assert(index < numInfected());
-
-      typename InfectiveIndex::iterator it = infIndex_.begin();
-      advance(it, index);
       double oldTime = it->getI();
 
       return infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
@@ -577,9 +585,7 @@ namespace EpiRisk
       if (idIter == idIndex_.end()) throw data_exception("Id not found");
       typename InfectiveIndex::iterator infIter = population_.project<byI>(idIter);
 
-      size_t idPos = distance(infIndex_.begin(), infIter);
-      cout << "Moving id: " << infIter->getId() << ", position " << idPos <<  endl;
-      return moveInfectionTime(idPos, newTime);
+      return moveInfectionTime(infIter, newTime);
     }
 
   template<typename Covars>

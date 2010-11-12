@@ -68,6 +68,8 @@ class Mcmc {
   Random* random_;
   EmpCovar<LogTransform>* logTransCovar_;
   ublas::matrix<double>* stdCov_;
+  map<string,double> productCache_;
+  map<string,double> productCacheTmp_;
 
   ofstream mcmcOutput_;
 
@@ -78,18 +80,21 @@ class Mcmc {
   double
   betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
   double
-  instantPressureOn(const Population<TestCovars>::InfectiveIterator& j);
+  instantPressureOn(const Population<TestCovars>::InfectiveIterator& j, const double Ij);
   double
-  integPressureOn(const Population<TestCovars>::PopulationIterator& j);
+  integPressureOn(const Population<TestCovars>::PopulationIterator& j, const double Ij);
   double
   calcLogLikelihood();
+  double
+  updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
   bool
   updateTrans();
-  void
+  bool
   updateI(const size_t index);
   void
   dumpParms() const;
-
+  void
+  dumpProdCache();
 public:
   Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);
   ~Mcmc();

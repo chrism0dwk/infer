@@ -32,7 +32,7 @@ dist(const double x1, const double y1, const double x2, const double y2)
 {
   double dx = (x1 - x2);
   double dy = (y1 - y2);
-  double dist = sqrt(dx*dx + dy*dy);
+  double dist = sqrt(dx * dx + dy * dy);
 
   return dist;
 }
@@ -69,6 +69,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
 
     }
 
+  if(false) pop_.dumpInfected();
   logLikelihood_ = calcLogLikelihood();
 }
 
@@ -93,10 +94,12 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if(distance <= 25) {
+  if (distance <= 25)
+    {
       return params_(0) * fastexp(-params_(2) * (distance - 5));
-  }
-  else return 0.0;
+    }
+  else
+    return 0.0;
 }
 
 inline
@@ -106,89 +109,169 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if(distance <= 25)
-	  return params_(1) * fastexp(-params_(2) * (distance - 5));
-  else return 0.0;
+  if (distance <= 25)
+    return params_(1) * fastexp(-params_(2) * (distance - 5));
+  else
+    return 0.0;
 }
 
 inline
 double
-Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j)
+Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
+    const double Ij)
 {
+  if (Ij <= pop_.infecBegin()->getI())
+    return 1.0; // Return 1 if j is I1
+
   double sumPressure = 0.0;
   Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
-  Population<TestCovars>::InfectiveIterator stop = pop_.infecUpperBound(j->getI()); // Don't need people infected after me.
+  Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij); // Don't need people infected after me.
 
   while (i != stop)
-          {
-            if (i != j)
-              { // Skip i==j
-
-                if (i->getN() > j->getI())
-                  {
-                    sumPressure += beta(*i, *j);
-                  }
-                else if (i->getR() > j->getI())
-                  {
-                    sumPressure += betastar(*i, *j);
-                  }
-              }
-            ++i;
-          }
+    {
+      if (i != j)
+        { // Skip i==j
+          if (i->getN() > Ij)
+            {
+              sumPressure += beta(*i, *j);
+            }
+          else if (i->getR() > Ij)
+            {
+              sumPressure += betastar(*i, *j);
+            }
+        }
+      ++i;
+    }
   sumPressure += params_(3);
   return sumPressure;
 }
 
 inline
 double
-Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j)
+Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
+    const double Ij)
 {
   double integPressure = 0.0;
-  double Ij = j->getI();
+  double I1 = min(Ij, pop_.infecBegin()->getI());
+  Population<TestCovars>::InfectiveIterator infj = pop_.asI(j);
   Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij);
-  for(Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
-      i != stop; // Don't need people infected after k
-      ++i)
+  for (Population<TestCovars>::InfectiveIterator i = pop_.infecBegin(); i
+      != stop; // Don't need people infected after k
+  ++i)
     {
+      if (i == infj)
+        continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * ( min(i->getN(), Ij) - min(
-         i->getI(), Ij) );
+      integPressure += beta(*i, *j) * (min(i->getN(), Ij) - min(i->getI(), Ij));
 
       // Notified -> Susceptible pressure
-      integPressure += betastar(*i, *j) * ( min(i->getR(), Ij) - min(
-          i->getN(), Ij) );
+      integPressure += betastar(*i, *j) * (min(i->getR(), Ij) - min(i->getN(),
+          Ij));
     }
 
-  integPressure += params_(3)*( min(Ij,pop_.getObsTime()) - pop_.infecBegin()->getI() );
+  integPressure += params_(3) * (min(Ij, pop_.getObsTime()) - I1);
 
-  return integPressure;
+  return -integPressure;
 }
-
 
 double
 Mcmc::calcLogLikelihood()
 {
   // Calculates log likelihood
 
-  Population<TestCovars>::InfectiveIterator j = pop_.infecBegin(); j++;
+  Population<TestCovars>::InfectiveIterator j = pop_.infecBegin();
   Population<TestCovars>::InfectiveIterator stop;
   double logLikelihood = 0.0;
 
+  productCache_.clear();
+  productCache_.insert(make_pair(j->getId(), 1.0));
+
   // First calculate the log product
+  ++j; // Don't include I1
   while (j != pop_.infecEnd())
     {
-      logLikelihood += fastlog(instantPressureOn(j));
+      double tmp = instantPressureOn(j, j->getI());
+      productCache_.insert(make_pair(j->getId(), tmp));
+      logLikelihood += log(tmp);
       ++j;
     }
 
+  productCacheTmp_ = productCache_;
   // Now calculate the integral
-  for(Population<TestCovars>::PopulationIterator j = pop_.begin();
-      j != pop_.end();
-      ++j)
+    for (Population<TestCovars>::PopulationIterator j = pop_.begin(); j
+        != pop_.end(); ++j)
+      {
+        logLikelihood += integPressureOn(j, j->getI());
+      }
+
+  return logLikelihood;
+}
+
+double
+Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
+    const double newTime)
+{
+  // Calculates an updated likelihood for an infection time move
+  cout << "LogLik before: " << logLikelihood_ << endl;
+  double logLikelihood = logLikelihood_;
+  Population<TestCovars>::PopulationIterator popj = pop_.asPop(j);
+  productCacheTmp_.clear();
+
+  // Sort out I1
+  if (j == pop_.infecBegin() or newTime < pop_.infecBegin()->getI())
     {
-      logLikelihood -= integPressureOn(j);
+      double oldTime = j->getI();
+      pop_.moveInfectionTime(j, newTime);
+      logLikelihood = calcLogLikelihood();
+      pop_.moveInfectionTime(j, oldTime);
+      productCacheTmp_ = productCache_;
+      return logLikelihood;
     }
 
+  // First instantaneous pressure on j
+  double myPressure = productCache_.find(j->getId())->second;
+  logLikelihood -= fastlog(myPressure);
+
+  myPressure = instantPressureOn(j, newTime);
+  productCacheTmp_.insert(make_pair(j->getId(), myPressure));
+  logLikelihood += fastlog(myPressure);
+
+  logLikelihood -= integPressureOn(popj, j->getI());
+  logLikelihood += integPressureOn(popj, newTime);
+
+  //Pressure from j on i
+  for (Population<TestCovars>::InfectiveIterator i = pop_.infecBegin(); i
+      != pop_.infecEnd(); ++i)
+    {
+      if (i == j)
+        continue;
+
+      // Product first
+      myPressure = productCache_.find(i->getId())->second;
+      logLikelihood -= fastlog(myPressure);
+
+      if (j->isIAt(i->getI()))
+        myPressure -= beta(*j, *i);
+
+      if (newTime <= i->getI() && i->getI() < j->getN())
+        myPressure += beta(*j, *i);
+
+      logLikelihood += fastlog(myPressure);
+      productCacheTmp_.insert(make_pair(i->getId(), myPressure));
+    }
+
+   //Integral now
+    for (Population<TestCovars>::PopulationIterator i = pop_.begin(); i
+        != pop_.end(); ++i)
+      {
+        if (i == popj) continue;
+        double myBeta = beta(*j, *i);
+        logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(
+            j->getI(), i->getI()));
+        logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
+            i->getI()));
+      }
+  cout << "LogLik after: " << logLikelihood << endl;
   return logLikelihood;
 }
 
@@ -224,6 +307,8 @@ Mcmc::updateTrans()
   params_(2) *= exp(logvars(2));
   params_(3) *= exp(logvars(3));
 
+  dumpParms();
+
   double logLikCan = calcLogLikelihood();
   double logPiCan = logLikCan;
   logPiCan += log(params_(0).prior());
@@ -238,7 +323,7 @@ Mcmc::updateTrans()
   qRatio += log(params_(3) / oldParams(3));
 
   double accept = logPiCan - logPiCur + qRatio;
-  //cout << "Prior: " << params_(0).prior() << ",  " << oldParams(0).prior() << endl;
+  return false;
   if (log(random_->uniform()) < accept)
     {
       logLikelihood_ = logLikCan;
@@ -252,10 +337,28 @@ Mcmc::updateTrans()
 
 }
 
-void
+bool
 Mcmc::updateI(const size_t index)
 {
+  if (index == 0 ) return false;
+  Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
+  advance(it, index);
 
+  cout << "Moving " << index << ", id = " << it->getId() << ", I = " << it->getI() << endl;
+
+  double newI = it->getI();//random_->gamma(4, 1);
+
+  double logLikCan = updateIlogLikelihood(it, newI);
+  double a = logLikCan - logLikelihood_;
+  return false;
+  if ( fastlog(random_->uniform()) < a)
+    {
+      pop_.moveInfectionTime(it,newI);
+      logLikelihood_ = logLikCan;
+      productCache_ = productCacheTmp_;
+      return true;
+    }
+  else return false;
 }
 
 map<string, double>
@@ -266,11 +369,18 @@ Mcmc::run(const size_t numIterations,
 
   map<string, double> acceptance;
   acceptance["transParms"] = 0.0;
-
+  acceptance["I"] = 0.0;
   for (size_t k = 0; k < numIterations; ++k)
     {
-      if(k % 50 == 0) cout << "\rIteration " << k << flush;
+      //if (k % 50 == 0)
+        cout << "\rIteration " << k << flush;
       acceptance["transParms"] += updateTrans();
+      cout << "Parms: " << logLikelihood_ << endl;
+
+      for(size_t infec=0; infec < 1; ++infec) {
+          //acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
+          cout << "Infec time: " << logLikelihood_ << endl;
+      }
 
       // Update the adaptive mcmc
       logTransCovar_->sample();
@@ -280,18 +390,37 @@ Mcmc::run(const size_t numIterations,
     }
   cout << "\n";
   cout << logTransCovar_->getCovariance() << endl;
+  dumpParms();
+  //pop_.dumpInfected();
+
+  //acceptance["transParms"] /= numIterations;
+  //acceptance["I"] /= (numIterations);
   return acceptance;
 }
-
 
 void
 Mcmc::dumpParms() const
 {
   ublas::vector<Parameter>::iterator it;
   it = params_.begin();
-  while(it != params_.end()) {
-      cout << *it << endl;
+  while (it != params_.end())
+    {
+      cout << *it << " ";
       ++it;
-  }
+    }
+  cout << endl;
 }
 
+void
+Mcmc::dumpProdCache()
+{
+  map<string, double>::const_iterator it = productCache_.begin();
+  cout << "ID \t \t Cache \t \t TmpCache \t \t Difference\n\n";
+  while (it != productCache_.end())
+    {
+      cout << it->first << ":\t" << it->second << "\t"
+          << productCacheTmp_[it->first] << "\t" << productCacheTmp_[it->first]
+          - it->second << endl;
+      ++it;
+    }
+}
