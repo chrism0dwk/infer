@@ -20,7 +20,9 @@
 
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
+#ifdef __LINUX__
 #include <acml_mv.h>
+#endif
 
 #include "Mcmc.hpp"
 
@@ -71,6 +73,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
 
   if(false) pop_.dumpInfected();
   logLikelihood_ = calcLogLikelihood();
+  productCache_ = productCacheTmp_;
 }
 
 Mcmc::~Mcmc()
@@ -96,7 +99,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25)
     {
-      return params_(0) * fastexp(-params_(2) * (distance - 5));
+      return params_(0) * exp(-params_(2) * (distance - 5));
     }
   else
     return 0.0;
@@ -110,7 +113,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25)
-    return params_(1) * fastexp(-params_(2) * (distance - 5));
+    return params_(1) * exp(-params_(2) * (distance - 5));
   else
     return 0.0;
 }
@@ -183,20 +186,19 @@ Mcmc::calcLogLikelihood()
   Population<TestCovars>::InfectiveIterator stop;
   double logLikelihood = 0.0;
 
-  productCache_.clear();
-  productCache_.insert(make_pair(j->getId(), 1.0));
+  productCacheTmp_.clear();
+  productCacheTmp_.insert(make_pair(j->getId(), 1.0));
 
   // First calculate the log product
   ++j; // Don't include I1
   while (j != pop_.infecEnd())
     {
       double tmp = instantPressureOn(j, j->getI());
-      productCache_.insert(make_pair(j->getId(), tmp));
+      productCacheTmp_.insert(make_pair(j->getId(), tmp));
       logLikelihood += log(tmp);
       ++j;
     }
 
-  productCacheTmp_ = productCache_;
   // Now calculate the integral
     for (Population<TestCovars>::PopulationIterator j = pop_.begin(); j
         != pop_.end(); ++j)
@@ -212,7 +214,7 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
     const double newTime)
 {
   // Calculates an updated likelihood for an infection time move
-  cout << "LogLik before: " << logLikelihood_ << endl;
+
   double logLikelihood = logLikelihood_;
   Population<TestCovars>::PopulationIterator popj = pop_.asPop(j);
   productCacheTmp_.clear();
@@ -230,11 +232,11 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
 
   // First instantaneous pressure on j
   double myPressure = productCache_.find(j->getId())->second;
-  logLikelihood -= fastlog(myPressure);
+  logLikelihood -= log(myPressure);
 
   myPressure = instantPressureOn(j, newTime);
   productCacheTmp_.insert(make_pair(j->getId(), myPressure));
-  logLikelihood += fastlog(myPressure);
+  logLikelihood += log(myPressure);
 
   logLikelihood -= integPressureOn(popj, j->getI());
   logLikelihood += integPressureOn(popj, newTime);
@@ -248,7 +250,7 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
 
       // Product first
       myPressure = productCache_.find(i->getId())->second;
-      logLikelihood -= fastlog(myPressure);
+      logLikelihood -= log(myPressure);
 
       if (j->isIAt(i->getI()))
         myPressure -= beta(*j, *i);
@@ -256,7 +258,7 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       if (newTime <= i->getI() && i->getI() < j->getN())
         myPressure += beta(*j, *i);
 
-      logLikelihood += fastlog(myPressure);
+      logLikelihood += log(myPressure);
       productCacheTmp_.insert(make_pair(i->getId(), myPressure));
     }
 
@@ -271,7 +273,6 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
         logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
             i->getI()));
       }
-  cout << "LogLik after: " << logLikelihood << endl;
   return logLikelihood;
 }
 
@@ -307,8 +308,6 @@ Mcmc::updateTrans()
   params_(2) *= exp(logvars(2));
   params_(3) *= exp(logvars(3));
 
-  dumpParms();
-
   double logLikCan = calcLogLikelihood();
   double logPiCan = logLikCan;
   logPiCan += log(params_(0).prior());
@@ -323,15 +322,19 @@ Mcmc::updateTrans()
   qRatio += log(params_(3) / oldParams(3));
 
   double accept = logPiCan - logPiCur + qRatio;
-  return false;
+
   if (log(random_->uniform()) < accept)
     {
       logLikelihood_ = logLikCan;
+      productCache_ = productCacheTmp_;
       return true;
     }
   else
     {
-      params_ = oldParams;
+      params_(0) = oldParams(0);
+      params_(1) = oldParams(1);
+      params_(2) = oldParams(2);
+      params_(3) = oldParams(3);
       return false;
     }
 
@@ -344,21 +347,21 @@ Mcmc::updateI(const size_t index)
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
 
-  cout << "Moving " << index << ", id = " << it->getId() << ", I = " << it->getI() << endl;
-
-  double newI = it->getI();//random_->gamma(4, 1);
+  double newI = it->getN() - random_->gamma(4, 1);
 
   double logLikCan = updateIlogLikelihood(it, newI);
   double a = logLikCan - logLikelihood_;
-  return false;
-  if ( fastlog(random_->uniform()) < a)
+
+  if ( log(random_->uniform()) < a)
     {
       pop_.moveInfectionTime(it,newI);
       logLikelihood_ = logLikCan;
       productCache_ = productCacheTmp_;
       return true;
     }
-  else return false;
+  else {
+      return false;
+  }
 }
 
 map<string, double>
@@ -372,14 +375,13 @@ Mcmc::run(const size_t numIterations,
   acceptance["I"] = 0.0;
   for (size_t k = 0; k < numIterations; ++k)
     {
-      //if (k % 50 == 0)
+      if (k % 50 == 0)
         cout << "\rIteration " << k << flush;
-      acceptance["transParms"] += updateTrans();
-      cout << "Parms: " << logLikelihood_ << endl;
 
-      for(size_t infec=0; infec < 1; ++infec) {
-          //acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
-          cout << "Infec time: " << logLikelihood_ << endl;
+      acceptance["transParms"] += updateTrans();
+
+      for(size_t infec=0; infec < 20; ++infec) {
+          acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
       }
 
       // Update the adaptive mcmc
@@ -390,11 +392,9 @@ Mcmc::run(const size_t numIterations,
     }
   cout << "\n";
   cout << logTransCovar_->getCovariance() << endl;
-  dumpParms();
-  //pop_.dumpInfected();
 
-  //acceptance["transParms"] /= numIterations;
-  //acceptance["I"] /= (numIterations);
+  acceptance["transParms"] /= numIterations;
+  acceptance["I"] /= (numIterations * 20);
   return acceptance;
 }
 
