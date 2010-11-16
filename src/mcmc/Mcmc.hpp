@@ -71,6 +71,8 @@ class Mcmc {
   map<string,double> productCache_;
   map<string,double> productCacheTmp_;
 
+  int mpirank_,mpiprocs_;
+  bool accept_;
   ofstream mcmcOutput_;
 
   virtual

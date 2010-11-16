@@ -20,6 +20,8 @@
 
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
+#include <mpi.h>
+
 #ifdef __LINUX__
 #include <acml_mv.h>
 #define log fastlog
@@ -34,14 +36,14 @@ inline
 double
 extremepdf(const double x, const double a, const double b)
 {
-  return a*b*exp(a + b*x - a*exp(b*x));
+  return a * b * exp(a + b * x - a * exp(b * x));
 }
 
 inline
 double
 extremecdf(const double x, const double a, const double b)
 {
-  return 1 - exp(-a*(exp(b*x) - 1));
+  return 1 - exp(-a * (exp(b * x) - 1));
 }
 
 inline
@@ -59,35 +61,53 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
     const size_t randomSeed) :
   pop_(population), params_(parameters), logLikelihood_(0)
 {
-  random_ = new Random(randomSeed);
-  EmpCovar<ExpTransform>::CovMatrix initCov(params_.size());
-  for (size_t i = 0; i < params_.size(); ++i)
+
+  // MPI setup
+  int largc = 1;
+  char** largv;
+
+  if (!MPI::Is_initialized())
+    MPI::Init(largc, largv);
+  MPI::COMM_WORLD.Set_errhandler(MPI::ERRORS_THROW_EXCEPTIONS);
+  mpirank_ = MPI::COMM_WORLD.Get_rank();
+  mpiprocs_ = MPI::COMM_WORLD.Get_size();
+
+  // Random number generator
+
+  if (mpirank_ == 0)
     {
-      for (size_t j = 0; j < params_.size(); ++j)
+      random_ = new Random(randomSeed);
+      EmpCovar<ExpTransform>::CovMatrix initCov(params_.size());
+      for (size_t i = 0; i < params_.size(); ++i)
         {
-          if (i == j)
-            initCov(i, j) = 0.00001;
-          else
-            initCov(i, j) = 0.0;
+          for (size_t j = 0; j < params_.size(); ++j)
+            {
+              if (i == j)
+                initCov(i, j) = 0.00001;
+              else
+                initCov(i, j) = 0.0;
+            }
         }
+
+      logTransCovar_ = new EmpCovar<LogTransform> (params_, initCov);
+      stdCov_ = new ublas::matrix<double>(params_.size(), params_.size());
+
+      for (size_t i = 0; i < params_.size(); ++i)
+        {
+          for (size_t j = 0; j < params_.size(); ++j)
+            {
+              if (i == j)
+                (*stdCov_)(i, j) = 0.1 / params_.size();
+              else
+                (*stdCov_)(i, j) = 0.0;
+            }
+
+        }
+
+      if (false)
+        pop_.dumpInfected();
     }
 
-  logTransCovar_ = new EmpCovar<LogTransform> (params_, initCov);
-  stdCov_ = new ublas::matrix<double>(params_.size(), params_.size());
-
-  for (size_t i = 0; i < params_.size(); ++i)
-    {
-      for (size_t j = 0; j < params_.size(); ++j)
-        {
-          if (i == j)
-            (*stdCov_)(i, j) = 0.1 / params_.size();
-          else
-            (*stdCov_)(i, j) = 0.0;
-        }
-
-    }
-
-  if(false) pop_.dumpInfected();
   logLikelihood_ = calcLogLikelihood();
   productCache_ = productCacheTmp_;
 }
@@ -95,9 +115,14 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
 Mcmc::~Mcmc()
 {
   // Nothing to do at present
-  delete stdCov_;
-  delete random_;
-  delete logTransCovar_;
+  if (mpirank_ == 0)
+    {
+      delete stdCov_;
+      delete random_;
+      delete logTransCovar_;
+    }
+
+  MPI::Finalize();
 }
 
 double
@@ -201,28 +226,51 @@ Mcmc::calcLogLikelihood()
   Population<TestCovars>::InfectiveIterator j = pop_.infecBegin();
   Population<TestCovars>::InfectiveIterator stop;
   double logLikelihood = 0.0;
+  size_t numInfecs = pop_.numInfected();
 
   productCacheTmp_.clear();
   productCacheTmp_.insert(make_pair(j->getId(), 1.0));
 
-  // First calculate the log product
-  ++j; // Don't include I1
-  while (j != pop_.infecEnd())
+  // Advance the iterator to our starting position
+  advance(j, mpirank_ * mpiprocs_);
+  size_t pos = mpirank_ * mpiprocs_;
+
+  // First calculate the log product (happens on master node)
+  if (j == pop_.infecBegin())
+    {
+      productCacheTmp_.insert(make_pair(j->getId(), 1.0)); // Don't include I1
+      ++j;
+    }
+  while (true)
     {
       double tmp = instantPressureOn(j, j->getI());
       productCacheTmp_.insert(make_pair(j->getId(), tmp));
       logLikelihood += log(tmp);
-      ++j;
+      pos += mpiprocs_;
+      if (pos < numInfecs)
+        break;
+      advance(j, mpiprocs_);
     }
 
   // Now calculate the integral
-    for (Population<TestCovars>::PopulationIterator j = pop_.begin(); j
-        != pop_.end(); ++j)
-      {
-        logLikelihood += integPressureOn(j, j->getI());
-      }
+  Population<TestCovars>::PopulationIterator k = pop_.begin();
+  pos = mpirank_ * mpiprocs_;
+  advance(k, mpirank_ * mpiprocs_);
+  while (true)
+    {
+      logLikelihood += integPressureOn(k, k->getI());
+      pos += mpiprocs_;
+      if (pos < numInfecs)
+        break;
+      advance(k, mpiprocs_);
+    }
 
-  return logLikelihood;
+  double gLogLikelihood;
+
+  MPI::COMM_WORLD.Reduce(&gLogLikelihood, &logLikelihood, 1, MPI::DOUBLE,
+      MPI::SUM, 0);
+
+  return gLogLikelihood;
 }
 
 double
@@ -277,46 +325,53 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       productCacheTmp_.insert(make_pair(i->getId(), myPressure));
     }
 
-   //Integral now
-    for (Population<TestCovars>::PopulationIterator i = pop_.begin(); i
-        != pop_.end(); ++i)
-      {
-        if (i == popj) continue;
-        double myBeta = beta(*j, *i);
-        logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(
-            j->getI(), i->getI()));
-        logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
-            i->getI()));
-      }
+  //Integral now
+  for (Population<TestCovars>::PopulationIterator i = pop_.begin(); i
+      != pop_.end(); ++i)
+    {
+      if (i == popj)
+        continue;
+      double myBeta = beta(*j, *i);
+      logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(j->getI(),
+          i->getI()));
+      logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
+          i->getI()));
+    }
   return logLikelihood;
 }
 
 bool
 Mcmc::updateTrans()
 {
-  double logPiCur = logLikelihood_;
-  logPiCur += log(params_(0).prior());
-  logPiCur += log(params_(1).prior());
-  logPiCur += log(params_(2).prior());
-  logPiCur += log(params_(3).prior());
-
   Parameters oldParams = params_;
   Random::Variates logvars;
+  double logPiCur;
 
-  if (random_->uniform() < 0.95)
+  if (mpirank_ == 0)
     {
-      try
+      logPiCur = logLikelihood_;
+      logPiCur += log(params_(0).prior());
+      logPiCur += log(params_(1).prior());
+      logPiCur += log(params_(2).prior());
+      logPiCur += log(params_(3).prior());
+
+      if (random_->uniform() < 0.95)
         {
-          logvars = random_->mvgauss(logTransCovar_->getCovariance() * 2.38
-              * 2.38 / params_.size());
+          try
+            {
+              logvars = random_->mvgauss(logTransCovar_->getCovariance() * 2.38
+                  * 2.38 / params_.size());
+            }
+          catch (cholesky_error& e)
+            {
+              logvars = random_->mvgauss(*stdCov_);
+            }
         }
-      catch (cholesky_error& e)
-        {
-          logvars = random_->mvgauss(*stdCov_);
-        }
+      else
+        logvars = random_->mvgauss(*stdCov_);
     }
-  else
-    logvars = random_->mvgauss(*stdCov_);
+
+  MPI::COMM_WORLD.Bcast(&logvars, params_.size(), MPI::DOUBLE, 0);
 
   params_(0) *= exp(logvars(0));
   params_(1) *= exp(logvars(1));
@@ -324,21 +379,32 @@ Mcmc::updateTrans()
   params_(3) *= exp(logvars(3));
 
   double logLikCan = calcLogLikelihood();
-  double logPiCan = logLikCan;
-  logPiCan += log(params_(0).prior());
-  logPiCan += log(params_(1).prior());
-  logPiCan += log(params_(2).prior());
-  logPiCan += log(params_(3).prior());
 
-  double qRatio = 0.0;
-  qRatio += log(params_(0) / oldParams(0));
-  qRatio += log(params_(1) / oldParams(1));
-  qRatio += log(params_(2) / oldParams(2));
-  qRatio += log(params_(3) / oldParams(3));
+  if (mpirank_ == 0)
+    {
+      double logPiCan = logLikCan;
+      logPiCan += log(params_(0).prior());
+      logPiCan += log(params_(1).prior());
+      logPiCan += log(params_(2).prior());
+      logPiCan += log(params_(3).prior());
 
-  double accept = logPiCan - logPiCur + qRatio;
+      double qRatio = 0.0;
+      qRatio += log(params_(0) / oldParams(0));
+      qRatio += log(params_(1) / oldParams(1));
+      qRatio += log(params_(2) / oldParams(2));
+      qRatio += log(params_(3) / oldParams(3));
 
-  if (log(random_->uniform()) < accept)
+      double accept = logPiCan - logPiCur + qRatio;
+
+      if (log(random_->uniform()) < accept)
+        accept_ = true;
+      else
+        accept_ = false;
+    }
+
+  MPI::COMM_WORLD.Bcast(&accept_, 1, MPI::BOOL, 0);
+
+  if (accept_)
     {
       logLikelihood_ = logLikCan;
       productCache_ = productCacheTmp_;
@@ -361,21 +427,22 @@ Mcmc::updateI(const size_t index)
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
 
-  double newI = it->getN() - random_->extreme(0.015,0.8);
+  double newI = it->getN() - random_->extreme(0.015, 0.8);
 
   double logLikCan = updateIlogLikelihood(it, newI);
   double a = logLikCan - logLikelihood_;
 
-  if ( log(random_->uniform()) < a)
+  if (log(random_->uniform()) < a)
     {
-      pop_.moveInfectionTime(it,newI);
+      pop_.moveInfectionTime(it, newI);
       logLikelihood_ = logLikCan;
       productCache_ = productCacheTmp_;
       return true;
     }
-  else {
+  else
+    {
       return false;
-  }
+    }
 }
 
 map<string, double>
@@ -385,31 +452,46 @@ Mcmc::run(const size_t numIterations,
   // Runs the MCMC
 
   map<string, double> acceptance;
-  acceptance["transParms"] = 0.0;
-  acceptance["I"] = 0.0;
+
+  if (mpirank_ == 0)
+    {
+      acceptance["transParms"] = 0.0;
+      acceptance["I"] = 0.0;
+    }
+
   for (size_t k = 0; k < numIterations; ++k)
     {
-      if (k % 50 == 0)
+      if (mpirank_ == 0 && k % 50 == 0)
         cout << "\rIteration " << k << flush;
 
       acceptance["transParms"] += updateTrans();
 
-      for(size_t infec=0; infec < 20; ++infec) {
-          acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
-      }
-      cerr << "Likelihood: " << logLikelihood_ << endl;
+      //      for (size_t infec = 0; infec < 20; ++infec)
+      //        {
+      //          acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
+      //        }
+      //      cerr << "Likelihood: " << logLikelihood_ << endl;
       // Update the adaptive mcmc
-      logTransCovar_->sample();
 
-      writer.write(pop_);
-      writer.write(params_);
+      if (mpirank_ == 0)
+        {
+          logTransCovar_->sample();
+
+          writer.write(pop_);
+          writer.write(params_);
+        }
     }
-  cout << "\n";
-  cout << logTransCovar_->getCovariance() << endl;
 
-  acceptance["transParms"] /= numIterations;
-  acceptance["I"] /= (numIterations * 20);
+  if (mpirank_ == 0)
+    {
+      cout << "\n";
+      cout << logTransCovar_->getCovariance() << endl;
+
+      acceptance["transParms"] /= numIterations;
+      acceptance["I"] /= (numIterations * 20);
+    }
   return acceptance;
+
 }
 
 void

@@ -5,13 +5,17 @@
 AC_INIT(brandenburg, 0.1, Chris Jewell <chris.jewell@warwick.ac.uk>)
 
 AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE(brandenburg, 0.1)
 
 # Checks for programs.
 AC_PROG_CXXCPP
 AC_PROG_CXX
+
 AC_LANG([C++])
 AM_PROG_LIBTOOL
+
+
 
 # Checks for libraries.
 AC_CHECK_LIB(gsl, gsl_ran_gaussian,
@@ -30,9 +34,10 @@ AC_CHECK_HEADER([gsl/gsl_version.h], ,
 
 # Checks for library functions.
 
-# Get OpenMP flag - only for Autotools 2.63 apparently!
-AC_OPENMP
-
+# Set up MPI build
+AX_MPI
+CC="$MPICC"
+CXX="$MPICXX"
 
 # Substitutions
 AC_SUBST([OPENMP_CXXFLAGS])
