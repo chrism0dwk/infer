@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
   (*myParameters)(0) = Parameter(0.03,GammaPrior(0.1,0.1));
   (*myParameters)(1) = Parameter(0.01,GammaPrior(0.1,0.1));
   (*myParameters)(2) = Parameter(0.2,GammaPrior(0.1,0.1));
-  (*myParameters)(3) = Parameter(2e-6,GammaPrior(0.0001,0.1));
+  (*myParameters)(3) = Parameter(2e-6,GammaPrior(0.002,10000));
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters,1);
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>("myParams.parms","myOccults.occ");
