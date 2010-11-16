@@ -63,8 +63,7 @@ namespace EpiRisk
     public:
 
     typedef Covars CovarsType;
-    typedef Individual<Covars> valType;
-    typedef Contact<valType> ContactType;
+    typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
     typedef vector<size_t> ConnectionList;
 
@@ -140,16 +139,22 @@ namespace EpiRisk
       }
 
 
-      const Covars*
+      const Covars&
       getCovariates() const
       {
-        return &covariates_;
+        return covariates_;
       }
 
       void
       setEvents(Events& events)
       {
         events_ = events;
+      }
+
+      const Events&
+      getEvents() const
+      {
+        return events_;
       }
 
       // Time methods
@@ -242,14 +247,22 @@ namespace EpiRisk
       ;
 
       // Connection graph
-      ConnectionList
-      getConnectionList() const;
+      const ConnectionList&
+      getConnectionList() const
+      {
+        return connections_;
+      }
       void
-      setConnections(ConnectionList& connections);
-
+      setConnections(ConnectionList& connections)
+      {
+        connections_ = connections;
+      }
       // Miscellaneous methods
       bool
-      hasBeenInfected() const;
+      hasBeenInfected() const
+      {
+        return hasBeenInfected_;
+      }
 
       bool
       isNonCentred() const;
