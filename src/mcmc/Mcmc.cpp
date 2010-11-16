@@ -22,11 +22,27 @@
 #include <boost/numeric/ublas/io.hpp>
 #ifdef __LINUX__
 #include <acml_mv.h>
+#define log fastlog
+#define exp fastexp
 #endif
 
 #include "Mcmc.hpp"
 
 using namespace EpiRisk;
+
+inline
+double
+extremepdf(const double x, const double a, const double b)
+{
+  return a*b*exp(a + b*x - a*exp(b*x));
+}
+
+inline
+double
+extremecdf(const double x, const double a, const double b)
+{
+  return 1 - exp(-a*(exp(b*x) - 1));
+}
 
 inline
 double
@@ -97,7 +113,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25)
+  if (distance <= 10)
     {
       return params_(0) * exp(-params_(2) * (distance - 5));
     }
@@ -112,7 +128,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25)
+  if (distance <= 10)
     return params_(1) * exp(-params_(2) * (distance - 5));
   else
     return 0.0;
@@ -226,7 +242,6 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       pop_.moveInfectionTime(j, newTime);
       logLikelihood = calcLogLikelihood();
       pop_.moveInfectionTime(j, oldTime);
-      productCacheTmp_ = productCache_;
       return logLikelihood;
     }
 
@@ -343,11 +358,10 @@ Mcmc::updateTrans()
 bool
 Mcmc::updateI(const size_t index)
 {
-  if (index == 0 ) return false;
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
 
-  double newI = it->getN() - random_->gamma(4, 1);
+  double newI = it->getN() - random_->extreme(0.015,0.8);
 
   double logLikCan = updateIlogLikelihood(it, newI);
   double a = logLikCan - logLikelihood_;
@@ -383,7 +397,7 @@ Mcmc::run(const size_t numIterations,
       for(size_t infec=0; infec < 20; ++infec) {
           acceptance["I"] += updateI(random_->integer(pop_.numInfected()));
       }
-
+      cerr << "Likelihood: " << logLikelihood_ << endl;
       // Update the adaptive mcmc
       logTransCovar_->sample();
 

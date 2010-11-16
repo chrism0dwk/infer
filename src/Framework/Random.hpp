@@ -63,6 +63,8 @@ namespace EpiRisk
     mvgauss(const CovMatrix& covariance);
     Variates
     mvgauss(const Variates& mu, const CovMatrix& covariance);
+    double
+    extreme(const double a, const double b);
   };
 
 }

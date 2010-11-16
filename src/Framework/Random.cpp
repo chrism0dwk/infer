@@ -128,5 +128,10 @@ namespace EpiRisk
     // Generates MVN(0,Sigma) variates
     return mu + mvgauss(covariance);
   }
+  double
+  Random::extreme(const double a, const double b)
+  {
+    return 1.0/b * log(1-log(1-uniform())/a);
+  }
 
 }
