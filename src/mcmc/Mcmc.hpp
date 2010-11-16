@@ -25,61 +25,39 @@
 
 #include <math.h>
 #include <limits>
+#include <iostream>
+#include <fstream>
 
 
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
+#include "Parameter.hpp"
+#include "Random.hpp"
+#include "EmpCovar.hpp"
+#include "McmcWriter.hpp"
 
 #define NEGINF (-numeric_limits<double>::infinity())
 
 using namespace std;
 using namespace EpiRisk;
 
-class Parameter
+
+struct ExpTransform
 {
-  double val_;
-
-public:
-  Parameter(double value)
+  double operator()(const double x)
   {
-    val_ = value;
-  }
-
-  double
-  operator()() const
-  {
-    return val_;
+    return exp(x);
   }
 };
 
-
-struct Parameters
+struct LogTransform
 {
-  Parameter* beta1;
-  Parameter* beta2;
-  Parameter* phi;
-
-  Parameters()
+  double operator()(const double x)
   {
-    beta1 = new Parameter(0.02);
-    beta2 = new Parameter(0.01);
-    phi = new Parameter(0.2);
-  }
-
-  Parameters(Parameters& toCopy)
-  {
-    beta1 = new Parameter(*toCopy.beta1);
-    beta2 = new Parameter(*toCopy.beta2);
-    phi = new Parameter(*toCopy.phi);
-  }
-
-  ~Parameters()
-  {
-    delete beta1;
-    delete beta2;
-    delete phi;
+    return log(x);
   }
 };
+
 
 
 class Mcmc {
@@ -87,18 +65,43 @@ class Mcmc {
   Population<TestCovars>& pop_;
   Parameters& params_;
   double logLikelihood_;
-  double beta(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
-  double betastar(const Population<TestCovars>::const_iterator i, const Population<TestCovars>::const_iterator j) const;
+  Random* random_;
+  EmpCovar<LogTransform>* logTransCovar_;
+  ublas::matrix<double>* stdCov_;
+  map<string,double> productCache_;
+  map<string,double> productCacheTmp_;
 
-  void
-  calcLogLikelihood();
+  ofstream mcmcOutput_;
 
-public:
-  Mcmc(Population<TestCovars>& population, Parameters& parameters);
-  ~Mcmc();
-
+  virtual
   double
-  getLikelihood() const;
+  beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+  virtual
+  double
+  betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+  double
+  instantPressureOn(const Population<TestCovars>::InfectiveIterator& j, const double Ij);
+  double
+  integPressureOn(const Population<TestCovars>::PopulationIterator& j, const double Ij);
+  double
+  calcLogLikelihood();
+  double
+  updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
+  bool
+  updateTrans();
+  bool
+  updateI(const size_t index);
+  void
+  dumpParms() const;
+  void
+  dumpProdCache();
+public:
+  Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);
+  ~Mcmc();
+  double
+  getLogLikelihood() const;
+  map<string,double>
+  run(const size_t numIterations, McmcWriter<Population<TestCovars> >& writer);
 };
 
 #endif
