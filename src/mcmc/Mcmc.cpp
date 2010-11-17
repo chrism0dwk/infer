@@ -66,9 +66,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
   int largc = 1;
   char** largv;
 
-  if (!MPI::Is_initialized())
-    MPI::Init(largc, largv);
-  MPI::COMM_WORLD.Set_errhandler(MPI::ERRORS_THROW_EXCEPTIONS);
+
   mpirank_ = MPI::COMM_WORLD.Get_rank();
   mpiprocs_ = MPI::COMM_WORLD.Get_size();
 
@@ -121,8 +119,6 @@ Mcmc::~Mcmc()
       delete random_;
       delete logTransCovar_;
     }
-
-  MPI::Finalize();
 }
 
 double
@@ -238,7 +234,7 @@ Mcmc::calcLogLikelihood()
   if (j == pop_.infecBegin())
     {
       productCacheTmp_.insert(make_pair(j->getId(), 1.0)); // Don't include I1
-      ++j;
+      ++j; ++pos;
     }
   while (true)
     {
@@ -248,7 +244,6 @@ Mcmc::calcLogLikelihood()
       pos += mpiprocs_;
       if (pos >= numInfecs)
         break;
-      j++;
       advance(j, mpiprocs_);
     }
 
@@ -272,6 +267,7 @@ Mcmc::calcLogLikelihood()
 
   return gLogLikelihood;
 }
+
 
 double
 Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
