@@ -48,6 +48,14 @@ namespace EpiRisk
     ~DataImporter() {};
 
     virtual
+    void
+    open() = 0;
+
+    virtual
+    void
+    close() = 0;
+
+    virtual
     Record
     next() = 0;
 

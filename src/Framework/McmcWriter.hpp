@@ -41,22 +41,36 @@ namespace EpiRisk
   private:
     ofstream paramFile_;
     ofstream occFile_;
+    string paramFn_, occFn_;
 
   public:
     McmcWriter(const string paramFile,
-               const string occultFile)
+               const string occultFile) : paramFn_(paramFile), occFn_(occultFile)
     {
-      paramFile_.open(paramFile.c_str(),ios::out);
-      if(!paramFile_.is_open()) throw output_exception("Cannot open parameter file for writing!");
 
-      occFile_.open(occultFile.c_str(),ios::out);
-      if(!paramFile_.is_open()) throw output_exception("Cannot open occult file for writing!");
     }
     virtual
     ~McmcWriter()
     {
-      paramFile_.close();
-      occFile_.close();
+      if(paramFile_.is_open()) paramFile_.close();
+      if(occFile_.is_open()) occFile_.close();
+    }
+    virtual
+    void
+    open()
+    {
+      paramFile_.open(paramFn_.c_str(),ios::out);
+      if(!paramFile_.is_open()) throw output_exception("Cannot open parameter file for writing!");
+
+      occFile_.open(occFn_.c_str(),ios::out);
+      if(!paramFile_.is_open()) throw output_exception("Cannot open occult file for writing!");
+    }
+    virtual
+    void
+    close()
+    {
+      if(paramFile_.is_open()) paramFile_.close();
+      if(occFile_.is_open()) occFile_.close();
     }
     virtual
     void
