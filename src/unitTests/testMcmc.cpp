@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <gsl/gsl_randist.h>
+#include <mpi.h>
 
 #include "SpatPointPop.hpp"
 #include "Mcmc.hpp"
@@ -66,6 +67,9 @@ int main(int argc, char* argv[])
 {
   // Tests out class Mcmc
 
+  MPI::Init(argc,argv);
+  MPI::COMM_WORLD.Set_errhandler(MPI::ERRORS_THROW_EXCEPTIONS);
+
   if (argc != 3) {
       cerr << "Usage: testSpatPointPop <pop file> <epi file>" << endl;
       return EXIT_FAILURE;
@@ -98,13 +102,17 @@ int main(int argc, char* argv[])
 
   map<string,double> acceptance = myMcmc->run(10000, *writer);
 
-  cout << "Parameter acceptance: " << acceptance["transParms"] << endl;
-  cout << "Infection acceptance: " << acceptance["I"] << endl;
+  if(MPI::COMM_WORLD.Get_rank() == 0) {
+      cout << "Parameter acceptance: " << acceptance["transParms"] << endl;
+      cout << "Infection acceptance: " << acceptance["I"] << endl;
+  }
+
   delete writer;
   delete myMcmc;
   delete myParameters;
   delete myPopulation;
 
+  MPI::Finalize();
   return EXIT_SUCCESS;
 
 }

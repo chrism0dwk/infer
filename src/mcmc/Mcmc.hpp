@@ -72,6 +72,7 @@ class Mcmc {
   map<string,double> productCacheTmp_;
 
   int mpirank_,mpiprocs_;
+  bool mpiInitHere_;
   bool accept_;
   ofstream mcmcOutput_;
 
