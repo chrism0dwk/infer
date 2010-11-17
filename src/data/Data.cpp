@@ -10,23 +10,35 @@
 #include "stlStrTok.hpp"
 
 
-PopDataImporter::PopDataImporter(const string filename)
+PopDataImporter::PopDataImporter(const string filename) : filename_(filename)
 {
-  dataFile_.open(filename.c_str(),ios::in);
-  if(!dataFile_.is_open()) {
-      throw EpiRisk::data_exception("Cannot open population file for reading");
-  }
-
-  // Take out header line
-  string row;
-  getline(dataFile_,row);
 
 }
 
 PopDataImporter::~PopDataImporter()
 {
+  if(dataFile_.is_open()) dataFile_.close();
+}
+
+void
+PopDataImporter::open()
+{
+  dataFile_.open(filename_.c_str(),ios::in);
+    if(!dataFile_.is_open()) {
+        throw EpiRisk::data_exception("Cannot open population file for reading");
+    }
+
+    // Take out header line
+    string row;
+    getline(dataFile_,row);
+}
+
+void
+PopDataImporter::close()
+{
   dataFile_.close();
 }
+
 
 PopDataImporter::Record
 PopDataImporter::next()
@@ -60,16 +72,9 @@ PopDataImporter::reset()
 
 
 
-EpiDataImporter::EpiDataImporter(const string filename)
+EpiDataImporter::EpiDataImporter(const string filename) : filename_(filename)
 {
 
-    dataFile_.open(filename.c_str(),ios::in);
-    if(!dataFile_.is_open()) {
-        throw EpiRisk::data_exception("Cannot open population file for reading");
-    }
-
-    string row;
-    getline(dataFile_,row);
 }
 
 EpiDataImporter::~EpiDataImporter()
@@ -77,6 +82,23 @@ EpiDataImporter::~EpiDataImporter()
   dataFile_.close();
 }
 
+void
+EpiDataImporter::open()
+{
+  dataFile_.open(filename_.c_str(),ios::in);
+      if(!dataFile_.is_open()) {
+          throw EpiRisk::data_exception("Cannot open population file for reading");
+      }
+
+  string row;
+  getline(dataFile_,row);
+}
+
+void
+EpiDataImporter::close()
+{
+  dataFile_.close();
+}
 
 EpiDataImporter::Record
 EpiDataImporter::next()

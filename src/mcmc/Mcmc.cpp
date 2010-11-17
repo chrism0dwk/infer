@@ -229,11 +229,10 @@ Mcmc::calcLogLikelihood()
   size_t numInfecs = pop_.numInfected();
 
   productCacheTmp_.clear();
-  productCacheTmp_.insert(make_pair(j->getId(), 1.0));
 
   // Advance the iterator to our starting position
-  advance(j, mpirank_ * mpiprocs_);
-  size_t pos = mpirank_ * mpiprocs_;
+  advance(j, mpirank_);
+  size_t pos = mpirank_;
 
   // First calculate the log product (happens on master node)
   if (j == pop_.infecBegin())
@@ -247,27 +246,28 @@ Mcmc::calcLogLikelihood()
       productCacheTmp_.insert(make_pair(j->getId(), tmp));
       logLikelihood += log(tmp);
       pos += mpiprocs_;
-      if (pos < numInfecs)
+      if (pos >= numInfecs)
         break;
+      j++;
       advance(j, mpiprocs_);
     }
 
   // Now calculate the integral
   Population<TestCovars>::PopulationIterator k = pop_.begin();
-  pos = mpirank_ * mpiprocs_;
-  advance(k, mpirank_ * mpiprocs_);
+  pos = mpirank_;
+  advance(k, mpirank_);
   while (true)
     {
       logLikelihood += integPressureOn(k, k->getI());
       pos += mpiprocs_;
-      if (pos < numInfecs)
+      if (pos >= pop_.size())
         break;
       advance(k, mpiprocs_);
     }
 
-  double gLogLikelihood;
+  double gLogLikelihood = 0.0;
 
-  MPI::COMM_WORLD.Reduce(&gLogLikelihood, &logLikelihood, 1, MPI::DOUBLE,
+  MPI::COMM_WORLD.Reduce(&logLikelihood, &gLogLikelihood, 1, MPI::DOUBLE,
       MPI::SUM, 0);
 
   return gLogLikelihood;
@@ -345,6 +345,7 @@ Mcmc::updateTrans()
 {
   Parameters oldParams = params_;
   Random::Variates logvars;
+  double* logvarsTmp = new double[params_.size()];
   double logPiCur;
 
   if (mpirank_ == 0)
@@ -369,14 +370,18 @@ Mcmc::updateTrans()
         }
       else
         logvars = random_->mvgauss(*stdCov_);
+
+      for(size_t i=0; i<params_.size(); ++i) logvarsTmp[i] = logvars(i);
     }
 
-  MPI::COMM_WORLD.Bcast(&logvars, params_.size(), MPI::DOUBLE, 0);
+  MPI::COMM_WORLD.Bcast(logvarsTmp, params_.size(), MPI::DOUBLE, 0);
 
-  params_(0) *= exp(logvars(0));
-  params_(1) *= exp(logvars(1));
-  params_(2) *= exp(logvars(2));
-  params_(3) *= exp(logvars(3));
+  params_(0) *= exp(logvarsTmp[0]);
+  params_(1) *= exp(logvarsTmp[1]);
+  params_(2) *= exp(logvarsTmp[2]);
+  params_(3) *= exp(logvarsTmp[3]);
+
+  delete[] logvarsTmp;
 
   double logLikCan = calcLogLikelihood();
 
@@ -455,6 +460,7 @@ Mcmc::run(const size_t numIterations,
 
   if (mpirank_ == 0)
     {
+      writer.open();
       acceptance["transParms"] = 0.0;
       acceptance["I"] = 0.0;
     }
@@ -476,7 +482,6 @@ Mcmc::run(const size_t numIterations,
       if (mpirank_ == 0)
         {
           logTransCovar_->sample();
-
           writer.write(pop_);
           writer.write(params_);
         }
@@ -487,6 +492,7 @@ Mcmc::run(const size_t numIterations,
       cout << "\n";
       cout << logTransCovar_->getCovariance() << endl;
 
+      writer.close();
       acceptance["transParms"] /= numIterations;
       acceptance["I"] /= (numIterations * 20);
     }

@@ -402,7 +402,7 @@ namespace EpiRisk
     Population<Covars>::importPopData(DataImporter<Covars>& popDataImporter)
     {
       typename DataImporter<Covars>::Record record;
-      popDataImporter.reset(); // Make sure we're at the beginning of the file
+      popDataImporter.open();
 
       try
         {
@@ -417,6 +417,8 @@ namespace EpiRisk
         {
           return;
         }
+
+      popDataImporter.close();
     }
 
   template<typename Covars>
@@ -424,7 +426,7 @@ namespace EpiRisk
     Population<Covars>::importEpiData(DataImporter<Events>& epiDataImporter)
     {
       DataImporter<Events>::Record record;
-      epiDataImporter.reset();
+      epiDataImporter.open();
       try
         {
           IdIndex& idIndex = population_.get<byId>();
@@ -443,6 +445,8 @@ namespace EpiRisk
         {
           return;
         }
+
+      epiDataImporter.close();
     }
 
   template<typename Covars>
