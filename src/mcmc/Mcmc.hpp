@@ -41,6 +41,9 @@
 using namespace std;
 using namespace EpiRisk;
 
+enum MpiMsgTag {
+  MPIPRODCACHE = 0
+};
 
 struct ExpTransform
 {
@@ -64,12 +67,10 @@ class Mcmc {
 
   Population<TestCovars>& pop_;
   Parameters& params_;
-  double logLikelihood_;
+  double logLikelihood_, logLikCan_, gLogLikelihood_, logProduct_, logProductCan_;
   Random* random_;
   EmpCovar<LogTransform>* logTransCovar_;
   ublas::matrix<double>* stdCov_;
-  map<string,double> productCache_;
-  map<string,double> productCacheTmp_;
 
   int mpirank_,mpiprocs_;
   bool mpiInitHere_;
@@ -90,10 +91,14 @@ class Mcmc {
   calcLogLikelihood();
   double
   updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
+  double
+  updateIlogLikelihoodSerial(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
   bool
   updateTrans();
   bool
   updateI(const size_t index);
+  void
+  moveProdCache(const string id, const size_t fromIndex, const size_t toIndex);
   void
   dumpParms() const;
   void

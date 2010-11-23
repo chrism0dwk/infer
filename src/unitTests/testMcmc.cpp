@@ -58,8 +58,6 @@ int main(int argc, char* argv[])
 
   typedef Population<TestCovars> MyPopulation;
 
-  // TODO: Required to parallelise the writers!
-
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
 
