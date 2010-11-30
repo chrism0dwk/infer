@@ -7,13 +7,16 @@
 
 #include <iostream>
 #include <gsl/gsl_randist.h>
-#include <mpi.h>
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <sstream>
 
 #include "SpatPointPop.hpp"
 #include "Mcmc.hpp"
 #include "Data.hpp"
 #include "McmcWriter.hpp"
 
+namespace mpi = boost::mpi;
 
   class GammaPrior : public Prior
   {
@@ -48,11 +51,11 @@ int main(int argc, char* argv[])
 {
   // Tests out class Mcmc
 
-  MPI::Init(argc,argv);
-  MPI::COMM_WORLD.Set_errhandler(MPI::ERRORS_THROW_EXCEPTIONS);
+  mpi::environment env(argc,argv);
+  mpi::communicator comm;
 
-  if (argc != 3) {
-      cerr << "Usage: testSpatPointPop <pop file> <epi file>" << endl;
+  if (argc != 4) {
+      cerr << "Usage: testSpatPointPop <pop file> <epi file> <num iterations>" << endl;
       return EXIT_FAILURE;
   }
 
@@ -77,11 +80,22 @@ int main(int argc, char* argv[])
   (*myParameters)(3) = Parameter(2e-6,GammaPrior(0.002,10000));
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters,1);
-  McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>("myParams.parms","myOccults.occ");
 
-  map<string,double> acceptance = myMcmc->run(10000, *writer);
+  stringstream parmFn;
+  stringstream occFn;
 
-  if(MPI::COMM_WORLD.Get_rank() == 0) {
+  parmFn << "/scratch/stsiab/myParams" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/myOccults" << comm.size() << ".occ";
+
+  McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
+
+  size_t numIters;
+  stringstream iters(argv[3]);
+  iters >> numIters;
+
+  map<string,double> acceptance = myMcmc->run(numIters, *writer);
+
+  if(comm.rank() == 0) {
       cout << "Parameter acceptance: " << acceptance["transParms"] << endl;
       cout << "Infection acceptance: " << acceptance["I"] << endl;
   }

@@ -20,7 +20,7 @@
 
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
-#include <mpi.h>
+#include <boost/mpi/datatype.hpp>
 
 #ifdef __LINUX__
 #include <acml_mv.h>
@@ -66,10 +66,10 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
   int largc = 1;
   char** largv;
 
-  mpirank_ = MPI::COMM_WORLD.Get_rank();
-  mpiprocs_ = MPI::COMM_WORLD.Get_size();
+  mpirank_ = comm_.rank();
+  mpiprocs_ = comm_.size();
 
-  // Random number generator
+  // Random number generation, AdMCMC covariance.
 
   if (mpirank_ == 0)
     {
@@ -105,9 +105,20 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
         pop_.dumpInfected();
     }
 
-  gLogLikelihood_ = calcLogLikelihood();
-  logLikelihood_ = logLikCan_;
-  logProduct_ = logProductCan_;
+  // Set up process-bound infectives
+  Population<TestCovars>::InfectiveIterator j = pop_.infecBegin();
+  size_t pos = mpirank_;
+  advance(j, mpirank_);
+  while (pos < pop_.numInfected())
+    {
+      processInfectives_.push_back(j);
+      pos += mpiprocs_;
+      advance(j, mpiprocs_);
+    }
+
+  logLikelihood_ = calcLogLikelihood();
+  reduce(comm_, logLikelihood_, gLogLikelihood_, plus<double> (), 0);
+  productCache_ = productCacheTmp_;
 }
 
 Mcmc::~Mcmc()
@@ -219,32 +230,24 @@ Mcmc::calcLogLikelihood()
 {
   // Calculates log likelihood
 
-  Population<TestCovars>::InfectiveIterator j = pop_.infecBegin();
+  ProcessInfectives::const_iterator j = processInfectives_.begin();
   Population<TestCovars>::InfectiveIterator stop;
   double logLikelihood = 0.0;
   size_t numInfecs = pop_.numInfected();
+  size_t pos = 0;
 
-  // Advance the iterator to our starting position
-  advance(j, mpirank_);
-  size_t pos = mpirank_;
+  productCacheTmp_.clear();
 
   // First calculate the log product (happens on master node)
-  if (j == pop_.infecBegin())
+  while (j != processInfectives_.end())
     {
-      pos += mpiprocs_;
-      if (pos < numInfecs) advance(j,mpiprocs_);
-    }
-  while (pos < numInfecs)
-    {
-      double tmp = instantPressureOn(j, j->getI());
+      double tmp = instantPressureOn(*j, (*j)->getI());
+      productCacheTmp_.insert(make_pair((*j)->getId(), tmp));
       logLikelihood += log(tmp);
-      pos += mpiprocs_;
-      advance(j, mpiprocs_);
+      ++j;
     }
 
-  logProductCan_ = logLikelihood;
-
-  // Now calculate the integral
+  //Now calculate the integral
   Population<TestCovars>::PopulationIterator k = pop_.begin();
   pos = mpirank_;
   advance(k, mpirank_);
@@ -255,11 +258,7 @@ Mcmc::calcLogLikelihood()
       advance(k, mpiprocs_);
     }
 
-  logLikCan_ = logLikelihood;
-  double gLogLikelihood = 0.0;
-  MPI::COMM_WORLD.Reduce(&logLikelihood,&gLogLikelihood,1,MPI::DOUBLE,MPI::SUM,0);
-
-  return gLogLikelihood;
+  return logLikelihood;
 }
 
 double
@@ -269,8 +268,8 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
   // Calculates an updated likelihood for an infection time move
 
   double logLikelihood = logLikelihood_;
-  size_t counter = 0;
   Population<TestCovars>::PopulationIterator popj = pop_.asPop(j);
+  productCacheTmp_.clear();
 
   // Sort out I1
   if (j == pop_.infecBegin() or newTime < pop_.infecBegin()->getI())
@@ -282,71 +281,55 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       return logLikelihood;
     }
 
-  // Calculate logProduct
-  // First instantaneous pressure on j
-  Population<TestCovars>::InfectiveIterator infectee = pop_.infecBegin();
-  Population<TestCovars>::InfectiveIterator stop;
-  logProductCan_ = 0.0;
-  size_t numInfecs = pop_.numInfected();
-
-  // Temporarily move the infection time.
-  double oldI = j->getI();
-  pop_.moveInfectionTime(j,newTime);
-
-  // Advance the iterator to our starting position
-  advance(infectee, mpirank_);
-  size_t pos = mpirank_;
-
-  // First calculate the log product (happens on master node)
-  if (infectee == pop_.infecBegin())
+  // Product part of likelihood
+  for (ProcessInfectives::const_iterator i = processInfectives_.begin(); i
+      != processInfectives_.end(); ++i)
     {
-      pos += mpiprocs_;
-      if (pos < numInfecs) advance(infectee,mpiprocs_);
-    }
-  while (pos < numInfecs)
-    {
-      double tmp = instantPressureOn(infectee, infectee->getI());
-      logProductCan_ += log(tmp);
-      pos += mpiprocs_;
-      advance(infectee, mpiprocs_);
-    }
+      double myPressure = productCache_.find((*i)->getId())->second;
+      logLikelihood -= log(myPressure);
 
-  logLikelihood -= logProduct_;
-  logLikelihood += logProductCan_;
-
-  // Move infection time back
-  pop_.moveInfectionTime(j,oldI);
-
-  // Integrated pressure on the movee
-  if(mpirank_ == 0) {
-      logLikelihood -= integPressureOn(popj,j->getI());
-  }
-  if(mpirank_ == mpiprocs_ - 1) {
-      logLikelihood += integPressureOn(popj,newTime);
-  }
-
-  //Integral now
-  Population<TestCovars>::PopulationIterator k = pop_.begin();
-  advance(k, mpirank_);
-  counter = mpirank_;
-  while (counter < pop_.size())
-    {
-      if (k != popj)
+      if (*i == j) // Instantaneous pressure on j
         {
-          double myBeta = beta(*j, *k);
-          logLikelihood += myBeta * (min(j->getN(), k->getI()) - min(j->getI(),
-              k->getI()));
-          logLikelihood -= myBeta * (min(j->getN(), k->getI()) - min(newTime,
-              k->getI()));
+          // Product part of likelihood
+          myPressure = instantPressureOn(*i, newTime);
         }
-      counter += mpiprocs_;
-      advance(k, mpiprocs_);
+      else
+        {
+          if (j->isIAt((*i)->getI()))
+            myPressure -= beta(*j, **i);
+
+          if (newTime <= (*i)->getI() && (*i)->getI() < j->getN())
+            myPressure += beta(*j, **i);
+        }
+
+      productCacheTmp_.insert(make_pair((*i)->getId(), myPressure));
+      logLikelihood += log(myPressure);
     }
 
-  logLikCan_ = logLikelihood;
-  double gLogLikelihood = 0.0;
-  MPI::COMM_WORLD.Reduce(&logLikelihood,&gLogLikelihood,1,MPI::DOUBLE,MPI::SUM,0);
-  return gLogLikelihood;
+  // Integral part of likelihood
+  double pos = mpirank_;
+  Population<TestCovars>::PopulationIterator i = pop_.begin();
+  advance(i, mpirank_);
+  while (pos < pop_.size())
+    {
+      if (i == popj)
+        {
+          logLikelihood -= integPressureOn(i, i->getI());
+          logLikelihood += integPressureOn(i, newTime);
+        }
+      else
+        {
+          double myBeta = beta(*j, *i);
+          logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(j->getI(),
+              i->getI()));
+          logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
+              i->getI()));
+        }
+      advance(i, mpiprocs_);
+      pos += mpiprocs_;
+    }
+
+  return logLikelihood;
 }
 
 bool
@@ -356,6 +339,7 @@ Mcmc::updateTrans()
   Random::Variates logvars;
   double* logvarsTmp = new double[params_.size()];
   double logPiCur;
+  double gLogLikCan;
 
   if (mpirank_ == 0)
     {
@@ -384,17 +368,17 @@ Mcmc::updateTrans()
         logvarsTmp[i] = logvars(i);
     }
 
-  MPI::COMM_WORLD.Bcast(logvarsTmp, params_.size(), MPI::DOUBLE, 0);
+  broadcast(comm_, logvars, 0);
 
-  params_(0) *= exp(logvarsTmp[0]);
-  params_(1) *= exp(logvarsTmp[1]);
-  params_(2) *= exp(logvarsTmp[2]);
-  params_(3) *= exp(logvarsTmp[3]);
+  params_(0) *= exp(logvars[0]);
+  params_(1) *= exp(logvars[1]);
+  params_(2) *= exp(logvars[2]);
+  params_(3) *= exp(logvars[3]);
 
   delete[] logvarsTmp;
 
-  double gLogLikCan = calcLogLikelihood();
-
+  double logLikCan = calcLogLikelihood();
+  reduce(comm_, logLikCan, gLogLikCan, plus<double> (), 0);
 
   if (mpirank_ == 0)
     {
@@ -411,21 +395,23 @@ Mcmc::updateTrans()
       qRatio += log(params_(3) / oldParams(3));
 
       double accept = logPiCan - logPiCur + qRatio;
-      if (log(random_->uniform()) < accept) {
-        accept_ = true;
-      }
-      else {
-        accept_ = false;
-      }
+      if (log(random_->uniform()) < accept)
+        {
+          accept_ = true;
+        }
+      else
+        {
+          accept_ = false;
+        }
     }
 
-  MPI::COMM_WORLD.Bcast(&accept_, 1, MPI::BOOL, 0);
+  broadcast(comm_, accept_, 0);
 
   if (accept_)
     {
-      logLikelihood_ = logLikCan_;
-      logProduct_ = logProductCan_;
+      logLikelihood_ = logLikCan;
       gLogLikelihood_ = gLogLikCan;
+      productCache_ = productCacheTmp_;
       return true;
     }
   else
@@ -443,17 +429,20 @@ bool
 Mcmc::updateI(const size_t index)
 {
   double newI;
+  double gLogLikCan;
+
   if (mpirank_ == 0)
     {
       newI = random_->extreme(0.015, 0.8);
     }
-  MPI::COMM_WORLD.Bcast(&newI, 1, MPI::DOUBLE, 0);
+  broadcast(comm_, newI, 0);
 
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
   newI = it->getN() - newI;
 
-  double gLogLikCan = updateIlogLikelihood(it, newI);
+  double logLikCan = updateIlogLikelihood(it, newI);
+  reduce(comm_, logLikCan, gLogLikCan, plus<double> (), 0);
 
   if (mpirank_ == 0)
     {
@@ -463,21 +452,21 @@ Mcmc::updateI(const size_t index)
         {
           accept_ = true;
         }
-      else {
+      else
+        {
           accept_ = false;
-      }
-
+        }
     }
 
-  MPI::COMM_WORLD.Bcast(&accept_, 1, MPI::BOOL, 0);
+  broadcast(comm_, accept_, 0);
 
   if (accept_)
     {
       // Update the infection
       pop_.moveInfectionTime(it, newI);
-      logLikelihood_ = logLikCan_;
+      logLikelihood_ = logLikCan;
       gLogLikelihood_ = gLogLikCan;
-      logProduct_ = logProductCan_;
+      productCache_ = productCacheTmp_;
       return true;
     }
   else
@@ -513,12 +502,11 @@ Mcmc::run(const size_t numIterations,
         {
           if (mpirank_ == 0)
             toMove = random_->integer(pop_.numInfected());
-          MPI::COMM_WORLD.Bcast(&toMove, 1, MPI::INT, 0);
+          broadcast(comm_, toMove, 0);
           acceptance["I"] += updateI(toMove);
         }
 
       // Update the adaptive mcmc
-
       if (mpirank_ == 0)
         {
           logTransCovar_->sample();
@@ -540,29 +528,6 @@ Mcmc::run(const size_t numIterations,
 
 }
 
-//void
-//Mcmc::moveProdCache(const string id, const size_t fromIndex, const size_t toIndex)
-//{
-//  int oldProcess = fromIndex % mpiprocs_;
-//  int newProcess = toIndex % mpiprocs_;
-//
-//  if (oldProcess == newProcess) return;
-//
-//  if(mpirank_ == oldProcess) {
-//      map<string,double>::iterator itId = productCacheTmp_.find(id);
-//      if (itId == productCacheTmp_.end()) throw logic_error("Can't find id in product cache");
-//      double idPressure = itId->second;
-//      MPI::COMM_WORLD.Send(&idPressure,1,MPI::DOUBLE,newProcess,MPIPRODCACHE);
-//      productCacheTmp_.erase(id);
-//  }
-//  else if (mpirank_ == newProcess) {
-//      double idPressure = 0.0;
-//      MPI::COMM_WORLD.Recv(&idPressure,1,MPI::DOUBLE,oldProcess,MPIPRODCACHE);
-//      pair<map<string,double>::iterator,bool> rv = productCacheTmp_.insert(make_pair(id,idPressure));
-//      if(rv.second != true) throw logic_error("Duplicate insert in destination product cache");
-//  }
-//}
-
 void
 Mcmc::dumpParms() const
 {
@@ -576,26 +541,32 @@ Mcmc::dumpParms() const
   cout << endl;
 }
 
-//void
-//Mcmc::dumpProdCache()
-//{
-//  for(size_t proc=0; proc<mpiprocs_; ++proc) {
-//      MPI::COMM_WORLD.Barrier();
-//      if(mpirank_ == proc) {
-//      cout << "======================RANK " << proc << "====================" << endl;
-//      map<string, double>::const_iterator it = productCache_.begin();
-//      cout << "ID \t \t Cache \t \t TmpCache \t \t Difference\n" << endl;;
-//      MPI::COMM_WORLD.Barrier();
-//      while (it != productCache_.end())
-//        {
-//          cout << it->first << ":\t" << it->second << "\t"
-//              << productCacheTmp_[it->first] << "\t" << productCacheTmp_[it->first]
-//                                                                         - it->second << endl;
-//          MPI::COMM_WORLD.Barrier();
-//          ++it;
-//        }
-//      cout << "==============================================================\n" << endl;
-//      }
-//      MPI::COMM_WORLD.Barrier();
-//  }
-//}
+void
+Mcmc::dumpProdCache()
+{
+  for (size_t proc = 0; proc < mpiprocs_; ++proc)
+    {
+      MPI::COMM_WORLD.Barrier();
+      if (mpirank_ == proc)
+        {
+          cout << "======================RANK " << proc
+              << "====================" << endl;
+          map<string, double>::const_iterator it = productCache_.begin();
+          cout << "ID \t \t Cache \t \t TmpCache \t \t Difference\n" << endl;
+          ;
+          MPI::COMM_WORLD.Barrier();
+          while (it != productCache_.end())
+            {
+              cout << it->first << ":\t" << it->second << "\t"
+                  << productCacheTmp_[it->first] << "\t"
+                  << productCacheTmp_[it->first] - it->second << endl;
+              MPI::COMM_WORLD.Barrier();
+              ++it;
+            }
+          cout
+              << "==============================================================\n"
+              << endl;
+        }
+      MPI::COMM_WORLD.Barrier();
+    }
+}

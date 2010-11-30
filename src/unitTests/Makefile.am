@@ -6,7 +6,7 @@ testSpatPointPop_SOURCES = testSpatPointPop.cpp
 testSpatPointPop_LDADD = $(top_builddir)/src/data/libdata.la  $(top_builddir)/src/Framework/libstlstrtok.la -lm
 
 testMcmc_SOURCES = testMcmc.cpp
-testMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lacml
+testMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lboost_mpi -lboost_serialization -lacml
 
 #paramTest_SOURCES = paramTest.cpp
 #paramTest_LDADD = -lm

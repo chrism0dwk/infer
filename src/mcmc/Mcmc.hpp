@@ -27,6 +27,9 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
+#include <list>
+#include <map>
+#include <boost/mpi.hpp>
 
 
 #include "SpatPointPop.hpp"
@@ -40,6 +43,7 @@
 
 using namespace std;
 using namespace EpiRisk;
+namespace mpi = boost::mpi;
 
 enum MpiMsgTag {
   MPIPRODCACHE = 0
@@ -67,15 +71,21 @@ class Mcmc {
 
   Population<TestCovars>& pop_;
   Parameters& params_;
-  double logLikelihood_, logLikCan_, gLogLikelihood_, logProduct_, logProductCan_;
+  double logLikelihood_,gLogLikelihood_;
   Random* random_;
   EmpCovar<LogTransform>* logTransCovar_;
   ublas::matrix<double>* stdCov_;
+  map<string,double> productCache_;
+  map<string,double> productCacheTmp_;
 
+  mpi::communicator comm_;
   int mpirank_,mpiprocs_;
   bool mpiInitHere_;
   bool accept_;
   ofstream mcmcOutput_;
+
+  typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
+  ProcessInfectives processInfectives_;
 
   virtual
   double
