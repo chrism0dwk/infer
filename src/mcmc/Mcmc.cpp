@@ -32,6 +32,8 @@
 
 using namespace EpiRisk;
 
+
+
 inline
 double
 extremepdf(const double x, const double a, const double b)
@@ -430,16 +432,18 @@ Mcmc::updateI(const size_t index)
 {
   double newI;
   double gLogLikCan;
+  IProposal proposal;
 
   if (mpirank_ == 0)
     {
-      newI = random_->extreme(0.015, 0.8);
+      proposal.index = index;
+      proposal.I = random_->extreme(0.015, 0.8);
     }
-  broadcast(comm_, newI, 0);
+  broadcast(comm_, proposal, 0);
 
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
-  advance(it, index);
-  newI = it->getN() - newI;
+  advance(it, proposal.index);
+  newI = it->getN() - proposal.I;
 
   double logLikCan = updateIlogLikelihood(it, newI);
   reduce(comm_, logLikCan, gLogLikCan, plus<double> (), 0);
@@ -502,7 +506,7 @@ Mcmc::run(const size_t numIterations,
         {
           if (mpirank_ == 0)
             toMove = random_->integer(pop_.numInfected());
-          broadcast(comm_, toMove, 0);
+          else toMove = 0;
           acceptance["I"] += updateI(toMove);
         }
 

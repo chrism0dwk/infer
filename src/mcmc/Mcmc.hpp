@@ -30,6 +30,7 @@
 #include <list>
 #include <map>
 #include <boost/mpi.hpp>
+#include <boost/serialization/serialization.hpp>
 
 
 #include "SpatPointPop.hpp"
@@ -78,6 +79,21 @@ class Mcmc {
   map<string,double> productCache_;
   map<string,double> productCacheTmp_;
 
+  struct IProposal
+  {
+    unsigned int index;
+    double I;
+  private:
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+      ar & index;
+      ar & I;
+    }
+  };
+
   mpi::communicator comm_;
   int mpirank_,mpiprocs_;
   bool mpiInitHere_;
@@ -101,12 +117,10 @@ class Mcmc {
   calcLogLikelihood();
   double
   updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
-  double
-  updateIlogLikelihoodSerial(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
   bool
   updateTrans();
   bool
-  updateI(const size_t index);
+  updateI(const size_t index = 0);
   void
   moveProdCache(const string id, const size_t fromIndex, const size_t toIndex);
   void
@@ -121,5 +135,10 @@ public:
   map<string,double>
   run(const size_t numIterations, McmcWriter<Population<TestCovars> >& writer);
 };
+
+BOOST_IS_MPI_DATATYPE(Mcmc::IProposal)
+BOOST_CLASS_TRACKING(Mcmc::IProposal,track_never)
+BOOST_IS_BITWISE_SERIALIZABLE(Mcmc::IProposal)
+
 
 #endif
