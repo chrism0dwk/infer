@@ -46,10 +46,6 @@ using namespace std;
 using namespace EpiRisk;
 namespace mpi = boost::mpi;
 
-enum MpiMsgTag {
-  MPIPRODCACHE = 0
-};
-
 struct ExpTransform
 {
   double operator()(const double x)
@@ -121,6 +117,10 @@ class Mcmc {
   updateTrans();
   bool
   updateI(const size_t index = 0);
+  bool
+  addI(const Population<TestCovars>::PopulationIterator& toAdd, const double newTime);
+  bool
+  deleteI(const Population<TestCovars>::InfectiveIterator& toDelete);
   void
   moveProdCache(const string id, const size_t fromIndex, const size_t toIndex);
   void

@@ -21,6 +21,7 @@
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/mpi/datatype.hpp>
+#include <boost/mpi/collectives.hpp>
 
 #ifdef __LINUX__
 #include <acml_mv.h>
@@ -31,8 +32,6 @@
 #include "Mcmc.hpp"
 
 using namespace EpiRisk;
-
-
 
 inline
 double
@@ -71,40 +70,35 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
   mpirank_ = comm_.rank();
   mpiprocs_ = comm_.size();
 
-  // Random number generation, AdMCMC covariance.
+  // Random number generation
+  random_ = new Random(randomSeed);
 
-  if (mpirank_ == 0)
+  //AdMCMC covariance.
+  EmpCovar<ExpTransform>::CovMatrix initCov(params_.size());
+  for (size_t i = 0; i < params_.size(); ++i)
     {
-      random_ = new Random(randomSeed);
-      EmpCovar<ExpTransform>::CovMatrix initCov(params_.size());
-      for (size_t i = 0; i < params_.size(); ++i)
+      for (size_t j = 0; j < params_.size(); ++j)
         {
-          for (size_t j = 0; j < params_.size(); ++j)
-            {
-              if (i == j)
-                initCov(i, j) = 0.00001;
-              else
-                initCov(i, j) = 0.0;
-            }
+          if (i == j)
+            initCov(i, j) = 0.00001;
+          else
+            initCov(i, j) = 0.0;
+        }
+    }
+
+  logTransCovar_ = new EmpCovar<LogTransform> (params_, initCov);
+  stdCov_ = new ublas::matrix<double>(params_.size(), params_.size());
+
+  for (size_t i = 0; i < params_.size(); ++i)
+    {
+      for (size_t j = 0; j < params_.size(); ++j)
+        {
+          if (i == j)
+            (*stdCov_)(i, j) = 0.1 / params_.size();
+          else
+            (*stdCov_)(i, j) = 0.0;
         }
 
-      logTransCovar_ = new EmpCovar<LogTransform> (params_, initCov);
-      stdCov_ = new ublas::matrix<double>(params_.size(), params_.size());
-
-      for (size_t i = 0; i < params_.size(); ++i)
-        {
-          for (size_t j = 0; j < params_.size(); ++j)
-            {
-              if (i == j)
-                (*stdCov_)(i, j) = 0.1 / params_.size();
-              else
-                (*stdCov_)(i, j) = 0.0;
-            }
-
-        }
-
-      if (false)
-        pop_.dumpInfected();
     }
 
   // Set up process-bound infectives
@@ -119,19 +113,16 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
     }
 
   logLikelihood_ = calcLogLikelihood();
-  reduce(comm_, logLikelihood_, gLogLikelihood_, plus<double> (), 0);
+  all_reduce(comm_, logLikelihood_, gLogLikelihood_, plus<double> ());
   productCache_ = productCacheTmp_;
 }
 
 Mcmc::~Mcmc()
 {
   // Nothing to do at present
-  if (mpirank_ == 0)
-    {
-      delete stdCov_;
-      delete random_;
-      delete logTransCovar_;
-    }
+  delete stdCov_;
+  delete random_;
+  delete logTransCovar_;
 }
 
 double
@@ -339,77 +330,52 @@ Mcmc::updateTrans()
 {
   Parameters oldParams = params_;
   Random::Variates logvars;
-  double* logvarsTmp = new double[params_.size()];
   double logPiCur;
   double gLogLikCan;
 
-  if (mpirank_ == 0)
+  logPiCur = gLogLikelihood_;
+  logPiCur += log(params_(0).prior());
+  logPiCur += log(params_(1).prior());
+  logPiCur += log(params_(2).prior());
+  logPiCur += log(params_(3).prior());
+
+  if (random_->uniform() < 0.95)
     {
-      logPiCur = gLogLikelihood_;
-      logPiCur += log(params_(0).prior());
-      logPiCur += log(params_(1).prior());
-      logPiCur += log(params_(2).prior());
-      logPiCur += log(params_(3).prior());
-
-      if (random_->uniform() < 0.95)
+      try
         {
-          try
-            {
-              logvars = random_->mvgauss(logTransCovar_->getCovariance() * 2.38
-                  * 2.38 / params_.size());
-            }
-          catch (cholesky_error& e)
-            {
-              logvars = random_->mvgauss(*stdCov_);
-            }
+          logvars = random_->mvgauss(logTransCovar_->getCovariance() * 2.38
+              * 2.38 / params_.size());
         }
-      else
-        logvars = random_->mvgauss(*stdCov_);
-
-      for (size_t i = 0; i < params_.size(); ++i)
-        logvarsTmp[i] = logvars(i);
+      catch (cholesky_error& e)
+        {
+          logvars = random_->mvgauss(*stdCov_);
+        }
     }
-
-  broadcast(comm_, logvars, 0);
+  else
+    logvars = random_->mvgauss(*stdCov_);
 
   params_(0) *= exp(logvars[0]);
   params_(1) *= exp(logvars[1]);
   params_(2) *= exp(logvars[2]);
   params_(3) *= exp(logvars[3]);
 
-  delete[] logvarsTmp;
-
   double logLikCan = calcLogLikelihood();
-  reduce(comm_, logLikCan, gLogLikCan, plus<double> (), 0);
+  all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
 
-  if (mpirank_ == 0)
-    {
-      double logPiCan = gLogLikCan;
-      logPiCan += log(params_(0).prior());
-      logPiCan += log(params_(1).prior());
-      logPiCan += log(params_(2).prior());
-      logPiCan += log(params_(3).prior());
+  double logPiCan = gLogLikCan;
+  logPiCan += log(params_(0).prior());
+  logPiCan += log(params_(1).prior());
+  logPiCan += log(params_(2).prior());
+  logPiCan += log(params_(3).prior());
 
-      double qRatio = 0.0;
-      qRatio += log(params_(0) / oldParams(0));
-      qRatio += log(params_(1) / oldParams(1));
-      qRatio += log(params_(2) / oldParams(2));
-      qRatio += log(params_(3) / oldParams(3));
+  double qRatio = 0.0;
+  qRatio += log(params_(0) / oldParams(0));
+  qRatio += log(params_(1) / oldParams(1));
+  qRatio += log(params_(2) / oldParams(2));
+  qRatio += log(params_(3) / oldParams(3));
 
-      double accept = logPiCan - logPiCur + qRatio;
-      if (log(random_->uniform()) < accept)
-        {
-          accept_ = true;
-        }
-      else
-        {
-          accept_ = false;
-        }
-    }
-
-  broadcast(comm_, accept_, 0);
-
-  if (accept_)
+  double accept = logPiCan - logPiCur + qRatio;
+  if (log(random_->uniform()) < accept)
     {
       logLikelihood_ = logLikCan;
       gLogLikelihood_ = gLogLikCan;
@@ -434,37 +400,19 @@ Mcmc::updateI(const size_t index)
   double gLogLikCan;
   IProposal proposal;
 
-  if (mpirank_ == 0)
-    {
-      proposal.index = index;
-      proposal.I = random_->extreme(0.015, 0.8);
-    }
-  broadcast(comm_, proposal, 0);
+  proposal.index = index;
+  proposal.I = random_->extreme(0.015, 0.8);
 
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, proposal.index);
   newI = it->getN() - proposal.I;
 
   double logLikCan = updateIlogLikelihood(it, newI);
-  reduce(comm_, logLikCan, gLogLikCan, plus<double> (), 0);
+  all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
 
-  if (mpirank_ == 0)
-    {
-      double a = gLogLikCan - gLogLikelihood_;
+  double a = gLogLikCan - gLogLikelihood_;
 
-      if (log(random_->uniform()) < a)
-        {
-          accept_ = true;
-        }
-      else
-        {
-          accept_ = false;
-        }
-    }
-
-  broadcast(comm_, accept_, 0);
-
-  if (accept_)
+  if (log(random_->uniform()) < a)
     {
       // Update the infection
       pop_.moveInfectionTime(it, newI);
@@ -477,6 +425,7 @@ Mcmc::updateI(const size_t index)
     {
       return false;
     }
+
 }
 
 map<string, double>
@@ -491,9 +440,10 @@ Mcmc::run(const size_t numIterations,
   if (mpirank_ == 0)
     {
       writer.open();
-      acceptance["transParms"] = 0.0;
-      acceptance["I"] = 0.0;
     }
+
+  acceptance["transParms"] = 0.0;
+  acceptance["I"] = 0.0;
 
   for (size_t k = 0; k < numIterations; ++k)
     {
@@ -504,16 +454,14 @@ Mcmc::run(const size_t numIterations,
 
       for (size_t infec = 0; infec < 20; ++infec)
         {
-          if (mpirank_ == 0)
-            toMove = random_->integer(pop_.numInfected());
-          else toMove = 0;
+          toMove = random_->integer(pop_.numInfected());
           acceptance["I"] += updateI(toMove);
         }
 
       // Update the adaptive mcmc
+      logTransCovar_->sample();
       if (mpirank_ == 0)
         {
-          logTransCovar_->sample();
           writer.write(pop_);
           writer.write(params_);
         }
