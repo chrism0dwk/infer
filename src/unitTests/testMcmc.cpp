@@ -103,8 +103,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/myParams" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/myOccults" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/myParams1." << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/myOccults1." << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
