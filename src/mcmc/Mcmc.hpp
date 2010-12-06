@@ -75,21 +75,6 @@ class Mcmc {
   map<string,double> productCache_;
   map<string,double> productCacheTmp_;
 
-  struct IProposal
-  {
-    unsigned int index;
-    double I;
-  private:
-    friend class boost::serialization::access;
-
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-      ar & index;
-      ar & I;
-    }
-  };
-
   mpi::communicator comm_;
   int mpirank_,mpiprocs_;
   bool mpiInitHere_;
@@ -98,6 +83,7 @@ class Mcmc {
 
   typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
   ProcessInfectives processInfectives_;
+  ProcessInfectives occultList_;
 
   virtual
   double
@@ -118,15 +104,16 @@ class Mcmc {
   bool
   updateI(const size_t index = 0);
   bool
-  addI(const Population<TestCovars>::PopulationIterator& toAdd, const double newTime);
+  addI();
   bool
-  deleteI(const Population<TestCovars>::InfectiveIterator& toDelete);
+  deleteI();
   void
   moveProdCache(const string id, const size_t fromIndex, const size_t toIndex);
   void
   dumpParms() const;
   void
   dumpProdCache();
+
 public:
   Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);
   ~Mcmc();
@@ -135,10 +122,6 @@ public:
   map<string,double>
   run(const size_t numIterations, McmcWriter<Population<TestCovars> >& writer);
 };
-
-BOOST_IS_MPI_DATATYPE(Mcmc::IProposal)
-BOOST_CLASS_TRACKING(Mcmc::IProposal,track_never)
-BOOST_IS_BITWISE_SERIALIZABLE(Mcmc::IProposal)
 
 
 #endif

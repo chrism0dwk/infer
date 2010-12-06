@@ -33,6 +33,10 @@
 
 using namespace EpiRisk;
 
+// Constants
+const double a = 0.015;
+const double b = 0.8;
+
 inline
 double
 extremepdf(const double x, const double a, const double b)
@@ -45,6 +49,13 @@ double
 extremecdf(const double x, const double a, const double b)
 {
   return 1 - exp(-a * (exp(b * x) - 1));
+}
+
+inline
+double
+gaussianTailPdf(const double x, const double mean, const double var)
+{
+  return gsl_ran_gaussian_tail_pdf(x-mean,-mean,sqrt(var));
 }
 
 inline
@@ -396,16 +407,13 @@ Mcmc::updateTrans()
 bool
 Mcmc::updateI(const size_t index)
 {
-  double newI;
   double gLogLikCan;
-  IProposal proposal;
 
-  proposal.index = index;
-  proposal.I = random_->extreme(0.015, 0.8);
+  double newI = random_->extreme(a, b);
 
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
-  advance(it, proposal.index);
-  newI = it->getN() - proposal.I;
+  advance(it, index);
+  newI = it->getN() - newI;
 
   double logLikCan = updateIlogLikelihood(it, newI);
   all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
@@ -426,6 +434,81 @@ Mcmc::updateI(const size_t index)
       return false;
     }
 
+}
+
+bool
+Mcmc::addI()
+{
+  size_t numSusceptible = pop_.numSusceptible();
+
+  Population<TestCovars>::InfectiveIterator it = pop_.infecEnd();
+  advance(it,random_->integer(numSusceptible));
+
+  double inProp = random_->gaussianTail(-(1/b), 1/(a*b*b));
+  double newI = pop_.getObsTime() - inProp;
+
+  double logPiCur = gLogLikelihood_;
+
+  double logLikCan = updateIlogLikelihood(it,newI);
+  double glogLikCan;
+  all_reduce(comm_,logLikCan,glogLikCan,plus<double>());
+
+  double logPiCan = glogLikCan + log(extremepdf(inProp,a,b));
+
+  double qRatio = log( 1.0 / (occultList_.size() + 1) / (1.0 / numSusceptible * gaussianTailPdf(inProp,-1/b,1/(a*b*b))));
+
+  double accept = logPiCan - logPiCur + qRatio;
+  // Perform accept/reject step.
+
+  if(log(random_->uniform()) < accept)
+    {
+      pop_.moveInfectionTime(it,newI);
+      logLikelihood_ = logLikCan;
+      gLogLikelihood_ = glogLikCan;
+      productCache_ = productCacheTmp_;
+      return true;
+    }
+  else
+    {
+      return false;
+    }
+}
+
+bool
+Mcmc::deleteI()
+{
+  size_t numSusceptible = pop_.numSusceptible();
+
+  ProcessInfectives::const_iterator idx = occultList_.begin();
+  advance(idx,random_->integer(occultList_.size()));
+
+  Population<TestCovars>::InfectiveIterator it = *idx;
+
+  double logPiCur = gLogLikelihood_ + log(extremepdf(it->getN() - it->getI(),a,b));
+
+  double logLikCan = updateIlogLikelihood(it,POSINF);
+  double glogLikCan;
+  all_reduce(comm_,logLikCan, glogLikCan, plus<double>());
+
+  double logPiCan = glogLikCan;
+
+  double qRatio = log( 1.0/(numSusceptible + 1) * gaussianTailPdf(it->getN() - it->getI(),-1/b,1/(a*b*b))  / 1.0/occultList_.size());
+  // Perform accept/reject step.
+
+  double accept = logPiCan - logPiCur + qRatio;
+
+  if(log(random_->uniform()) < accept)
+    {
+      pop_.moveInfectionTime(it,POSINF);
+      logLikelihood_ = logLikCan;
+      gLogLikelihood_ = glogLikCan;
+      productCache_ = productCacheTmp_;
+      return true;
+    }
+  else
+    {
+      return false;
+    }
 }
 
 map<string, double>

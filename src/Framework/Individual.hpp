@@ -244,7 +244,6 @@ namespace EpiRisk
         else
           return REMOVED;
       }
-      ;
 
       // Connection graph
       const ConnectionList&
