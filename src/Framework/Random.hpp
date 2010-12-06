@@ -31,7 +31,7 @@ namespace EpiRisk
     virtual
     ~Random();
     double
-    gaussian(const double mu, const double var);
+    gaussian(const double mean, const double var);
     double
     gamma(const double shape, const double rate);
     double
@@ -46,6 +46,8 @@ namespace EpiRisk
     mvgauss(const Variates& mu, const CovMatrix& covariance);
     double
     extreme(const double a, const double b);
+    double
+    gaussianTail(const double mean, const double var);
   };
 
 }

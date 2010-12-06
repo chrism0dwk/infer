@@ -29,9 +29,9 @@ namespace EpiRisk
     gsl_rng_free(rng_);
   }
   double
-  Random::gaussian(const double mu, const double var)
+  Random::gaussian(const double mean, const double var)
   {
-    return mu + gsl_ran_gaussian(rng_, sqrt(var));
+    return mean + gsl_ran_gaussian(rng_, sqrt(var));
   }
   double
   Random::gamma(const double shape, const double rate)
@@ -113,6 +113,11 @@ namespace EpiRisk
   Random::extreme(const double a, const double b)
   {
     return 1.0/b * log(1-log(1-uniform())/a);
+  }
+  double
+  Random::gaussianTail(const double mean, const double var)
+  {
+    return gsl_ran_gaussian_tail(rng_,-mean,sqrt(var));
   }
 
 }

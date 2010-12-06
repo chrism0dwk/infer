@@ -47,6 +47,7 @@
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/composite_key.hpp>
 
 #include "types.hpp"
 #include "Individual.hpp"
@@ -87,10 +88,20 @@ namespace EpiRisk
           indexed_by<
             sequenced< tag<bySeq> >,
             hashed_unique< tag<byId>, const_mem_fun<Individual,string,&Individual::getId> >,
-            ordered_non_unique<tag<byI>,const_mem_fun<Individual,double,&Individual::getI> >,
-            hashed_non_unique<tag<byDiseaseStatus>,const_mem_fun<Individual,bool,&Individual::hasBeenInfected> >
+            ordered_non_unique<tag<byI>,composite_key<
+                                          Individual,
+                                          const_mem_fun<Individual,double,&Individual::getI>,
+                                          const_mem_fun<Individual,double,&Individual::getN>
+                                        >,
+                                        composite_key_compare<
+                                          std::less<double>,
+                                          std::greater<double>
+                                        >
+            >
           >
       >  PopulationContainer;
+
+
 
 
       // Population Indices
@@ -110,6 +121,12 @@ namespace EpiRisk
           bool rv = l < r;
           return rv;}
       };
+
+    // Occult index
+      typedef boost::multi_index_container<
+          InfectiveIterator,
+          indexed_by< sequenced<> >
+      > OccultList;
 
 
     public: // methods
@@ -190,16 +207,6 @@ namespace EpiRisk
       /*! Adds an occult infection
        * @param susceptibleIndex the position of the susceptible to add in the susceptibles index.
        */
-      void
-      addOccult(const size_t susceptibleIndex);
-      /*! Deletes an occult infection
-       * @param occultIndex the position of the occult to delete in the occult index.
-       */
-      void
-      delOccult(const size_t occultIndex);
-      //! Deletes all occult infections
-      void
-      resetOccults();
       //! Clears all infected individuals
       void
       clear(); // Clears all infected individuals
@@ -251,6 +258,12 @@ namespace EpiRisk
       /// Returns an iterator to one past the end of the infectives
       InfectiveIterator
       infecEnd() const;
+      /// Returns an iterator to the beginning of the occults
+      InfectiveIterator
+      occultBegin() const;
+      /// Returns an iterator to one past the end of the occults
+      InfectiveIterator
+      occultEnd() const;
       /// Returns an iterator to the infective with infection time <= I
       InfectiveIterator
       infecUpperBound(const double I);
@@ -314,6 +327,7 @@ namespace EpiRisk
     private:
       // Private data
       PopulationContainer population_;
+      OccultList occultList_;
 
       InfectiveIndex& infIndex_;
       PopulationIndex& seqIndex_;
@@ -508,8 +522,6 @@ namespace EpiRisk
     {
       return distance(infIndex_.upper_bound(obsTime_),infIndex_.end());
     }
-
-
 
   template<typename Covars>
     void
