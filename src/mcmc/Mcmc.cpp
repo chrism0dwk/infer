@@ -23,11 +23,11 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/mpi/collectives.hpp>
 
-#ifdef __LINUX__
-#include <acml_mv.h>
-#define log fastlog
-#define exp fastexp
-#endif
+//#ifdef __LINUX__
+//#include <acml_mv.h>
+//#define log fastlog
+//#define exp fastexp
+//#endif
 
 #include "Mcmc.hpp"
 
