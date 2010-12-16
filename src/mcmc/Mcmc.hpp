@@ -28,9 +28,11 @@
 #include <iostream>
 #include <fstream>
 #include <list>
+#include <vector>
 #include <map>
 #include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
 
 
 #include "SpatPointPop.hpp"
@@ -79,6 +81,8 @@ class Mcmc {
   int mpirank_,mpiprocs_;
   bool mpiInitHere_;
   bool accept_;
+  double integPressTime_;
+  std::vector<size_t> elements_;
   ofstream mcmcOutput_;
 
   typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
@@ -113,6 +117,8 @@ class Mcmc {
   dumpParms() const;
   void
   dumpProdCache();
+  void
+  loadBalance();
 
 public:
   Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);

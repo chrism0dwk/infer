@@ -42,6 +42,7 @@
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -86,7 +87,7 @@ namespace EpiRisk
       typedef boost::multi_index_container<
           Individual,
           indexed_by<
-            sequenced< tag<bySeq> >,
+            random_access< tag<bySeq> >,
             hashed_unique< tag<byId>, const_mem_fun<Individual,string,&Individual::getId> >,
             ordered_non_unique<tag<byI>,composite_key<
                                           Individual,
@@ -297,7 +298,9 @@ namespace EpiRisk
         typename InfectiveIndex::iterator it = iIndex.begin();
         while(it->getI() < obsTime_) {
             cerr << it->getId() << "\t"
-                << it->getI() << endl;
+                << it->getI() << "\t"
+                << it->getN() << "\t"
+                << it->getR() << endl;
             it++;
         }
       }
