@@ -34,9 +34,13 @@
 #include "DataImporter.hpp"
 
 struct TestCovars {
-  long int x;
-  long int y;
-  long int herdSize;
+  double x;
+  double y;
+  long int cattle;
+  long int pigs;
+  long int sheep;
+  long int goats;
+  long int deer;
 };
 
 

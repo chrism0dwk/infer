@@ -1,5 +1,5 @@
 /*************************************************************************
- *  ./src/unitTests/testMcmc.cpp
+ *  ./src/unitTests/fmdMcmc.cpp
  *  Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
  *
  *  This file is part of InFER.
@@ -92,19 +92,27 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Parameters* myParameters = new Parameters(4);
+  Parameters* myParameters = new Parameters(12);
   (*myParameters)(0) = Parameter(0.03,GammaPrior(0.1,0.1));
   (*myParameters)(1) = Parameter(0.01,GammaPrior(0.1,0.1));
   (*myParameters)(2) = Parameter(0.2,GammaPrior(0.1,0.1));
-  (*myParameters)(3) = Parameter(2e-6,GammaPrior(0.002,10000));
-
+  (*myParameters)(3) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(4) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(5) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(6) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(7) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(8) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(9) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(9) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(10) = Parameter(0.1,GammaPrior(0.1,0.1));
+  (*myParameters)(11) = Parameter(0.1,GammaPrior(0.1,0.1));
   Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters,1);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/myParams1." << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/myOccults1." << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/fmdParams1." << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/fmdOccults1." << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
