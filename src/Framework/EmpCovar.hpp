@@ -164,7 +164,7 @@ namespace EpiRisk
         double prod;
         int i, j;
         ParamIter it, jt;
-        for (it = params_.begin(), i = 0; it < params_.end(); ++it, ++i)
+        for (it = params_.begin(), i = 0; it != params_.end(); ++it, ++i)
           {
             double pi = transformFunc_(*it);
             (*sum_)(i) += pi;

@@ -114,8 +114,8 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
     }
 
   // Set up load balancing
-  for(size_t p=0; p<mpiprocs_;++p) elements_.push_back(0);
-  loadBalance();
+//  for(size_t p=0; p<mpiprocs_;++p) elements_.push_back(0);
+//  loadBalance();
 
   // Set up process-bound infectives
   Population<TestCovars>::InfectiveIterator j = pop_.infecBegin();
@@ -156,7 +156,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25)
+  if (distance <= 25.0)
     {
       double infectivity = i.getCovariates().cattle +
                            params_(2)*i.getCovariates().pigs +
@@ -171,7 +171,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
 
       double decay = params_(10)*params_(10);
 
-      return params_(0) * infectivity * susceptibility;// * decay / (decay * distance*distance);
+      return params_(0) * infectivity * susceptibility * decay / (decay + distance*distance);
     }
   else
     return 0.0;
@@ -184,7 +184,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25) {
+  if (distance <= 25.0) {
       double infectivity = i.getCovariates().cattle +
                            params_(2)*i.getCovariates().pigs +
                            params_(3)*i.getCovariates().sheep +
@@ -198,7 +198,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
 
       double decay = params_(10)*params_(10);
 
-      return params_(1) * infectivity * susceptibility;// * decay / (decay * distance*distance);
+      return params_(1) * infectivity * susceptibility * decay / (decay + distance*distance);
   }
   else
     return 0.0;
@@ -286,21 +286,14 @@ Mcmc::calcLogLikelihood()
     }
 
   //Now calculate the integral
-
-  size_t startPos = 0;
-  for(size_t p=0;p<mpirank_;++p) {
-      startPos += elements_[p];
-  }
-  size_t endPos = startPos + elements_.at(mpirank_);
-
-  Population<TestCovars>::PopulationIterator k = pop_.begin();
-  clock_t time = clock();
-  for (size_t pos = startPos; pos < endPos; ++pos)
+  size_t pos;
+  Population<TestCovars>::PopulationIterator k;
+  for (pos = mpirank_, k = pop_.begin() + mpirank_;
+       pos < pop_.size();
+       pos += mpiprocs_, k += mpiprocs_)
     {
       logLikelihood += integPressureOn(k, k->getI());
-      k++;
     }
-  integPressTime_ = (double)(clock() - time) / CLOCKS_PER_SEC / elements_[mpirank_];
 
   return logLikelihood;
 }
@@ -351,15 +344,11 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
     }
 
   // Integral part of likelihood
-
-  size_t startPos = 0;
-  for(size_t p=0;p<mpirank_;++p) {
-      startPos += elements_[p];
-  }
-  size_t endPos = startPos + elements_[mpirank_];
-
-  Population<TestCovars>::PopulationIterator i = pop_.begin()+startPos;
-  for (size_t pos = startPos; pos < endPos; ++pos)
+  size_t pos;
+  Population<TestCovars>::PopulationIterator i;
+  for (pos = mpirank_, i = pop_.begin() + mpirank_;
+       pos < pop_.size();
+       pos += mpiprocs_, i += mpiprocs_)
     {
       if (i == popj)
         {
@@ -374,7 +363,6 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
           logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
               i->getI()));
         }
-      ++i;
     }
 
   return logLikelihood;
@@ -569,15 +557,15 @@ Mcmc::run(const size_t numIterations,
 
       acceptance["transParms"] += updateTrans();
 
-      if (k % 10 == 0) loadBalance();
+      //if (k % 10 == 0) loadBalance();
 
-      for (size_t infec = 0; infec < 200; ++infec)
+      for (size_t infec = 0; infec < 0; ++infec)
         {
           toMove = random_->integer(pop_.numInfected());
           acceptance["I"] += updateI(toMove);
         }
 
-      cout << gLogLikelihood_ << endl;
+      if(mpirank_ == 0) cout << "gLogLikelihood: " << gLogLikelihood_ << endl;
 
       // Update the adaptive mcmc
       logTransCovar_->sample();
