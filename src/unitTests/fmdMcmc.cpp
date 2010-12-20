@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(34.405968);
+  myPopulation->setObsTime(241.0);
 
   delete popDataImporter;
   delete epiDataImporter;
