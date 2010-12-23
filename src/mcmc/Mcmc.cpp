@@ -159,19 +159,17 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
   if (distance <= 25.0)
     {
       double infectivity = i.getCovariates().cattle +
-                           params_(2)*i.getCovariates().pigs +
-                           params_(3)*i.getCovariates().sheep +
-                           params_(4)*i.getCovariates().goats +
-                           params_(5)*i.getCovariates().deer;
+                           params_(4)*i.getCovariates().pigs +
+                           params_(5)*i.getCovariates().sheep +
+                           params_(6)*i.getCovariates().goats +
+                           params_(7)*i.getCovariates().deer;
       double susceptibility = j.getCovariates().cattle +
-                                 params_(6)*j.getCovariates().pigs +
-                                 params_(7)*j.getCovariates().sheep +
-                                 params_(8)*j.getCovariates().goats +
-                                 params_(9)*j.getCovariates().deer;
+                                 params_(8)*j.getCovariates().pigs +
+                                 params_(9)*j.getCovariates().sheep +
+                                 params_(10)*j.getCovariates().goats +
+                                 params_(11)*j.getCovariates().deer;
 
-      double decay = params_(10)*params_(10);
-
-      return params_(0) * infectivity * susceptibility * decay / (decay + distance*distance);
+      return params_(0) * infectivity * susceptibility * params_(2) / (params_(2)*params_(2) + distance*distance);
     }
   else
     return 0.0;
@@ -186,19 +184,17 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
       double infectivity = i.getCovariates().cattle +
-                           params_(2)*i.getCovariates().pigs +
-                           params_(3)*i.getCovariates().sheep +
-                           params_(4)*i.getCovariates().goats +
-                           params_(5)*i.getCovariates().deer;
+                           params_(4)*i.getCovariates().pigs +
+                           params_(5)*i.getCovariates().sheep +
+                           params_(6)*i.getCovariates().goats +
+                           params_(7)*i.getCovariates().deer;
       double susceptibility = j.getCovariates().cattle +
-                                 params_(6)*j.getCovariates().pigs +
-                                 params_(7)*j.getCovariates().sheep +
-                                 params_(8)*j.getCovariates().goats +
-                                 params_(9)*j.getCovariates().deer;
+                                 params_(8)*j.getCovariates().pigs +
+                                 params_(9)*j.getCovariates().sheep +
+                                 params_(10)*j.getCovariates().goats +
+                                 params_(11)*j.getCovariates().deer;
 
-      double decay = params_(10)*params_(10);
-
-      return params_(1) * infectivity * susceptibility * decay / (decay + distance*distance);
+      return params_(1) * infectivity * susceptibility * params_(2) / (params_(2)*params_(2) + distance*distance);
   }
   else
     return 0.0;
@@ -231,7 +227,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
         }
       ++i;
     }
-  sumPressure += params_(11);
+  sumPressure += params_(3);
   return sumPressure;
 }
 
@@ -258,7 +254,7 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
           Ij));
     }
 
-  integPressure += params_(11) * (min(Ij, pop_.getObsTime()) - I1);
+  integPressure += params_(3) * (min(Ij, pop_.getObsTime()) - I1);
 
   return -integPressure;
 }
@@ -426,6 +422,48 @@ Mcmc::updateTrans()
 
 }
 
+
+bool
+Mcmc::updateATrans(const size_t p, const double tune)
+{
+  if(p >= params_.size()) throw range_error("Specified parameter out of range");
+
+  Parameters oldParams = params_;
+  double logPiCur;
+  double gLogLikCan;
+
+  logPiCur = gLogLikelihood_;
+  logPiCur += log(params_(p).prior());
+
+  params_(p) *= exp(random_->gaussian(0,tune));
+
+  double logLikCan = calcLogLikelihood();
+  all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
+
+  double logPiCan = gLogLikCan;
+  logPiCan += log(params_(p).prior());
+
+  double qRatio = 0.0;
+  qRatio += log(params_(p) / oldParams(p));
+
+  double accept = logPiCan - logPiCur + qRatio;
+  if (log(random_->uniform()) < accept)
+    {
+      logLikelihood_ = logLikCan;
+      gLogLikelihood_ = gLogLikCan;
+      productCache_ = productCacheTmp_;
+      return true;
+    }
+  else
+    {
+      params_(p) = oldParams(p);
+      return false;
+    }
+
+}
+
+
+
 bool
 Mcmc::updateI(const size_t index)
 {
@@ -547,6 +585,13 @@ Mcmc::run(const size_t numIterations,
       writer.open();
     }
 
+  writer.write(pop_);
+  writer.write(params_);
+
+//  acceptance["alpha"] = 0.0;
+//  acceptance["alphastar"] = 0.0;
+//  acceptance["delta"] = 0.0;
+//  acceptance["epsilon"] = 0.0;
   acceptance["transParms"] = 0.0;
   acceptance["I"] = 0.0;
 
@@ -559,7 +604,7 @@ Mcmc::run(const size_t numIterations,
 
       //if (k % 10 == 0) loadBalance();
 
-      for (size_t infec = 0; infec < 0; ++infec)
+      for (size_t infec = 0; infec < 200; ++infec)
         {
           toMove = random_->integer(pop_.numInfected());
           acceptance["I"] += updateI(toMove);
@@ -579,11 +624,15 @@ Mcmc::run(const size_t numIterations,
   if (mpirank_ == 0)
     {
       cout << "\n";
-      cout << logTransCovar_->getCovariance() << endl;
+      cout << "Covariance: " << logTransCovar_->getCovariance() << endl;
+      logTransCovar_->printInnerds();
 
       writer.close();
-      acceptance["transParms"] /= numIterations;
-      acceptance["I"] /= (numIterations * 20);
+      acceptance["alpha"] /= numIterations / 4;
+      acceptance["alphastar"] /= numIterations / 4;
+      acceptance["delta"] /= numIterations / 4;
+      acceptance["epsilon"] /= numIterations / 4;
+      acceptance["I"] /= (numIterations * 200);
     }
   return acceptance;
 

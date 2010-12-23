@@ -57,8 +57,10 @@
 
 #include "Parameter.hpp"
 #include <stdexcept>
+#include <iostream>
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
+#include <boost/numeric/ublas/io.hpp>
 
 
 using namespace boost::numeric::ublas;
@@ -118,7 +120,6 @@ namespace EpiRisk
       void
       kronecker()
       {
-        double tmp;
         for (size_t i = 0; i < expectation_->size(); ++i)
           for (size_t j = 0; j <= i; ++j)
             (*covMatrix_)(i, j) = (*expectation_)(i) * (*expectation_)(j);
@@ -128,7 +129,7 @@ namespace EpiRisk
     public:
       EmpCovar(const Parameters& params, CovMatrix covariance) :
         params_(params), p_(params.size()),
-            rowCount_(1)
+            rowCount_(0)
       {
         // Set up storage
         sum_ = new ublas::vector<double> (p_);
@@ -153,27 +154,36 @@ namespace EpiRisk
         // Create covariance matrix
         (*expectation_) = *sum_ / (double)rowCount_; // Averages
         kronecker();
-        (*covMatrix_) = *sumSq_ / (double)rowCount_ - *covMatrix_;
+        (*covMatrix_) = (*sumSq_ / (double)rowCount_) - *covMatrix_;
 
         // Return Cholesky decomp, throw exception if cov not pos def.
         return (*covMatrix_);
       }
       void
+      printInnerds()
+      {
+        std::cerr << "Sum: " << *sum_ << std::endl;
+        std::cerr << "Sumsq: " << *sumSq_ << std::endl;
+        std::cerr << "Row count: " << rowCount_ << std::endl;
+        (*expectation_) = *sum_ / (double)rowCount_;
+        std::cerr << "Expectation: " << *expectation_ << endl;
+        kronecker();
+        std::cerr << "kronecker: " << *covMatrix_ << std::endl;
+        std::cerr << "covMatrix: " << (*sumSq_ / (double)rowCount_) - *covMatrix_;
+      }
+      void
       sample()
       {
         double prod;
-        int i, j;
-        ParamIter it, jt;
-        for (it = params_.begin(), i = 0; it != params_.end(); ++it, ++i)
+        for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(*it);
+            double pi = transformFunc_(params_(i));
             (*sum_)(i) += pi;
             (*sumSq_)(i, i) += pi*pi;
-            for (jt = params_.begin(), j = 0; jt != it; ++jt, ++j)
+            for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(*jt);
-                prod = pi * pj;
-                (*sumSq_)(i, j) += prod;
+                double pj = transformFunc_(params_(j));
+                (*sumSq_)(i, j) += pi * pj;
               }
           }
 

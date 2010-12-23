@@ -106,6 +106,8 @@ class Mcmc {
   bool
   updateTrans();
   bool
+  updateATrans(const size_t p, const double tune);
+  bool
   updateI(const size_t index = 0);
   bool
   addI();

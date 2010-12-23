@@ -92,27 +92,27 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Parameters* myParameters = new Parameters(12);
-  (*myParameters)(0) = Parameter(0.03,GammaPrior(0.1,0.1));
-  (*myParameters)(1) = Parameter(0.01,GammaPrior(0.1,0.1));
-  (*myParameters)(2) = Parameter(0.2,GammaPrior(0.1,0.1));
-  (*myParameters)(3) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(4) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(5) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(6) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(7) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(8) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(9) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(9) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(10) = Parameter(0.1,GammaPrior(0.1,0.1));
-  (*myParameters)(11) = Parameter(0.1,GammaPrior(0.1,0.1));
-  Mcmc* myMcmc = new Mcmc(*myPopulation, *myParameters,1);
+  Parameters params(12);
+  params(0) = Parameter(0.005,GammaPrior(1,1));
+  params(1) = Parameter(0.004,GammaPrior(1,1));
+  params(2) = Parameter(1.2,GammaPrior(1,1));
+  params(3) = Parameter(2e-6,GammaPrior(1,1));
+  params(4) = Parameter(1,GammaPrior(1,1));
+  params(5) = Parameter(1,GammaPrior(1,1));
+  params(6) = Parameter(1,GammaPrior(1,1));
+  params(7) = Parameter(1,GammaPrior(1,1));
+  params(8) = Parameter(1,GammaPrior(1,1));
+  params(9) = Parameter(1,GammaPrior(1,1));
+  params(10) = Parameter(1,GammaPrior(1,1));
+  params(11) = Parameter(1,GammaPrior(1,1));
+
+  Mcmc* myMcmc = new Mcmc(*myPopulation, params,1);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/fmdParams1." << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/fmdOccults1." << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/fmdFullModel.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/fmdFullModel.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -123,13 +123,15 @@ int main(int argc, char* argv[])
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
   if(comm.rank() == 0) {
-      cout << "Parameter acceptance: " << acceptance["transParms"] << endl;
+      cout << "Alpha acceptance: " << acceptance["alpha"] << endl;
+      cout << "Alphastar acceptance: " << acceptance["alphastar"] << endl;
+      cout << "delta acceptance: " << acceptance["delta"] << endl;
+      cout << "epsilon acceptance: " << acceptance["epsilon"] << endl;
       cout << "Infection acceptance: " << acceptance["I"] << endl;
   }
 
   delete writer;
   delete myMcmc;
-  delete myParameters;
   delete myPopulation;
 
   MPI::Finalize();
