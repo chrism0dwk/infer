@@ -37,6 +37,8 @@ using namespace EpiRisk;
 // Constants
 const double a = 0.015;
 const double b = 0.8;
+const double tuneI = 0.8;
+const double numIUpdates = 0;
 
 inline
 double
@@ -70,9 +72,9 @@ dist(const double x1, const double y1, const double x2, const double y2)
   return dist;
 }
 
-Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
+Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Parameters& detectParams,
     const size_t randomSeed) :
-  pop_(population), params_(parameters), logLikelihood_(0), integPressTime_(1.0)
+  pop_(population), txparams_(transParams), dxparams_(detectParams), logLikelihood_(0), integPressTime_(1.0)
 {
 
   // MPI setup
@@ -86,27 +88,37 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& parameters,
   random_ = new Random(randomSeed);
 
   //AdMCMC covariance.
-  EmpCovar<ExpTransform>::CovMatrix initCov(params_.size());
-  for (size_t i = 0; i < params_.size(); ++i)
+  EmpCovar<ExpTransform>::CovMatrix initCov(txparams_.size());
+  for (size_t i = 0; i < txparams_.size(); ++i)
     {
-      for (size_t j = 0; j < params_.size(); ++j)
+      for (size_t j = 0; j < txparams_.size(); ++j)
         {
-          if (i == j)
-            initCov(i, j) = 0.00001;
-          else
             initCov(i, j) = 0.0;
         }
     }
 
-  logTransCovar_ = new EmpCovar<LogTransform> (params_, initCov);
-  stdCov_ = new ublas::matrix<double>(params_.size(), params_.size());
+  initCov(0,0) = 0.01;
+  initCov(1,1) = 0.01;
+  initCov(2,2) = 0.01;
+  initCov(3,3) = 0.01;
+  initCov(4,4) = 0.01; //0.95; // Inf pigs
+  initCov(5,5) = 0.01; //0.1; // Inf sheep
+  initCov(6,6) = 0.01; //2.53; // Inf goats
+  initCov(7,7) = 0.01; //154.4; // Inf deer
+  initCov(8,8) = 0.01; //0.95; // Susc pigs
+  initCov(9,9) = 0.01; //0.1; // Susc sheep
+  initCov(10,10) = 0.01; //2.53; // Susc goats
+  initCov(11,11) = 0.01; //154.4; // Susc deer
 
-  for (size_t i = 0; i < params_.size(); ++i)
+  logTransCovar_ = new EmpCovar<LogTransform> (txparams_, initCov);
+  stdCov_ = new ublas::matrix<double>(txparams_.size(), txparams_.size());
+
+  for (size_t i = 0; i < txparams_.size(); ++i)
     {
-      for (size_t j = 0; j < params_.size(); ++j)
+      for (size_t j = 0; j < txparams_.size(); ++j)
         {
           if (i == j)
-            (*stdCov_)(i, j) = 0.1 / params_.size();
+            (*stdCov_)(i, j) = 0.01 / txparams_.size();
           else
             (*stdCov_)(i, j) = 0.0;
         }
@@ -159,17 +171,17 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
   if (distance <= 25.0)
     {
       double infectivity = i.getCovariates().cattle +
-                           params_(4)*i.getCovariates().pigs +
-                           params_(5)*i.getCovariates().sheep +
-                           params_(6)*i.getCovariates().goats +
-                           params_(7)*i.getCovariates().deer;
+                           txparams_(4)*i.getCovariates().pigs +
+                           txparams_(5)*i.getCovariates().sheep +
+                           txparams_(6)*i.getCovariates().goats +
+                           txparams_(7)*i.getCovariates().deer;
       double susceptibility = j.getCovariates().cattle +
-                                 params_(8)*j.getCovariates().pigs +
-                                 params_(9)*j.getCovariates().sheep +
-                                 params_(10)*j.getCovariates().goats +
-                                 params_(11)*j.getCovariates().deer;
+                                 txparams_(8)*j.getCovariates().pigs +
+                                 txparams_(9)*j.getCovariates().sheep +
+                                 txparams_(10)*j.getCovariates().goats +
+                                 txparams_(11)*j.getCovariates().deer;
 
-      return params_(0) * infectivity * susceptibility * params_(2) / (params_(2)*params_(2) + distance*distance);
+      return txparams_(0) * infectivity * susceptibility * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
     }
   else
     return 0.0;
@@ -184,17 +196,17 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
       double infectivity = i.getCovariates().cattle +
-                           params_(4)*i.getCovariates().pigs +
-                           params_(5)*i.getCovariates().sheep +
-                           params_(6)*i.getCovariates().goats +
-                           params_(7)*i.getCovariates().deer;
+                           txparams_(4)*i.getCovariates().pigs +
+                           txparams_(5)*i.getCovariates().sheep +
+                           txparams_(6)*i.getCovariates().goats +
+                           txparams_(7)*i.getCovariates().deer;
       double susceptibility = j.getCovariates().cattle +
-                                 params_(8)*j.getCovariates().pigs +
-                                 params_(9)*j.getCovariates().sheep +
-                                 params_(10)*j.getCovariates().goats +
-                                 params_(11)*j.getCovariates().deer;
+                                 txparams_(8)*j.getCovariates().pigs +
+                                 txparams_(9)*j.getCovariates().sheep +
+                                 txparams_(10)*j.getCovariates().goats +
+                                 txparams_(11)*j.getCovariates().deer;
 
-      return params_(1) * infectivity * susceptibility * params_(2) / (params_(2)*params_(2) + distance*distance);
+      return txparams_(1) * infectivity * susceptibility * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
   }
   else
     return 0.0;
@@ -227,7 +239,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
         }
       ++i;
     }
-  sumPressure += params_(3);
+  sumPressure += txparams_(3);
   return sumPressure;
 }
 
@@ -254,7 +266,7 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
           Ij));
     }
 
-  integPressure += params_(3) * (min(Ij, pop_.getObsTime()) - I1);
+  integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);
 
   return -integPressure;
 }
@@ -364,24 +376,33 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
   return logLikelihood;
 }
 
+
+//BlockUpdate&
+//Mcmc::createBlockUpdate()
+//{
+//  updates_.push_back(BlockUpdate);
+//  return updates_.back();
+//}
+
+
 bool
 Mcmc::updateTrans()
 {
-  Parameters oldParams = params_;
+  Parameters oldParams = txparams_;
   Random::Variates logvars;
   double logPiCur;
   double gLogLikCan;
 
   logPiCur = gLogLikelihood_;
-  for(size_t p=0; p < params_.size(); ++p)
-      logPiCur += log(params_(p).prior());
+  for(size_t p=0; p < txparams_.size(); ++p)
+      logPiCur += log(txparams_(p).prior());
 
   if (random_->uniform() < 0.95)
     {
       try
         {
           logvars = random_->mvgauss(logTransCovar_->getCovariance() * 2.38
-              * 2.38 / params_.size());
+				     * 2.38 / txparams_.size());
         }
       catch (cholesky_error& e)
         {
@@ -391,19 +412,19 @@ Mcmc::updateTrans()
   else
     logvars = random_->mvgauss(*stdCov_);
 
-  for(size_t p=0; p<params_.size(); ++p)
-    params_(p) *= exp(logvars[p]);
+  for(size_t p=0; p<txparams_.size(); ++p)
+    txparams_(p) *= exp(logvars[p]);
 
   double logLikCan = calcLogLikelihood();
   all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
 
   double logPiCan = gLogLikCan;
-  for(size_t p=0; p<params_.size(); ++p)
-    logPiCan += log(params_(p).prior());
+  for(size_t p=0; p<txparams_.size(); ++p)
+    logPiCan += log(txparams_(p).prior());
 
   double qRatio = 0.0;
-  for(size_t p=0; p<params_.size(); ++p)
-    qRatio += log(params_(p) / oldParams(p));
+  for(size_t p=0; p<txparams_.size(); ++p)
+    qRatio += log(txparams_(p) / oldParams(p));
 
   double accept = logPiCan - logPiCur + qRatio;
   if (log(random_->uniform()) < accept)
@@ -415,8 +436,8 @@ Mcmc::updateTrans()
     }
   else
     {
-      for(size_t p=0; p<params_.size();++p)
-        params_(p) = oldParams(p);
+      for(size_t p=0; p<txparams_.size();++p)
+        txparams_(p) = oldParams(p);
       return false;
     }
 
@@ -426,25 +447,25 @@ Mcmc::updateTrans()
 bool
 Mcmc::updateATrans(const size_t p, const double tune)
 {
-  if(p >= params_.size()) throw range_error("Specified parameter out of range");
+  if(p >= txparams_.size()) throw range_error("Specified parameter out of range");
 
-  Parameters oldParams = params_;
+  Parameters oldParams = txparams_;
   double logPiCur;
   double gLogLikCan;
 
   logPiCur = gLogLikelihood_;
-  logPiCur += log(params_(p).prior());
+  logPiCur += log(txparams_(p).prior());
 
-  params_(p) *= exp(random_->gaussian(0,tune));
+  txparams_(p) *= exp(random_->gaussian(0,tune));
 
   double logLikCan = calcLogLikelihood();
   all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
 
   double logPiCan = gLogLikCan;
-  logPiCan += log(params_(p).prior());
+  logPiCan += log(txparams_(p).prior());
 
   double qRatio = 0.0;
-  qRatio += log(params_(p) / oldParams(p));
+  qRatio += log(txparams_(p) / oldParams(p));
 
   double accept = logPiCan - logPiCur + qRatio;
   if (log(random_->uniform()) < accept)
@@ -456,7 +477,7 @@ Mcmc::updateATrans(const size_t p, const double tune)
     }
   else
     {
-      params_(p) = oldParams(p);
+      txparams_(p) = oldParams(p);
       return false;
     }
 
@@ -469,18 +490,22 @@ Mcmc::updateI(const size_t index)
 {
   double gLogLikCan;
 
-  double newI = random_->extreme(a, b);
-
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
-  newI = it->getN() - newI;
+
+  double newI = it->getN() - (it->getN() - it->getI()) * exp(random_->gaussian(0,tuneI));
+  //double newI = it->getN() - random_->extreme(a, b); // Independence sampler
 
   double logLikCan = updateIlogLikelihood(it, newI);
   all_reduce(comm_, logLikCan, gLogLikCan, plus<double> ());
 
-  double a = gLogLikCan - gLogLikelihood_;
+  double piCan = gLogLikCan + log(extremepdf(it->getN() - newI,a,b));
+  double piCur = gLogLikelihood_ + log(extremepdf(it->getN() - it->getI(),a,b));
 
-  if (log(random_->uniform()) < a)
+  double qRatio = log((it->getN() - newI) / (it->getN() - it->getI()));
+  double accept = piCan - piCur + qRatio;
+
+  if (log(random_->uniform()) < accept)
     {
       // Update the infection
       pop_.moveInfectionTime(it, newI);
@@ -586,7 +611,7 @@ Mcmc::run(const size_t numIterations,
     }
 
   writer.write(pop_);
-  writer.write(params_);
+  writer.write(txparams_);
 
 //  acceptance["alpha"] = 0.0;
 //  acceptance["alphastar"] = 0.0;
@@ -604,7 +629,7 @@ Mcmc::run(const size_t numIterations,
 
       //if (k % 10 == 0) loadBalance();
 
-      for (size_t infec = 0; infec < 200; ++infec)
+      for (size_t infec = 0; infec < numIUpdates; ++infec)
         {
           toMove = random_->integer(pop_.numInfected());
           acceptance["I"] += updateI(toMove);
@@ -617,7 +642,7 @@ Mcmc::run(const size_t numIterations,
       if (mpirank_ == 0)
         {
           writer.write(pop_);
-          writer.write(params_);
+          writer.write(txparams_);
         }
     }
 
@@ -628,11 +653,8 @@ Mcmc::run(const size_t numIterations,
       logTransCovar_->printInnerds();
 
       writer.close();
-      acceptance["alpha"] /= numIterations / 4;
-      acceptance["alphastar"] /= numIterations / 4;
-      acceptance["delta"] /= numIterations / 4;
-      acceptance["epsilon"] /= numIterations / 4;
-      acceptance["I"] /= (numIterations * 200);
+      acceptance["transParms"] /= (double)numIterations;
+      acceptance["I"] /= (numIterations * numIUpdates);
     }
   return acceptance;
 
@@ -642,8 +664,8 @@ void
 Mcmc::dumpParms() const
 {
   ublas::vector<Parameter>::iterator it;
-  it = params_.begin();
-  while (it != params_.end())
+  it = txparams_.begin();
+  while (it != txparams_.end())
     {
       cout << *it << " ";
       ++it;
