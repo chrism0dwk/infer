@@ -33,6 +33,7 @@
 #include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 
 #include "SpatPointPop.hpp"
@@ -47,6 +48,7 @@
 using namespace std;
 using namespace EpiRisk;
 namespace mpi = boost::mpi;
+
 
 struct ExpTransform
 {
@@ -69,7 +71,8 @@ struct LogTransform
 class Mcmc {
 
   Population<TestCovars>& pop_;
-  Parameters& params_;
+  Parameters& txparams_;
+  Parameters& dxparams_;
   double logLikelihood_,gLogLikelihood_;
   Random* random_;
   EmpCovar<LogTransform>* logTransCovar_;
@@ -89,6 +92,8 @@ class Mcmc {
   ProcessInfectives processInfectives_;
   ProcessInfectives occultList_;
 
+
+  //// THESE SHOULD BE IN A "MODEL" CLASS ////
   virtual
   double
   beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
@@ -103,6 +108,11 @@ class Mcmc {
   calcLogLikelihood();
   double
   updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
+  /////////////////////////////////////////////
+
+  //! Creates a block update group
+//  BlockUpdate&
+//  createBlockUpdate();
   bool
   updateTrans();
   bool
@@ -123,7 +133,10 @@ class Mcmc {
   loadBalance();
 
 public:
-  Mcmc(Population<TestCovars>& population, Parameters& parameters, const size_t randomSeed);
+  Mcmc(Population<TestCovars>& population,
+       Parameters& transParams,
+       Parameters& detectParams,
+       const size_t randomSeed);
   ~Mcmc();
   double
   getLogLikelihood() const;

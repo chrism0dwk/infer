@@ -73,27 +73,50 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Parameters params(12);
-  params(0) = Parameter(0.005,GammaPrior(1,1));
-  params(1) = Parameter(0.004,GammaPrior(1,1));
-  params(2) = Parameter(1.2,GammaPrior(1,1));
-  params(3) = Parameter(2e-6,GammaPrior(1,1));
-  params(4) = Parameter(1,GammaPrior(1,1));
-  params(5) = Parameter(1,GammaPrior(1,1));
-  params(6) = Parameter(1,GammaPrior(1,1));
-  params(7) = Parameter(1,GammaPrior(1,1));
-  params(8) = Parameter(1,GammaPrior(1,1));
-  params(9) = Parameter(1,GammaPrior(1,1));
-  params(10) = Parameter(1,GammaPrior(1,1));
-  params(11) = Parameter(1,GammaPrior(1,1));
+  Parameters txparams(12);
+  txparams(0) = Parameter(0.005,GammaPrior(1,1));
+  txparams(1) = Parameter(0.004,GammaPrior(1,1));
+  txparams(2) = Parameter(1.2,GammaPrior(1,1));
+  txparams(3) = Parameter(2e-6,GammaPrior(1,1));
+  txparams(4) = Parameter(1,GammaPrior(1,1));
+  txparams(5) = Parameter(1,GammaPrior(1,1));
+  txparams(6) = Parameter(1,GammaPrior(1,1));
+  txparams(7) = Parameter(1,GammaPrior(1,1));
+  txparams(8) = Parameter(1,GammaPrior(1,1));
+  txparams(9) = Parameter(1,GammaPrior(1,1));
+  txparams(10) = Parameter(1,GammaPrior(1,1));
+  txparams(11) = Parameter(1,GammaPrior(1,1));
 
-  Mcmc* myMcmc = new Mcmc(*myPopulation, params,1);
+  Parameters dxparams(1);
+  dxparams(0) = Parameter(0.1,GammaPrior(1,1));
+
+  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
+
+//  BlockUpdate& infecUpdate = myMcmc->createBlockUpdate();
+//  infecUpdate.push_back(txparams(0));
+//  infecUpdate.push_back(txparams(1));
+//  infecUpdate.push_back(txparams(4));
+//  infecUpdate.push_back(txparams(5));
+//  infecUpdate.push_back(txparams(6));
+//  infecUpdate.push_back(txparams(7));
+//
+//  BlockUpdate& suscepUpdate = myMcmc->createBlockUpdate();
+//  suscepUpdate.push_back(txparams(0));
+//  suscepUpdate.push_back(txparams(1));
+//  suscepUpdate.push_back(txparams(8));
+//  suscepUpdate.push_back(txparams(9));
+//  suscepUpdate.push_back(txparams(10));
+//  suscepUpdate.push_back(txparams(11));
+//
+//  BlockUpdate& deltaUpdate = myMcmc->createBlockUpdate();
+//  deltaUpdate.push_back(txparams(3));
+//  deltaUpdate.push_back(txparams(2));
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/fmdFullModel.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/fmdFullModel.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/fmdFullModelScalVar3.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/fmdFullModelScalVar3.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -104,10 +127,11 @@ int main(int argc, char* argv[])
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
   if(comm.rank() == 0) {
-      cout << "Alpha acceptance: " << acceptance["alpha"] << endl;
-      cout << "Alphastar acceptance: " << acceptance["alphastar"] << endl;
-      cout << "delta acceptance: " << acceptance["delta"] << endl;
-      cout << "epsilon acceptance: " << acceptance["epsilon"] << endl;
+      cout << "Trans parm acceptance: " << acceptance["transParms"] << endl;
+      //cout << "Alpha acceptance: " << acceptance["alpha"] << endl;
+      //cout << "Alphastar acceptance: " << acceptance["alphastar"] << endl;
+      //cout << "delta acceptance: " << acceptance["delta"] << endl;
+      //cout << "epsilon acceptance: " << acceptance["epsilon"] << endl;
       cout << "Infection acceptance: " << acceptance["I"] << endl;
   }
 

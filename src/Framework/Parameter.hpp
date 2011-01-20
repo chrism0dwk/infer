@@ -133,6 +133,7 @@ namespace EpiRisk
 
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
+  typedef boost::numeric::ublas::vector<Parameter&> ParameterGroup;
 
 }
 
