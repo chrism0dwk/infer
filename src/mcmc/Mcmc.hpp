@@ -34,7 +34,7 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-
+#include <boost/ptr_container/ptr_list.hpp>
 
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
@@ -42,107 +42,108 @@
 #include "Random.hpp"
 #include "EmpCovar.hpp"
 #include "McmcWriter.hpp"
+#include "MCMCUpdater.hpp"
 
 #define NEGINF (-numeric_limits<double>::infinity())
 
-using namespace std;
-using namespace EpiRisk;
-namespace mpi = boost::mpi;
-
-
-struct ExpTransform
+namespace EpiRisk
 {
-  double operator()(const double x)
+  using namespace std;
+  using namespace EpiRisk;
+  namespace mpi = boost::mpi;
+
+  // FWD DECLS
+  class McmcUpdate;
+  class AdaptiveMultiLogMRW;
+
+  struct Likelihood
   {
-    return exp(x);
-  }
-};
+    double local;
+    double global;
+    map<string, double> productCache;
+  };
 
-struct LogTransform
-{
-  double operator()(const double x)
+  class Mcmc
   {
-    return log(x);
-  }
-};
+
+    //// Update algorithms ////
+//    friend class McmcUpdater;
+//    friend class AdaptiveMultiLogMRW;
+
+    Population<TestCovars>& pop_;
+    Parameters& txparams_;
+    Parameters& dxparams_;
+    Likelihood logLikelihood_;
+    Random* random_;
+
+    boost::ptr_list<McmcUpdate> updateStack_;
+    mpi::communicator comm_;
+    int mpirank_, mpiprocs_;
+    bool mpiInitHere_;
+    bool accept_;
+    double integPressTime_;
+    std::vector<size_t> elements_;
+    ofstream mcmcOutput_;
+
+    typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
+    ProcessInfectives processInfectives_;
+    ProcessInfectives occultList_;
+
+    //// THESE SHOULD BE IN A "MODEL" CLASS ////
+    virtual
+    double
+    beta(const Population<TestCovars>::Individual& i, const Population<
+        TestCovars>::Individual& j) const;
+    virtual
+    double
+    betastar(const Population<TestCovars>::Individual& i, const Population<
+        TestCovars>::Individual& j) const;
+    double
+    instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
+        const double Ij);
+    double
+    integPressureOn(const Population<TestCovars>::PopulationIterator& j,
+        const double Ij);
+
+    void
+    updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
+        const double newTime, Likelihood& updatedLogLik);
+    /////////////////////////////////////////////
 
 
+    bool
+    updateI(const size_t index = 0);
+    bool
+    addI();
+    bool
+    deleteI();
+    void
+        moveProdCache(const string id, const size_t fromIndex,
+            const size_t toIndex);
+    void
+    dumpParms() const;
+    void
+    dumpProdCache();
+    void
+    loadBalance();
 
-class Mcmc {
+  public:
+    Mcmc(Population<TestCovars>& population, Parameters& transParams,
+        Parameters& detectParams, const size_t randomSeed);
+    ~Mcmc();
+    //    void
+    //    pushUpdater(const string tag, const ParameterGroup& updateGroup);
+    double
+    getLogLikelihood() const;
+    map<string, double>
+        run(const size_t numIterations,
+            McmcWriter<Population<TestCovars> >& writer);
+    //! Creates a block update group
+    AdaptiveMultiLogMRW*
+    newAdaptiveMultiLogMRW(const string tag, const ParameterGroup& params);
+    void
+    calcLogLikelihood(Likelihood& logLikelihood);
+  };
 
-  Population<TestCovars>& pop_;
-  Parameters& txparams_;
-  Parameters& dxparams_;
-  double logLikelihood_,gLogLikelihood_;
-  Random* random_;
-  EmpCovar<LogTransform>* logTransCovar_;
-  ublas::matrix<double>* stdCov_;
-  map<string,double> productCache_;
-  map<string,double> productCacheTmp_;
-
-  mpi::communicator comm_;
-  int mpirank_,mpiprocs_;
-  bool mpiInitHere_;
-  bool accept_;
-  double integPressTime_;
-  std::vector<size_t> elements_;
-  ofstream mcmcOutput_;
-
-  typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
-  ProcessInfectives processInfectives_;
-  ProcessInfectives occultList_;
-
-
-  //// THESE SHOULD BE IN A "MODEL" CLASS ////
-  virtual
-  double
-  beta(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
-  virtual
-  double
-  betastar(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
-  double
-  instantPressureOn(const Population<TestCovars>::InfectiveIterator& j, const double Ij);
-  double
-  integPressureOn(const Population<TestCovars>::PopulationIterator& j, const double Ij);
-  double
-  calcLogLikelihood();
-  double
-  updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j, const double newTime);
-  /////////////////////////////////////////////
-
-  //! Creates a block update group
-//  BlockUpdate&
-//  createBlockUpdate();
-  bool
-  updateTrans();
-  bool
-  updateATrans(const size_t p, const double tune);
-  bool
-  updateI(const size_t index = 0);
-  bool
-  addI();
-  bool
-  deleteI();
-  void
-  moveProdCache(const string id, const size_t fromIndex, const size_t toIndex);
-  void
-  dumpParms() const;
-  void
-  dumpProdCache();
-  void
-  loadBalance();
-
-public:
-  Mcmc(Population<TestCovars>& population,
-       Parameters& transParams,
-       Parameters& detectParams,
-       const size_t randomSeed);
-  ~Mcmc();
-  double
-  getLogLikelihood() const;
-  map<string,double>
-  run(const size_t numIterations, McmcWriter<Population<TestCovars> >& writer);
-};
-
-
+}
 #endif

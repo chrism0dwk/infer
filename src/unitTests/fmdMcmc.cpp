@@ -16,7 +16,8 @@
 #include "Data.hpp"
 #include "McmcWriter.hpp"
 
-namespace mpi = boost::mpi;
+
+using namespace EpiRisk;
 
   class GammaPrior : public Prior
   {
@@ -92,31 +93,34 @@ int main(int argc, char* argv[])
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
 
-//  BlockUpdate& infecUpdate = myMcmc->createBlockUpdate();
-//  infecUpdate.push_back(txparams(0));
-//  infecUpdate.push_back(txparams(1));
-//  infecUpdate.push_back(txparams(4));
-//  infecUpdate.push_back(txparams(5));
-//  infecUpdate.push_back(txparams(6));
-//  infecUpdate.push_back(txparams(7));
-//
-//  BlockUpdate& suscepUpdate = myMcmc->createBlockUpdate();
-//  suscepUpdate.push_back(txparams(0));
-//  suscepUpdate.push_back(txparams(1));
-//  suscepUpdate.push_back(txparams(8));
-//  suscepUpdate.push_back(txparams(9));
-//  suscepUpdate.push_back(txparams(10));
-//  suscepUpdate.push_back(txparams(11));
-//
-//  BlockUpdate& deltaUpdate = myMcmc->createBlockUpdate();
-//  deltaUpdate.push_back(txparams(3));
-//  deltaUpdate.push_back(txparams(2));
+  ParameterGroup infecUpdate;
+  infecUpdate.push_back(&txparams(0));
+  infecUpdate.push_back(&txparams(1));
+  infecUpdate.push_back(&txparams(4));
+  infecUpdate.push_back(&txparams(5));
+  infecUpdate.push_back(&txparams(6));
+  infecUpdate.push_back(&txparams(7));
+  myMcmc->newAdaptiveMultiLogMRW("txInfec",infecUpdate);
+
+  ParameterGroup suscepUpdate;
+  suscepUpdate.push_back(&txparams(0));
+  suscepUpdate.push_back(&txparams(1));
+  suscepUpdate.push_back(&txparams(8));
+  suscepUpdate.push_back(&txparams(9));
+  suscepUpdate.push_back(&txparams(10));
+  suscepUpdate.push_back(&txparams(11));
+  myMcmc->newAdaptiveMultiLogMRW("txSuscep",suscepUpdate);
+
+  ParameterGroup deltaUpdate;
+  deltaUpdate.push_back(&txparams(3));
+  deltaUpdate.push_back(&txparams(2));
+  myMcmc->newAdaptiveMultiLogMRW("txDistance",deltaUpdate);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/fmdFullModelScalVar3.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/fmdFullModelScalVar3.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/fmdCustomScheme.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/fmdCustomScheme.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
