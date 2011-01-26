@@ -28,6 +28,7 @@
 #define PARAMETER_HPP_
 
 #include <boost/numeric/ublas/vector.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 namespace EpiRisk
 {
@@ -152,7 +153,8 @@ namespace EpiRisk
 
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
-  typedef boost::numeric::ublas::vector<Parameter&> ParameterGroup;
+  typedef boost::ptr_vector<Parameter> ParameterGroup;
+  typedef boost::ptr_vector<Parameter> UpdateGroup;
 
 }
 

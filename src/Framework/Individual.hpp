@@ -65,7 +65,7 @@ namespace EpiRisk
     typedef Covars CovarsType;
     typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
-    typedef vector<size_t> ConnectionList;
+    typedef std::vector<size_t> ConnectionList;
 
 
     private:
@@ -372,14 +372,13 @@ namespace EpiRisk
 
         return false;
       }
-      ;
 
-      vector<const ContactType*>
+      std::vector<const ContactType*>
       getInfecContacts() const// TODO: We should watch this one, just in case it impacts on performance!!
       {
         // Gets all infectious contacts
 
-        vector<const ContactType*> contactList;
+        std::vector<const ContactType*> contactList;
         typename ContactList::iterator cIter(contacts_.begin());
 
         if (!hasContacts())
@@ -620,16 +619,15 @@ namespace EpiRisk
 
         return numContact;
       }
-      ;
 
-      vector<const ContactType*>
+      std::vector<const ContactType*>
       getContactsByUntil(const int contactType, const double t) const
       {
         // Returns a vector of pointers to individuals who
         // contacted *this by method contactType up to just
         // before time t.
 
-        vector<const ContactType*> contactList;
+        std::vector<const ContactType*> contactList;
         typename ContactList::iterator cIter = contacts_.begin();
 
         // Return empty vector if no contacts exist (time saver)

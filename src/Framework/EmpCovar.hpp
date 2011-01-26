@@ -61,15 +61,17 @@
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 
 using namespace boost::numeric::ublas;
 using namespace boost::numeric;
+using namespace boost::ptr_container;
 
 namespace EpiRisk
 {
 
-  class CholeskyFail : public exception
+  class CholeskyFail : public std::exception
   {
   public:
     CholeskyFail(const char* msg)
@@ -111,7 +113,7 @@ namespace EpiRisk
       symmetric_matrix<double>* sqExpectation_;
       ublas::vector<double>* expectation_;
 
-      const Parameters& params_;
+      const UpdateGroup& params_;
       size_t p_;
       int rowCount_;
 
@@ -127,7 +129,7 @@ namespace EpiRisk
 
 
     public:
-      EmpCovar(const Parameters& params, CovMatrix covariance) :
+      EmpCovar(const UpdateGroup& params, CovMatrix covariance) :
         params_(params), p_(params.size()),
             rowCount_(0)
       {
@@ -166,7 +168,7 @@ namespace EpiRisk
         std::cerr << "Sumsq: " << *sumSq_ << std::endl;
         std::cerr << "Row count: " << rowCount_ << std::endl;
         (*expectation_) = *sum_ / (double)rowCount_;
-        std::cerr << "Expectation: " << *expectation_ << endl;
+        std::cerr << "Expectation: " << *expectation_ << std::endl;
         kronecker();
         std::cerr << "kronecker: " << *covMatrix_ << std::endl;
         std::cerr << "covMatrix: " << (*sumSq_ / (double)rowCount_) - *covMatrix_;
@@ -174,15 +176,14 @@ namespace EpiRisk
       void
       sample()
       {
-        double prod;
         for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(params_(i));
+            double pi = transformFunc_(params_[i]);
             (*sum_)(i) += pi;
             (*sumSq_)(i, i) += pi*pi;
             for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(params_(j));
+                double pj = transformFunc_(params_[j]);
                 (*sumSq_)(i, j) += pi * pj;
               }
           }
