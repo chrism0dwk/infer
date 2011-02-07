@@ -64,7 +64,7 @@ namespace EpiRisk
   class McmcUpdate
   {
   public:
-    McmcUpdate(const std::string& tag, const ParameterGroup& params, Random& rng,
+    McmcUpdate(const std::string& tag, ParameterView& params, Random& rng,
         Likelihood& logLikelihood, Mcmc* const env );
     virtual
     ~McmcUpdate();
@@ -80,14 +80,11 @@ namespace EpiRisk
     getTag() const;
 
   protected:
-    virtual
-    void
-    initialize();
     const std::string tag_;
     Mcmc* env_;
     Likelihood& logLikelihood_;
     Random& random_;
-    UpdateGroup updateGroup_;
+    ParameterView updateGroup_;
     size_t acceptance_;
     size_t numUpdates_;
   };
@@ -96,7 +93,7 @@ namespace EpiRisk
   class AdaptiveMultiLogMRW : public McmcUpdate
   {
   public:
-    AdaptiveMultiLogMRW(const std::string& tag, const ParameterGroup& params, Random& rng,
+    AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, Random& rng,
         Likelihood& logLikelihood, Mcmc* const env  );
     ~AdaptiveMultiLogMRW();
     void
@@ -104,8 +101,6 @@ namespace EpiRisk
     void
     update();
   private:
-    void
-    initialize();
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };
