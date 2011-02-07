@@ -55,8 +55,8 @@ int main(int argc, char* argv[])
   mpi::environment env(argc,argv);
   mpi::communicator comm;
 
-  if (argc != 4) {
-      cerr << "Usage: testSpatPointPop <pop file> <epi file> <num iterations>" << endl;
+  if (argc != 5) {
+      cerr << "Usage: testSpatPointPop <pop file> <epi file> <covar matrix> <num iterations>" << endl;
       return EXIT_FAILURE;
   }
 
@@ -74,58 +74,71 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
+  // Data covariance matrix
+  EmpCovar<LogTransform>::CovMatrix speciesCovar;
+  ifstream covMatrix;
+  covMatrix.open(argv[3],ios::in);
+  covMatrix >> speciesCovar;
+  covMatrix.close();
+
+
   Parameters txparams(12);
-  txparams(0) = Parameter(0.005,GammaPrior(1,1));
-  txparams(1) = Parameter(0.004,GammaPrior(1,1));
-  txparams(2) = Parameter(1.2,GammaPrior(1,1));
-  txparams(3) = Parameter(2e-6,GammaPrior(1,1));
-  txparams(4) = Parameter(1,GammaPrior(1,1));
-  txparams(5) = Parameter(1,GammaPrior(1,1));
-  txparams(6) = Parameter(1,GammaPrior(1,1));
-  txparams(7) = Parameter(1,GammaPrior(1,1));
-  txparams(8) = Parameter(1,GammaPrior(1,1));
-  txparams(9) = Parameter(1,GammaPrior(1,1));
-  txparams(10) = Parameter(1,GammaPrior(1,1));
-  txparams(11) = Parameter(1,GammaPrior(1,1));
+  txparams(0) = Parameter(2e-7,GammaPrior(1,1));
+  txparams(1) = Parameter(1.8e-7,GammaPrior(1,1));
+  txparams(2) = Parameter(1,GammaPrior(1,1));
+  txparams(3) = Parameter(5e-6,GammaPrior(1,1));
+  txparams(4) = Parameter(0.18,GammaPrior(1,1));
+  txparams(5) = Parameter(0.13,GammaPrior(1,1));
+  txparams(6) = Parameter(0.72,GammaPrior(1,1));
+  txparams(7) = Parameter(1.4,GammaPrior(1,1));
+  txparams(8) = Parameter(0.018,GammaPrior(1,1));
+  txparams(9) = Parameter(0.14,GammaPrior(1,1));
+  txparams(10) = Parameter(1.7,GammaPrior(1,1));
+  txparams(11) = Parameter(0.46,GammaPrior(1,1));
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1));
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
 
-  ParameterGroup infecUpdate;
-  infecUpdate.push_back(&txparams(0));
-  infecUpdate.push_back(&txparams(1));
-  infecUpdate.push_back(&txparams(4));
-  infecUpdate.push_back(&txparams(5));
-  infecUpdate.push_back(&txparams(6));
-  infecUpdate.push_back(&txparams(7));
-  myMcmc->newAdaptiveMultiLogMRW("txInfec",infecUpdate);
+  ParameterView txInfec;
+//  for(size_t i=0; i<txparams.size(); ++i)
+  txInfec.push_back(&txparams[0]);
+  txInfec.push_back(&txparams[1]);
+  txInfec.push_back(&txparams[4]);
+  txInfec.push_back(&txparams[5]);
+  txInfec.push_back(&txparams[6]);
+  txInfec.push_back(&txparams[7]);
+  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txInfec",txInfec);
+  tx->setCovariance(speciesCovar);
 
-  ParameterGroup suscepUpdate;
-  suscepUpdate.push_back(&txparams(0));
-  suscepUpdate.push_back(&txparams(1));
-  suscepUpdate.push_back(&txparams(8));
-  suscepUpdate.push_back(&txparams(9));
-  suscepUpdate.push_back(&txparams(10));
-  suscepUpdate.push_back(&txparams(11));
-  myMcmc->newAdaptiveMultiLogMRW("txSuscep",suscepUpdate);
+  ParameterView txSuscep;
+  txSuscep.push_back(&txparams[0]);
+  txSuscep.push_back(&txparams[1]);
+  txSuscep.push_back(&txparams[8]);
+  txSuscep.push_back(&txparams[9]);
+  txSuscep.push_back(&txparams[10]);
+  txSuscep.push_back(&txparams[11]);
+  tx = myMcmc->newAdaptiveMultiLogMRW("txSuscep",txSuscep);
+  tx->setCovariance(speciesCovar);
 
-  ParameterGroup deltaUpdate;
-  deltaUpdate.push_back(&txparams(3));
-  deltaUpdate.push_back(&txparams(2));
-  myMcmc->newAdaptiveMultiLogMRW("txDistance",deltaUpdate);
+  ParameterView txDelta;
+  txDelta.push_back(&txparams[0]);
+  txDelta.push_back(&txparams[1]);
+  txDelta.push_back(&txparams[2]);
+  txDelta.push_back(&txparams[3]);
+  tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/fmdCustomScheme.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/fmdCustomScheme.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/fmdCustomScheme2.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/fmdCustomScheme2.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
   size_t numIters;
-  stringstream iters(argv[3]);
+  stringstream iters(argv[4]);
   iters >> numIters;
 
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
@@ -139,8 +152,8 @@ int main(int argc, char* argv[])
       cout << "Infection acceptance: " << acceptance["I"] << endl;
   }
 
-  delete writer;
   delete myMcmc;
+  delete writer;
   delete myPopulation;
 
   MPI::Finalize();

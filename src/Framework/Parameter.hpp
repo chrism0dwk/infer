@@ -8,7 +8,9 @@
 #ifndef PARAMETER_HPP_
 #define PARAMETER_HPP_
 
+#include <vector>
 #include <boost/numeric/ublas/vector.hpp>
+#include <boost/numeric/ublas/vector_proxy.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
 namespace EpiRisk
@@ -132,10 +134,9 @@ namespace EpiRisk
     }
   };
 
-
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
-  typedef boost::ptr_vector<Parameter> ParameterGroup;
-  typedef boost::ptr_vector<Parameter> UpdateGroup;
+  typedef boost::numeric::ublas::slice ParameterSlice;
+  typedef std::vector< Parameter* > ParameterView;
 
 }
 

@@ -61,12 +61,9 @@
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-
 
 using namespace boost::numeric::ublas;
 using namespace boost::numeric;
-using namespace boost::ptr_container;
 
 namespace EpiRisk
 {
@@ -107,14 +104,16 @@ namespace EpiRisk
 
     private:
       typedef ublas::vector<Parameter>::const_iterator ParamIter; // Tries to enforce type consistency
-      CovMatrix* covMatrix_;
-      ublas::vector<double>* sum_;
-      symmetric_matrix<double>* sumSq_;
-      symmetric_matrix<double>* sqExpectation_;
-      ublas::vector<double>* expectation_;
 
-      const UpdateGroup& params_;
       size_t p_;
+      ublas::vector<double> sum_;
+      symmetric_matrix<double> sumSq_;
+      CovMatrix covMatrix_;
+      ublas::vector<double> expectation_;
+
+      const ParameterView& params_;
+      const size_t burnin_;
+
       int rowCount_;
 
       Transform transformFunc_;
@@ -122,76 +121,77 @@ namespace EpiRisk
       void
       kronecker()
       {
-        for (size_t i = 0; i < expectation_->size(); ++i)
+        for (size_t i = 0; i < expectation_.size(); ++i)
           for (size_t j = 0; j <= i; ++j)
-            (*covMatrix_)(i, j) = (*expectation_)(i) * (*expectation_)(j);
+            covMatrix_(i, j) = expectation_(i) * expectation_(j);
       }
 
 
     public:
-      EmpCovar(const UpdateGroup& params, CovMatrix covariance) :
-        params_(params), p_(params.size()),
+      EmpCovar(const ParameterView& params, CovMatrix& covariance, const size_t burnin) :
+        params_(params),burnin_(burnin),p_(params.size()),
             rowCount_(0)
       {
         // Set up storage
-        sum_ = new ublas::vector<double> (p_);
-        sumSq_ = new CovMatrix(p_);
-        covMatrix_ = new CovMatrix(p_);
-        *covMatrix_ = covariance;
-        expectation_ = new ublas::vector<double> (p_);
+        sum_.resize(params.size());
+        sumSq_.resize(params.size());
+        expectation_.resize(params.size());
+        for(size_t i = 0; i<params.size(); ++i) {
+            sum_(i) = 0.0;
+            expectation_(i) = 0.0;
+            for(size_t j = 0; j < params.size(); ++j) sumSq_(i,j) = 0.0;
+        }
+        covMatrix_ = covariance;
+
 
         // Add a parameter row
-        sample();
+        //setCovariance(covariance);
+        //sample();
       }
       ~EmpCovar()
       {
-        delete sum_;
-        delete sumSq_;
-        delete covMatrix_;
-        delete expectation_;
       }
       const CovMatrix&
       getCovariance()
       {
-        // Create covariance matrix
-        (*expectation_) = *sum_ / (double)rowCount_; // Averages
-        kronecker();
-        (*covMatrix_) = (*sumSq_ / (double)rowCount_) - *covMatrix_;
-
-        // Return Cholesky decomp, throw exception if cov not pos def.
-        return (*covMatrix_);
+        if (rowCount_ > burnin_) {
+            // Create covariance matrix
+            double denominator = rowCount_ - burnin_;
+            expectation_ = sum_ / denominator; // Averages
+            kronecker();
+            covMatrix_ = sumSq_ / denominator - covMatrix_;
+        }
+        return covMatrix_;
       }
       void
       printInnerds()
       {
-        std::cerr << "Sum: " << *sum_ << std::endl;
-        std::cerr << "Sumsq: " << *sumSq_ << std::endl;
+        std::cerr << "Sum: " << sum_ << std::endl;
+        std::cerr << "Sumsq: " << sumSq_ << std::endl;
         std::cerr << "Row count: " << rowCount_ << std::endl;
-        (*expectation_) = *sum_ / (double)rowCount_;
-        std::cerr << "Expectation: " << *expectation_ << std::endl;
+        expectation_ = sum_ / (double)rowCount_;
+        std::cerr << "Expectation: " << expectation_ << std::endl;
         kronecker();
-        std::cerr << "kronecker: " << *covMatrix_ << std::endl;
-        std::cerr << "covMatrix: " << (*sumSq_ / (double)rowCount_) - *covMatrix_;
+        std::cerr << "kronecker: " << covMatrix_ << std::endl;
+        std::cerr << "covMatrix: " << sumSq_ / (double)rowCount_ - covMatrix_;
       }
       void
       sample()
       {
         for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(params_[i]);
-            (*sum_)(i) += pi;
-            (*sumSq_)(i, i) += pi*pi;
+            double pi = transformFunc_(*(params_[i]));
+            sum_(i) += pi;
+            sumSq_(i, i) += pi*pi;
             for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(params_[j]);
-                (*sumSq_)(i, j) += pi * pj;
+                double pj = transformFunc_(*(params_[j]));
+                sumSq_(i, j) += pi * pj;
               }
           }
 
         rowCount_++;
       }
-      std::vector<Parameter>&
-      getProposal();
       void
       print();
 

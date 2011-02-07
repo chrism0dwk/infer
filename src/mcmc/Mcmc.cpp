@@ -38,7 +38,7 @@ using namespace EpiRisk;
 const double a = 0.015;
 const double b = 0.8;
 const double tuneI = 0.8;
-const double numIUpdates = 0;
+const double numIUpdates = 200;
 
 inline
 double
@@ -87,6 +87,8 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Paramete
   // Random number generation
   random_ = new Random(randomSeed);
 
+
+
   // Set up load balancing
 //  for(size_t p=0; p<mpiprocs_;++p) elements_.push_back(0);
 //  loadBalance();
@@ -115,7 +117,7 @@ Mcmc::~Mcmc()
 
 //! Pushes an updater onto the MCMC stack
 AdaptiveMultiLogMRW*
-Mcmc::newAdaptiveMultiLogMRW(const string name, const ParameterGroup& updateGroup)
+Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup)
 {
   // Create starting covariance matrix
   EmpCovar<LogTransform>::CovMatrix initCov(updateGroup.size());
@@ -124,8 +126,10 @@ Mcmc::newAdaptiveMultiLogMRW(const string name, const ParameterGroup& updateGrou
       initCov(i,j) = i == j ? 0.1 : 0.0;
 
 
-  McmcUpdate* update = new AdaptiveMultiLogMRW(name,updateGroup,*random_,logLikelihood_,this);
+  AdaptiveMultiLogMRW* update = new AdaptiveMultiLogMRW(name,updateGroup,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
+
+  return update;
 }
 
 double
@@ -470,10 +474,9 @@ Mcmc::run(const size_t numIterations,
   if (mpirank_ == 0)
     {
       writer.open();
+      writer.write(pop_);
+      writer.write(txparams_);
     }
-
-  writer.write(pop_);
-  writer.write(txparams_);
 
   acceptance["I"] = 0.0;
 

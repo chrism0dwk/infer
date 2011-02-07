@@ -33,7 +33,6 @@
 #include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 
 #include "SpatPointPop.hpp"
@@ -140,7 +139,7 @@ namespace EpiRisk
             McmcWriter<Population<TestCovars> >& writer);
     //! Creates a block update group
     AdaptiveMultiLogMRW*
-    newAdaptiveMultiLogMRW(const string tag, const ParameterGroup& params);
+    newAdaptiveMultiLogMRW(const string tag, ParameterView& params);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
   };
