@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
   covMatrix.close();
 
 
-  Parameters txparams(12);
+  Parameters txparams(14);
   txparams(0) = Parameter(2e-7,GammaPrior(1,1));
   txparams(1) = Parameter(1.8e-7,GammaPrior(1,1));
   txparams(2) = Parameter(1,GammaPrior(1,1));
@@ -95,6 +95,8 @@ int main(int argc, char* argv[])
   txparams(9) = Parameter(0.14,GammaPrior(1,1));
   txparams(10) = Parameter(1.7,GammaPrior(1,1));
   txparams(11) = Parameter(0.46,GammaPrior(1,1));
+  txparams(12) = Parameter(0.5,GammaPrior(1,1));
+  txparams(13) = Parameter(0.5,GammaPrior(1,1));
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1));
@@ -109,18 +111,20 @@ int main(int argc, char* argv[])
   txInfec.push_back(&txparams[5]);
   txInfec.push_back(&txparams[6]);
   txInfec.push_back(&txparams[7]);
+  txInfec.push_back(&txparams[8]);
   AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txInfec",txInfec);
-  tx->setCovariance(speciesCovar);
+  //tx->setCovariance(speciesCovar);
 
   ParameterView txSuscep;
   txSuscep.push_back(&txparams[0]);
   txSuscep.push_back(&txparams[1]);
-  txSuscep.push_back(&txparams[8]);
   txSuscep.push_back(&txparams[9]);
   txSuscep.push_back(&txparams[10]);
   txSuscep.push_back(&txparams[11]);
+  txSuscep.push_back(&txparams[12]);
+  txSuscep.push_back(&txparams[13]);
   tx = myMcmc->newAdaptiveMultiLogMRW("txSuscep",txSuscep);
-  tx->setCovariance(speciesCovar);
+  //tx->setCovariance(speciesCovar);
 
   ParameterView txDelta;
   txDelta.push_back(&txparams[0]);

@@ -74,7 +74,7 @@ dist(const double x1, const double y1, const double x2, const double y2)
 
 Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Parameters& detectParams,
     const size_t randomSeed) :
-  pop_(population), txparams_(transParams), dxparams_(detectParams), integPressTime_(1.0)
+  pop_(population), txparams_(transParams), dxparams_(detectParams), integPressTime_(1.0),meanParams_(transParams),dicUpdates_(0),postMeanDev_(0.0)
 {
 
   // MPI setup
@@ -107,6 +107,9 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Paramete
   // Calculate log likelihood
   calcLogLikelihood(logLikelihood_);
   all_reduce(comm_, logLikelihood_.local, logLikelihood_.global, plus<double> ());
+
+  // Set up DIC
+  initializeDIC();
 }
 
 Mcmc::~Mcmc()
@@ -138,6 +141,28 @@ Mcmc::getLogLikelihood() const
   return logLikelihood_.global;
 }
 
+
+inline
+double
+Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
+{
+  double infectivity = pow(i.getCovariates().cattle,txparams_(6)) +
+                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
+                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  return infectivity;
+}
+
+inline
+double
+Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
+{
+  double susceptibility = pow(j.getCovariates().cattle,txparams_(11)) +
+                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
+                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
+
+  return susceptibility;
+}
+
 inline
 double
 Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
@@ -147,18 +172,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0)
     {
-      double infectivity = i.getCovariates().cattle +
-                           txparams_(4)*i.getCovariates().pigs +
-                           txparams_(5)*i.getCovariates().sheep +
-                           txparams_(6)*i.getCovariates().goats +
-                           txparams_(7)*i.getCovariates().deer;
-      double susceptibility = j.getCovariates().cattle +
-                                 txparams_(8)*j.getCovariates().pigs +
-                                 txparams_(9)*j.getCovariates().sheep +
-                                 txparams_(10)*j.getCovariates().goats +
-                                 txparams_(11)*j.getCovariates().deer;
-
-      return txparams_(0) * infectivity * susceptibility * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(0) * infectivity(i,j) * susceptibility(i,j) * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
     }
   else
     return 0.0;
@@ -172,18 +186,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
-      double infectivity = i.getCovariates().cattle +
-                           txparams_(4)*i.getCovariates().pigs +
-                           txparams_(5)*i.getCovariates().sheep +
-                           txparams_(6)*i.getCovariates().goats +
-                           txparams_(7)*i.getCovariates().deer;
-      double susceptibility = j.getCovariates().cattle +
-                                 txparams_(8)*j.getCovariates().pigs +
-                                 txparams_(9)*j.getCovariates().sheep +
-                                 txparams_(10)*j.getCovariates().goats +
-                                 txparams_(11)*j.getCovariates().deer;
-
-      return txparams_(1) * infectivity * susceptibility * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(1) * infectivity(i,j) * susceptibility(i,j) * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
   }
   else
     return 0.0;
@@ -283,6 +286,91 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
   all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());
 }
 
+/////////DIC Methods -- probably should be in a separate class//////////
+void
+Mcmc::initializeDIC()
+{
+  // Parameter means
+  meanParams_ = txparams_;
+
+  // Infection time means
+  ProcessInfectives::iterator it;
+  for(it = processInfectives_.begin();
+      it != processInfectives_.end();
+      it++)
+    {
+      meanInfecTimes_.insert(make_pair((*it)->getId(),0.0));
+    }
+  dicUpdates_ = 0;
+}
+
+void
+Mcmc::updateDIC()
+{
+  // Updates DIC
+
+  dicUpdates_++;
+
+  // Mean posterior deviance
+  double delta = -2*getLogLikelihood() - postMeanDev_;
+  postMeanDev_ += delta / dicUpdates_;
+
+  // Mean posterior parameters
+  for(size_t i=0; i<txparams_.size(); i++) {
+      delta = txparams_(i) - meanParams_(i);
+      meanParams_(i) += delta / dicUpdates_;
+  }
+
+  // Mean infection times
+  map<string,double>::iterator it;
+  for(it = meanInfecTimes_.begin();
+      it != meanInfecTimes_.end();
+      it++)
+    {
+      delta = pop_.getById(it->first).getI() - it->second; //SLOW!
+      it->second += delta / dicUpdates_;
+    }
+}
+
+DIC
+Mcmc::getDIC()
+{
+  // Returns a struct containing the DIC
+
+  // First calculate the deviance at the posterior means:
+  Parameters oldParams = txparams_;
+  txparams_ = meanParams_;
+  map<string,double> oldInfecTimes;
+  for(ProcessInfectives::iterator it = processInfectives_.begin();
+      it != processInfectives_.end();
+      it++)
+    {
+      Population<TestCovars>::InfectiveIterator i = *it;
+      oldInfecTimes.insert(make_pair(i->getId(),i->getI()));
+      pop_.moveInfectionTime(i,meanInfecTimes_[i->getId()]);
+    }
+
+  Likelihood myLikelihood;
+  calcLogLikelihood(myLikelihood);
+
+  // Assemble DIC
+  DIC rv;
+  rv.Dbar = postMeanDev_;
+  rv.Dhat = -2*myLikelihood.global;
+  rv.pD = rv.Dbar - rv.Dhat;
+  rv.DIC = rv.Dbar - rv.pD;
+
+  // Undo changes
+  txparams_ = oldParams;
+  for(ProcessInfectives::iterator it = processInfectives_.begin();
+        it != processInfectives_.end();
+        it++)
+      {
+        pop_.moveInfectionTime(*it, oldInfecTimes[(*it)->getId()]);
+      }
+
+  return rv;
+}
 
 void
 Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
@@ -485,6 +573,17 @@ Mcmc::run(const size_t numIterations,
       if (mpirank_ == 0 && k % 1 == 0)
         cout << "Iteration " << k << endl;
 
+      if(k % 5000 == 0) {
+          DIC myDIC = getDIC();
+          if (mpirank_ = 0) {
+              cout << "=======DIC=======\n"
+                   << "Dbar: " << myDIC.Dbar << "\n"
+                   << "Dhat: " << myDIC.Dhat << "\n"
+                   << "pD: " << myDIC.pD << "\n"
+                   << "DIC: " << myDIC.DIC << endl;
+          }
+      }
+
       for(boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
           it != updateStack_.end();
           ++it) it->update();
@@ -494,6 +593,8 @@ Mcmc::run(const size_t numIterations,
           toMove = random_->integer(pop_.numInfected());
           acceptance["I"] += updateI(toMove);
         }
+
+      updateDIC();
 
       if(mpirank_ == 0) cout << "gLogLikelihood: " << logLikelihood_.global << endl;
 
