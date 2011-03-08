@@ -55,6 +55,13 @@ namespace EpiRisk
   class McmcUpdate;
   class AdaptiveMultiLogMRW;
 
+  struct DIC {
+     double Dbar;
+     double Dhat;
+     double pD;
+     double DIC;
+  };
+
   struct Likelihood
   {
     double local;
@@ -91,6 +98,12 @@ namespace EpiRisk
     //// THESE SHOULD BE IN A "MODEL" CLASS ////
     virtual
     double
+    susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+    virtual
+    double
+    infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+    virtual
+    double
     beta(const Population<TestCovars>::Individual& i, const Population<
         TestCovars>::Individual& j) const;
     virtual
@@ -119,6 +132,18 @@ namespace EpiRisk
     void
         moveProdCache(const string id, const size_t fromIndex,
             const size_t toIndex);
+
+    /// DIC Methods -- again, should be a separate class
+    DIC dic_;
+    size_t dicUpdates_;
+    double postMeanDev_;
+    map<string,double> meanInfecTimes_;
+    Parameters meanParams_;
+    void
+    initializeDIC();
+    void
+    updateDIC();
+
     void
     dumpParms() const;
     void
@@ -142,6 +167,9 @@ namespace EpiRisk
     newAdaptiveMultiLogMRW(const string tag, ParameterView& params);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
+    DIC
+    getDIC();
+
   };
 
 }
