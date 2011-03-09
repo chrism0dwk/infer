@@ -128,22 +128,16 @@ int main(int argc, char* argv[])
   txInfec.push_back(&txparams[1]);
   txInfec.push_back(&txparams[4]);
   txInfec.push_back(&txparams[5]);
-  txInfec.push_back(&txparams[6]);
-  txInfec.push_back(&txparams[7]);
-  txInfec.push_back(&txparams[8]);
   AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txInfec",txInfec);
-  //tx->setCovariance(speciesCovar);
+  tx->setCovariance(speciesCovar);
 
   ParameterView txSuscep;
   txSuscep.push_back(&txparams[0]);
   txSuscep.push_back(&txparams[1]);
   txSuscep.push_back(&txparams[9]);
   txSuscep.push_back(&txparams[10]);
-  txSuscep.push_back(&txparams[11]);
-  txSuscep.push_back(&txparams[12]);
-  txSuscep.push_back(&txparams[13]);
   tx = myMcmc->newAdaptiveMultiLogMRW("txSuscep",txSuscep);
-  //tx->setCovariance(speciesCovar);
+  tx->setCovariance(speciesCovar);
 
   ParameterView txDelta;
   txDelta.push_back(&txparams[0]);
@@ -152,11 +146,23 @@ int main(int argc, char* argv[])
   txDelta.push_back(&txparams[3]);
   tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta);
 
+//  ParameterView txPsi;
+//  txPsi.push_back(&txparams[6]);
+//  txPsi.push_back(&txparams[7]);
+//  txPsi.push_back(&txparams[8]);
+//  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi);
+//
+//  ParameterView txPhi;
+//  txPhi.push_back(&txparams[11]);
+//  txPhi.push_back(&txparams[12]);
+//  txPhi.push_back(&txparams[13]);
+//  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi);
+
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/fmdCustomScheme2.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/fmdCustomScheme2.p" << comm.size() << ".occ";
+  parmFn << "/Users/stsiab/Documents/InFER/FMD2001/output/fmdTestNoPow.p" << comm.size() << ".parms";
+  occFn << "/Users/stsiab/Documents/InFER/FMD2001/output/fmdTestNoPow.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -167,11 +173,6 @@ int main(int argc, char* argv[])
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
   if(comm.rank() == 0) {
-      cout << "Trans parm acceptance: " << acceptance["transParms"] << endl;
-      //cout << "Alpha acceptance: " << acceptance["alpha"] << endl;
-      //cout << "Alphastar acceptance: " << acceptance["alphastar"] << endl;
-      //cout << "delta acceptance: " << acceptance["delta"] << endl;
-      //cout << "epsilon acceptance: " << acceptance["epsilon"] << endl;
       cout << "Infection acceptance: " << acceptance["I"] << endl;
   }
 
@@ -179,7 +180,6 @@ int main(int argc, char* argv[])
   delete writer;
   delete myPopulation;
 
-  MPI::Finalize();
   return EXIT_SUCCESS;
 
 }

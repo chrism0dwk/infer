@@ -34,6 +34,9 @@
 #include "EmpCovar.hpp"
 #include "Mcmc.hpp"
 
+
+#define ADMLM_BURNIN 2000
+
 namespace EpiRisk
 {
 

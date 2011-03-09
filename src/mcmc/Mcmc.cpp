@@ -38,7 +38,7 @@ using namespace EpiRisk;
 const double a = 0.015;
 const double b = 0.8;
 const double tuneI = 0.8;
-const double numIUpdates = 200;
+const double numIUpdates = 0;
 
 inline
 double
@@ -146,9 +146,10 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = pow(i.getCovariates().cattle,txparams_(6)) +
-                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
-                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  double infectivity = i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().pigs;
+//      pow(i.getCovariates().cattle,txparams_(6)) +
+//                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
+//                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
   return infectivity;
 }
 
@@ -156,9 +157,10 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = pow(j.getCovariates().cattle,txparams_(11)) +
-                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
-                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
+  double susceptibility = j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
+//      pow(j.getCovariates().cattle,txparams_(11)) +
+//                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
+//                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
 
   return susceptibility;
 }
@@ -573,9 +575,9 @@ Mcmc::run(const size_t numIterations,
       if (mpirank_ == 0 && k % 1 == 0)
         cout << "Iteration " << k << endl;
 
-      if(k % 5000 == 0) {
+      if(k % 100 == 0) {
           DIC myDIC = getDIC();
-          if (mpirank_ = 0) {
+          if (mpirank_ == 0) {
               cout << "=======DIC=======\n"
                    << "Dbar: " << myDIC.Dbar << "\n"
                    << "Dhat: " << myDIC.Dhat << "\n"

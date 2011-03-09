@@ -71,7 +71,7 @@ namespace EpiRisk
               }
           }
 
-        empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_, 5000);
+        empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_, ADMLM_BURNIN);
 
   };
 
