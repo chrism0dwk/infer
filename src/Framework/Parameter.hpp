@@ -27,6 +27,8 @@
 #ifndef PARAMETER_HPP_
 #define PARAMETER_HPP_
 
+
+#include <string>
 #include <vector>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/vector_proxy.hpp>
@@ -85,17 +87,19 @@ namespace EpiRisk
   class Parameter
   {
 
+    std::string tag_;
     double value_;
     Prior* prior_;
 
   public:
-    Parameter() : value_(0.0), prior_(new UniformPrior) {}
-    Parameter(const double value,const Prior& prior) : value_(value)
+    Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {}
+    Parameter(const double value,const Prior& prior,const std::string tag) : value_(value),tag_(tag)
     {
       prior_ = prior.clone();
     }
     Parameter(const Parameter& param)
     {
+      tag_ = param.tag_;
       value_ = param.value_;
       prior_ = param.prior_->clone();
     }
@@ -104,6 +108,7 @@ namespace EpiRisk
     {
       if(this != &param) {
           delete prior_;
+          tag_ = param.tag_;
           value_ = param.value_;
           prior_ = param.prior_->clone();
       }
@@ -151,6 +156,12 @@ namespace EpiRisk
       value_ -= x;
       return *this;
     }
+    const std::string&
+    getTag() const
+    {
+      return tag_;
+    }
+
   };
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;

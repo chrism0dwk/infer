@@ -112,7 +112,6 @@ namespace EpiRisk
       ublas::vector<double> expectation_;
 
       const ParameterView& params_;
-      const size_t burnin_;
 
       int rowCount_;
 
@@ -128,8 +127,8 @@ namespace EpiRisk
 
 
     public:
-      EmpCovar(const ParameterView& params, CovMatrix& covariance, const size_t burnin) :
-        params_(params),burnin_(burnin),p_(params.size()),
+      EmpCovar(const ParameterView& params, CovMatrix& covariance) :
+        params_(params),p_(params.size()),
             rowCount_(0)
       {
         // Set up storage
@@ -154,13 +153,11 @@ namespace EpiRisk
       const CovMatrix&
       getCovariance()
       {
-        if (rowCount_ > burnin_) {
-            // Create covariance matrix
-            double denominator = rowCount_ - burnin_;
-            expectation_ = sum_ / denominator; // Averages
-            kronecker();
-            covMatrix_ = sumSq_ / denominator - covMatrix_;
-        }
+        // Create covariance matrix
+        double denominator = rowCount_;
+        expectation_ = sum_ / denominator; // Averages
+        kronecker();
+        covMatrix_ = sumSq_ / denominator - covMatrix_;
         return covMatrix_;
       }
       void

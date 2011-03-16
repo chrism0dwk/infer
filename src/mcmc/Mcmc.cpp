@@ -120,7 +120,7 @@ Mcmc::~Mcmc()
 
 //! Pushes an updater onto the MCMC stack
 AdaptiveMultiLogMRW*
-Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup)
+Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup, size_t burnin)
 {
   // Create starting covariance matrix
   EmpCovar<LogTransform>::CovMatrix initCov(updateGroup.size());
@@ -129,7 +129,7 @@ Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup)
       initCov(i,j) = i == j ? 0.1 : 0.0;
 
 
-  AdaptiveMultiLogMRW* update = new AdaptiveMultiLogMRW(name,updateGroup,*random_,logLikelihood_,this);
+  AdaptiveMultiLogMRW* update = new AdaptiveMultiLogMRW(name,updateGroup,burnin,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
 
   return update;
@@ -146,10 +146,10 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().pigs;
-//      pow(i.getCovariates().cattle,txparams_(6)) +
-//                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
-//                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  double infectivity = //i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().pigs;
+      pow(i.getCovariates().cattle,txparams_(6)) +
+                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
+                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
   return infectivity;
 }
 
@@ -157,10 +157,10 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
-//      pow(j.getCovariates().cattle,txparams_(11)) +
-//                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
-//                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
+  double susceptibility = //j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
+      pow(j.getCovariates().cattle,txparams_(11)) +
+                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
+                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
 
   return susceptibility;
 }
@@ -174,7 +174,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0)
     {
-      return txparams_(0) * infectivity(i,j) * susceptibility(i,j) * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(0)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
     }
   else
     return 0.0;
@@ -188,7 +188,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
-      return txparams_(1) * infectivity(i,j) * susceptibility(i,j) * txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(1)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
   }
   else
     return 0.0;
@@ -563,7 +563,7 @@ Mcmc::run(const size_t numIterations,
 
   if (mpirank_ == 0)
     {
-      writer.open();
+      writer.open(txparams_);
       writer.write(pop_);
       writer.write(txparams_);
     }
@@ -618,7 +618,10 @@ Mcmc::run(const size_t numIterations,
       cout << "============\n";
       for(boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
           it != updateStack_.end();
-          ++it) cout << it->getTag() << ": " << it->getAcceptance() << "\n";
+          ++it)
+        {
+          cout << it->getTag() << ": " << it->getAcceptance() << "\n";
+        }
       acceptance["I"] /= (numIterations * numIUpdates);
     }
   return acceptance;

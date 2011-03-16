@@ -164,7 +164,7 @@ namespace EpiRisk
             McmcWriter<Population<TestCovars> >& writer);
     //! Creates a block update group
     AdaptiveMultiLogMRW*
-    newAdaptiveMultiLogMRW(const string tag, ParameterView& params);
+    newAdaptiveMultiLogMRW(const string tag, ParameterView& params, size_t burnin = 1000);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC
