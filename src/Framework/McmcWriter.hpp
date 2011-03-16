@@ -38,10 +38,18 @@ namespace EpiRisk
     }
     virtual
     void
-    open()
+    open(Parameters& params)
     {
       paramFile_.open(paramFn_.c_str(),ios::out);
       if(!paramFile_.is_open()) throw output_exception("Cannot open parameter file for writing!");
+      Parameters::iterator it = params.begin();
+      paramFile_ << "\"" << (*it).getTag() << "\"";
+      it++;
+      while(it != params.end()) {
+          paramFile_ << ",\"" << (*it).getTag() << "\"";
+          it++;
+      }
+      paramFile_ << "\n";
 
       occFile_.open(occFn_.c_str(),ios::out);
       if(!paramFile_.is_open()) throw output_exception("Cannot open occult file for writing!");

@@ -16,8 +16,6 @@
 #include "Mcmc.hpp"
 
 
-#define ADMLM_BURNIN 2000
-
 namespace EpiRisk
 {
 
@@ -77,14 +75,18 @@ namespace EpiRisk
   class AdaptiveMultiLogMRW : public McmcUpdate
   {
   public:
-    AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, Random& rng,
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, size_t burnin, Random& rng,
         Likelihood& logLikelihood, Mcmc* const env  );
     ~AdaptiveMultiLogMRW();
     void
     setCovariance(EmpCovar<LogTransform>::CovMatrix& covariance);
+    Covariance
+    getCovariance() const;
     void
     update();
   private:
+    size_t burnin_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };

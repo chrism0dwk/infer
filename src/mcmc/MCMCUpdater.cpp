@@ -35,9 +35,9 @@ namespace EpiRisk
   }
 
 
-  AdaptiveMultiLogMRW::AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, Random& rng,
+  AdaptiveMultiLogMRW::AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, size_t burnin, Random& rng,
           Likelihood& logLikelihood, Mcmc* const env ) :
-          McmcUpdate(tag,params,rng,logLikelihood,env) {
+          McmcUpdate(tag,params,rng,logLikelihood,env), burnin_(burnin) {
 
     // Initialize the standard covariance
         stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
@@ -52,12 +52,13 @@ namespace EpiRisk
               }
           }
 
-        empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_, ADMLM_BURNIN);
+        empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_);
 
   };
 
   AdaptiveMultiLogMRW::~AdaptiveMultiLogMRW()
   {
+    cout << tag_ << ": " << empCovar_->getCovariance() << "\n";
     delete empCovar_;
     delete stdCov_;
   }
@@ -67,7 +68,12 @@ namespace EpiRisk
   {
     // Start the empirical covariance matrix
     delete empCovar_;
-    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, covariance,5000);
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, covariance);
+  }
+  AdaptiveMultiLogMRW::Covariance
+  AdaptiveMultiLogMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
   }
 
   void
@@ -88,11 +94,11 @@ namespace EpiRisk
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
-    if (random_.uniform() < 0.95)
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * 2.38 * 2.38
+            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
                 / updateGroup_.size());
           }
         catch (cholesky_error& e)
