@@ -107,6 +107,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Paramete
   // Calculate log likelihood
   calcLogLikelihood(logLikelihood_);
   all_reduce(comm_, logLikelihood_.local, logLikelihood_.global, plus<double> ());
+  if (mpirank_ == 0) std::cout << "Log likelihood starts at " << logLikelihood_.global << std::endl;
 
   // Set up DIC
   initializeDIC();
@@ -117,10 +118,18 @@ Mcmc::~Mcmc()
   delete random_;
 }
 
+//! Pushes an updater onto the MCMC stack
+SingleSiteLogMRW*
+Mcmc::newSingleSiteLogMRW(Parameter& param, const double tuning)
+{
+  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.getTag(), param, tuning, *random_, logLikelihood_, this);
+  updateStack_.push_back(update);
+}
+
 
 //! Pushes an updater onto the MCMC stack
 AdaptiveMultiLogMRW*
-Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup, size_t burnin)
+Mcmc::newAdaptiveMultiLogMRW(const string name, UpdateBlock& updateGroup, size_t burnin)
 {
   // Create starting covariance matrix
   EmpCovar<LogTransform>::CovMatrix initCov(updateGroup.size());
@@ -130,6 +139,23 @@ Mcmc::newAdaptiveMultiLogMRW(const string name, ParameterView& updateGroup, size
 
 
   AdaptiveMultiLogMRW* update = new AdaptiveMultiLogMRW(name,updateGroup,burnin,*random_,logLikelihood_,this);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
+//! Pushes an updater onto the MCMC stack
+AdaptiveMultiMRW*
+Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup, size_t burnin)
+{
+  // Create starting covariance matrix
+  EmpCovar<Identity>::CovMatrix initCov(updateGroup.size());
+  for(size_t i=0;i<updateGroup.size();++i)
+    for(size_t j=0;j<=i;++j)
+      initCov(i,j) = i == j ? 0.1 : 0.0;
+
+
+  AdaptiveMultiMRW* update = new AdaptiveMultiMRW(name,updateGroup,burnin,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
 
   return update;
@@ -146,10 +172,10 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = //i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().pigs;
-      pow(i.getCovariates().cattle,txparams_(6)) +
-                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
-                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  double infectivity = i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().sheep;
+      //pow(i.getCovariates().cattle,txparams_(6)) +
+      //                 txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
+      //                 txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
   return infectivity;
 }
 
@@ -157,10 +183,10 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = //j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
-      pow(j.getCovariates().cattle,txparams_(11)) +
-                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
-                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
+  double susceptibility = j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
+      //pow(j.getCovariates().cattle,txparams_(11)) +
+      //                             txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
+      //                             txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
 
   return susceptibility;
 }
@@ -188,7 +214,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
-      return txparams_(1)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(0)*txparams_(1)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
   }
   else
     return 0.0;
@@ -222,6 +248,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
       ++i;
     }
   sumPressure += txparams_(3);
+
   return sumPressure;
 }
 
@@ -282,7 +309,12 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
        pos < pop_.size();
        pos += mpiprocs_, k += mpiprocs_)
     {
-      logLikelihood.local += integPressureOn(k, k->getI());
+      double tmp = integPressureOn(k, k->getI());
+      if ( tmp > 0.0 ) {
+          logLikelihood.local = NEGINF;
+          break;
+      }
+      else logLikelihood.local += integPressureOn(k, k->getI());
     }
 
   all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());

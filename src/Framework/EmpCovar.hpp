@@ -55,12 +55,13 @@
 #define _INCLUDE_ADAPTIVE_H
 
 
-#include "Parameter.hpp"
 #include <stdexcept>
 #include <iostream>
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
+
+#include "StochasticNode.hpp"
 
 using namespace boost::numeric::ublas;
 using namespace boost::numeric;
@@ -111,7 +112,7 @@ namespace EpiRisk
       CovMatrix covMatrix_;
       ublas::vector<double> expectation_;
 
-      const ParameterView& params_;
+      const UpdateBlock& params_;
 
       int rowCount_;
 
@@ -127,7 +128,7 @@ namespace EpiRisk
 
 
     public:
-      EmpCovar(const ParameterView& params, CovMatrix& covariance) :
+      EmpCovar(const UpdateBlock& params, CovMatrix& covariance) :
         params_(params),p_(params.size()),
             rowCount_(0)
       {
@@ -177,12 +178,12 @@ namespace EpiRisk
       {
         for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(*(params_[i]));
+            double pi = transformFunc_(params_[i]->getValue());
             sum_(i) += pi;
             sumSq_(i, i) += pi*pi;
             for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(*(params_[j]));
+                double pj = transformFunc_(params_[j]->getValue());
                 sumSq_(i, j) += pi * pj;
               }
           }

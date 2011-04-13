@@ -28,8 +28,7 @@
 #define MCMCUPDATER_HPP_
 
 #include <string>
-
-#include "Parameter.hpp"
+#include "StochasticNode.hpp"
 #include "Random.hpp"
 #include "EmpCovar.hpp"
 #include "Mcmc.hpp"
@@ -61,11 +60,13 @@ namespace EpiRisk
     }
   };
 
+
+
   // MCMC UPDATERS
   class McmcUpdate
   {
   public:
-    McmcUpdate(const std::string& tag, ParameterView& params, Random& rng,
+    McmcUpdate(const std::string& tag, Random& rng,
         Likelihood& logLikelihood, Mcmc* const env );
     virtual
     ~McmcUpdate();
@@ -85,17 +86,51 @@ namespace EpiRisk
     Mcmc* env_;
     Likelihood& logLikelihood_;
     Random& random_;
-    ParameterView updateGroup_;
     size_t acceptance_;
     size_t numUpdates_;
   };
+
+
+
+  class SingleSiteLogMRW : public McmcUpdate
+  {
+    Parameter& param_;
+    const double tuning_;
+  public:
+    SingleSiteLogMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    ~SingleSiteLogMRW();
+    void
+    update();
+  };
+
+  //! Adaptive Multisite Linear Random Walk algorithm
+  class AdaptiveMultiMRW : public McmcUpdate
+    {
+    public:
+      typedef EmpCovar<Identity>::CovMatrix Covariance;
+      AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
+          Likelihood& logLikelihood, Mcmc* const env  );
+      ~AdaptiveMultiMRW();
+      void
+      setCovariance(EmpCovar<Identity>::CovMatrix& covariance);
+      Covariance
+      getCovariance() const;
+      void
+      update();
+    private:
+      UpdateBlock& updateGroup_;
+      size_t burnin_;
+      EmpCovar<Identity>* empCovar_;
+      EmpCovar<Identity>::CovMatrix* stdCov_;
+    };
+
 
   //! Adaptive Multisite Logarithmic Random Walk algorithm
   class AdaptiveMultiLogMRW : public McmcUpdate
   {
   public:
     typedef EmpCovar<LogTransform>::CovMatrix Covariance;
-    AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, size_t burnin, Random& rng,
+    AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
         Likelihood& logLikelihood, Mcmc* const env  );
     ~AdaptiveMultiLogMRW();
     void
@@ -105,6 +140,7 @@ namespace EpiRisk
     void
     update();
   private:
+    UpdateBlock& updateGroup_;
     size_t burnin_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;

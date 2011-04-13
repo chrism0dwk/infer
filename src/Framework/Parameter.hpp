@@ -83,17 +83,15 @@ namespace EpiRisk
   };
 
 
-
   class Parameter
   {
-
     std::string tag_;
     double value_;
     Prior* prior_;
 
   public:
-    Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {}
-    Parameter(const double value,const Prior& prior,const std::string tag) : value_(value),tag_(tag)
+    Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {};
+    Parameter(const double value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
     {
       prior_ = prior.clone();
     }
@@ -102,6 +100,19 @@ namespace EpiRisk
       tag_ = param.tag_;
       value_ = param.value_;
       prior_ = param.prior_->clone();
+    }
+    virtual Parameter* clone()
+    {
+      return new Parameter(*this);
+    }
+    virtual Parameter* create()
+    {
+      return new Parameter();
+    }
+    const std::string&
+    getTag() const
+    {
+      return tag_;
     }
     Parameter&
     operator=(const Parameter& param)
@@ -156,17 +167,13 @@ namespace EpiRisk
       value_ -= x;
       return *this;
     }
-    const std::string&
-    getTag() const
-    {
-      return tag_;
-    }
-
   };
+
+
+
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
   typedef boost::numeric::ublas::slice ParameterSlice;
-  typedef std::vector< Parameter* > ParameterView;
 
 }
 
