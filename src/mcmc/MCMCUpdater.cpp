@@ -10,9 +10,9 @@
 namespace EpiRisk
 {
 
-  McmcUpdate::McmcUpdate(const std::string& tag, ParameterView& params, Random& rng,
+  McmcUpdate::McmcUpdate(const std::string& tag, Random& rng,
       Likelihood& logLikelihood, Mcmc* const env) :
-    tag_(tag), updateGroup_(params), random_(rng), logLikelihood_(logLikelihood), env_(env),
+    tag_(tag), random_(rng), logLikelihood_(logLikelihood), env_(env),
       acceptance_(0),
       numUpdates_(0)
   {
@@ -35,9 +35,161 @@ namespace EpiRisk
   }
 
 
-  AdaptiveMultiLogMRW::AdaptiveMultiLogMRW(const std::string& tag, ParameterView& params, size_t burnin, Random& rng,
+  SingleSiteLogMRW::SingleSiteLogMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env ) :
+      McmcUpdate(tag, rng, logLikelihood, env), param_(param), tuning_(tuning)
+  {
+  }
+
+  SingleSiteLogMRW::~SingleSiteLogMRW()
+  {
+  }
+
+  void
+  SingleSiteLogMRW::update()
+  {
+    double oldValue = param_;
+
+    // Calculate current posterior
+    double logPiCur = logLikelihood_.global + log(param_.prior());
+
+    // Proposal via log random walk
+    param_ *= exp(random_.gaussian(0,tuning_));
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    // Candidate posterior
+    double logPiCan = logLikCan.global + log(param_.prior());
+
+    // q-ratio
+    double qratio = param_ / oldValue;
+
+    // Accept or reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qratio)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        param_ = oldValue;
+      }
+
+    numUpdates_++;
+
+  }
+
+
+  AdaptiveMultiMRW::AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
           Likelihood& logLikelihood, Mcmc* const env ) :
-          McmcUpdate(tag,params,rng,logLikelihood,env), burnin_(burnin) {
+          McmcUpdate(tag,rng,logLikelihood,env), updateGroup_(params), burnin_(burnin) {
+
+    // Initialize the standard covariance
+        stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
+        for (size_t i = 0; i < updateGroup_.size(); ++i)
+          {
+            for (size_t j = 0; j < updateGroup_.size(); ++j)
+              {
+                if (i == j)
+                  (*stdCov_)(i, j) = 0.01 / updateGroup_.size();
+                else
+                  (*stdCov_)(i, j) = 0.0;
+              }
+          }
+
+        empCovar_ = new EmpCovar<Identity> (updateGroup_, *stdCov_);
+
+  };
+
+  AdaptiveMultiMRW::~AdaptiveMultiMRW()
+  {
+    delete empCovar_;
+    delete stdCov_;
+  }
+
+  void
+  AdaptiveMultiMRW::setCovariance(EmpCovar<Identity>::CovMatrix& covariance)
+  {
+    // Start the empirical covariance matrix
+    delete empCovar_;
+    empCovar_ = new EmpCovar<Identity> (updateGroup_, covariance);
+  }
+  AdaptiveMultiMRW::Covariance
+  AdaptiveMultiMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
+  }
+
+  void
+  AdaptiveMultiMRW::update()
+  {
+    // Save old values
+    std::vector<double> oldParams(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); i++)
+      oldParams[i] = updateGroup_[i]->getValue();
+
+    // Update empirical covariance
+    empCovar_->sample();
+
+    // Calculate current posterior
+    double logPiCur = logLikelihood_.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCur += log(updateGroup_[p]->prior());
+
+    // Propose as in Haario, Sachs, Tamminen (2001)
+    Random::Variates vars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            vars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+                / updateGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            vars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      vars = random_.mvgauss(*stdCov_);
+
+    // Log MRW proposal
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      updateGroup_[p]->setValue(updateGroup_[p]->getValue() + vars[p]);
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    double logPiCan = logLikCan.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCan += log(updateGroup_[p]->prior());
+
+    // Proposal ratio
+    double qRatio = 0.0; // Gaussian proposal cancels
+
+    // Accept or reject
+    double accept = logPiCan - logPiCur + qRatio;
+    if (log(random_.uniform()) < accept)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        for (size_t p = 0; p < updateGroup_.size(); ++p)
+          updateGroup_[p]->setValue(oldParams[p]);
+      }
+
+    ++numUpdates_;
+  }
+
+
+
+  AdaptiveMultiLogMRW::AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
+          Likelihood& logLikelihood, Mcmc* const env ) :
+          McmcUpdate(tag,rng,logLikelihood,env), updateGroup_(params), burnin_(burnin) {
 
     // Initialize the standard covariance
         stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
@@ -58,7 +210,6 @@ namespace EpiRisk
 
   AdaptiveMultiLogMRW::~AdaptiveMultiLogMRW()
   {
-    cout << tag_ << ": " << empCovar_->getCovariance() << "\n";
     delete empCovar_;
     delete stdCov_;
   }
@@ -82,7 +233,7 @@ namespace EpiRisk
     // Save old values
     std::vector<double> oldParams(updateGroup_.size());
     for (size_t i = 0; i < updateGroup_.size(); i++)
-      oldParams[i] = *(updateGroup_[i]);
+      oldParams[i] = updateGroup_[i]->getValue();
 
     // Update empirical covariance
     empCovar_->sample();
@@ -111,7 +262,7 @@ namespace EpiRisk
 
     // Log MRW proposal
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      *(updateGroup_[p]) *= exp(logvars[p]);
+      updateGroup_[p]->setValue(updateGroup_[p]->getValue() * exp(logvars[p]));
 
     // Calculate candidate posterior
     Likelihood logLikCan;
@@ -124,7 +275,7 @@ namespace EpiRisk
     // Proposal ratio
     double qRatio = 0.0;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      qRatio += log(*(updateGroup_[p]) / oldParams[p]);
+      qRatio += log(updateGroup_[p]->getValue() / oldParams[p]);
 
     // Accept or reject
     double accept = logPiCan - logPiCur + qRatio;
@@ -136,7 +287,7 @@ namespace EpiRisk
     else
       {
         for (size_t p = 0; p < updateGroup_.size(); ++p)
-          *(updateGroup_[p]) = oldParams[p];
+          updateGroup_[p]->setValue(oldParams[p]);
       }
 
     ++numUpdates_;
