@@ -58,11 +58,8 @@ PopDataImporter::next()
   record.id = tokens[0];
   record.data.x = atof(tokens[1].c_str()) / 1000;
   record.data.y = atof(tokens[2].c_str()) / 1000;
-  record.data.cattle = atoi(tokens[3].c_str());
-  record.data.pigs = atoi(tokens[4].c_str());
-  record.data.sheep = atoi(tokens[5].c_str());
-  record.data.goats = atoi(tokens[6].c_str());
-  record.data.deer = atoi(tokens[7].c_str());
+  record.data.horses = atoi(tokens[3].c_str());
+  record.data.area = atoi(tokens[4].c_str());
 
   return record;
 }

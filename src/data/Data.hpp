@@ -17,11 +17,8 @@
 struct TestCovars {
   double x;
   double y;
-  long int cattle;
-  long int pigs;
-  long int sheep;
-  long int goats;
-  long int deer;
+  double horses;
+  double area;
 };
 
 

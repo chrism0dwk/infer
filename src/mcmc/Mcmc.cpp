@@ -172,10 +172,7 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().sheep;
-      //pow(i.getCovariates().cattle,txparams_(6)) +
-      //                 txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
-      //                 txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  double infectivity = txparams_(1)*i.getCovariates().horses + txparams_(2)*i.getCovariates().area;
   return infectivity;
 }
 
@@ -183,11 +180,7 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
-      //pow(j.getCovariates().cattle,txparams_(11)) +
-      //                             txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
-      //                             txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
-
+  double susceptibility = txparams_(3)*j.getCovariates().horses + txparams_(4)*j.getCovariates().area;
   return susceptibility;
 }
 
@@ -200,7 +193,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0)
     {
-      return txparams_(0)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
+      return infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
     }
   else
     return 0.0;
@@ -214,7 +207,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
-      return txparams_(0)*txparams_(1)*infectivity(i,j) * susceptibility(i,j) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(6)*infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
   }
   else
     return 0.0;
@@ -247,7 +240,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
         }
       ++i;
     }
-  sumPressure += txparams_(3);
+  sumPressure += txparams_(0);
 
   return sumPressure;
 }
