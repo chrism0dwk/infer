@@ -1,5 +1,5 @@
 /*************************************************************************
- *  ./src/unitTests/fmdMcmc.cpp
+ *  ./src/unitTests/auseiMcmc.cpp
  *  Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
  *
  *  This file is part of InFER.
