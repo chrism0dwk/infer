@@ -451,9 +451,12 @@ namespace EpiRisk
             {
               record = epiDataImporter.next();
               typename IdIndex::iterator ref = idIndex.find(record.id);
-              if (ref == idIndex.end())
-                throw parse_exception(
-                    "Key in epidemic data not found in population data");
+              if (ref == idIndex.end()) {
+                  string msg("Key '");
+                  msg += record.id;
+                  msg += "' in epidemic data not found in population data";
+                throw parse_exception(msg.c_str());
+              }
               Events oldEvents = ref->getEvents();
               idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
             }

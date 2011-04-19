@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
   mpi::environment env(argc,argv);
   mpi::communicator comm;
 
-  if (argc != 5) {
+  if (argc != 4) {
       cerr << "Usage: testSpatPointPop <pop file> <epi file> <num iterations>" << endl;
       return EXIT_FAILURE;
   }
@@ -114,28 +114,36 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(241.0);
+  myPopulation->setObsTime(145.0);
 
   delete popDataImporter;
   delete epiDataImporter;
 
   Parameters txparams(7);
-  txparams(0) = Parameter(2e-6,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(1.8e-7,GammaPrior(1,1),"gamma2");
-  txparams(2) = Parameter(1,GammaPrior(1,1),"delta");
-  txparams(3) = Parameter(1e-6,GammaPrior(1,1),"epsilon");
-  txparams(4) = Parameter(0.18,GammaPrior(3,3),"xi_p");
-  txparams(5) = Parameter(0.13,GammaPrior(1,1),"xi_s");
-  txparams(6) = Parameter(1,BetaPrior(2,2),"psi_c");
+  txparams(0) = Parameter(2e-6,GammaPrior(1,1),"epsilon");
+  txparams(1) = Parameter(1,GammaPrior(1,1),"gamma_1");
+  txparams(2) = Parameter(1,GammaPrior(1,1),"gamma_2");
+  txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
+  txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
+  txparams(5) = Parameter(0.13,GammaPrior(1,1),"delta");
+  txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
 
-  UpdateBlock updates;
-  for(size_t i=0; i<7; i++) updates.add(txparams(i));
-  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
+//  UpdateBlock updates;
+//  for(size_t i=0; i<7; i++) updates.add(txparams(i));
+//  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
+
+  myMcmc->newSingleSiteLogMRW(txparams(0),20.0);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.1);
+  //myMcmc->newSingleSiteLogMRW(txparams(2),0.1);
+  //myMcmc->newSingleSiteLogMRW(txparams(3),1000.0);
+  //myMcmc->newSingleSiteLogMRW(txparams(4),0.1);
+  myMcmc->newSingleSiteLogMRW(txparams(5),0.4);
+  //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
 
   stringstream parmFn;
   stringstream occFn;
