@@ -61,7 +61,7 @@ gaussianTailPdf(const double x, const double mean, const double var)
   return gsl_ran_gaussian_tail_pdf(x-mean,-mean,sqrt(var));
 }
 
-inline
+//inline
 double
 dist(const double x1, const double y1, const double x2, const double y2)
 {
@@ -168,52 +168,52 @@ Mcmc::getLogLikelihood() const
 }
 
 
-inline
+//inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = txparams_(1)*i.getCovariates().horses + txparams_(2)*i.getCovariates().area;
+  double infectivity = i.getCovariates().horses;// + txparams_(3)*i.getCovariates().area;
   return infectivity;
 }
 
-inline
+//inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = txparams_(3)*j.getCovariates().horses + txparams_(4)*j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses;// + txparams_(4)*j.getCovariates().area;
   return susceptibility;
 }
 
-inline
+//inline
 double
 Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
     TestCovars>::Individual& j) const
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25.0)
+  if (distance <= 100.0)
     {
-      return infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
+      return txparams_(1) * exp(-txparams_(5) * (distance - 5));
     }
   else
     return 0.0;
 }
 
-inline
+//inline
 double
 Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
     TestCovars>::Individual& j) const
 {
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 25.0) {
-      return txparams_(6)*infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
+  if (distance <= 100.0) {
+      return txparams_(1) * exp(-txparams_(5) * (distance - 5));
   }
   else
     return 0.0;
 }
 
-inline
+//inline
 double
 Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     const double Ij)
@@ -245,7 +245,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
   return sumPressure;
 }
 
-inline
+//inline
 double
 Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
     const double Ij)
@@ -268,7 +268,7 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
           Ij));
     }
 
-  integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);
+  integPressure += txparams_(0) * (min(Ij, pop_.getObsTime()) - I1);
 
   return -integPressure;
 }
