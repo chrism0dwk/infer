@@ -193,7 +193,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 100.0)
     {
-      return txparams_(1) * exp(-txparams_(5) * (distance - 5));
+      return txparams_(1) * infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
     }
   else
     return 0.0;
@@ -207,7 +207,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 100.0) {
-      return txparams_(1) * exp(-txparams_(5) * (distance - 5));
+      return txparams_(2) * infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
   }
   else
     return 0.0;
@@ -229,11 +229,11 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     {
       if (i != j)
         { // Skip i==j
-          if (i->getN() > Ij)
+          if (i->getN() >= Ij)
             {
               sumPressure += beta(*i, *j);
             }
-          else if (i->getR() > Ij)
+          else if (i->getR() >= Ij)
             {
               sumPressure += betastar(*i, *j);
             }

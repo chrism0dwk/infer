@@ -140,11 +140,11 @@ int main(int argc, char* argv[])
 
   Parameters txparams(7);
   txparams(0) = Parameter(2e-6,GammaPrior(1,1),"epsilon");
-  txparams(1) = Parameter(1,GammaPrior(1,1),"gamma_1");
-  txparams(2) = Parameter(1,GammaPrior(1,1),"gamma_2");
+  txparams(1) = Parameter(0.01,GammaPrior(1,1),"gamma_1");
+  txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
   txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
   txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
-  txparams(5) = Parameter(0.13,GammaPrior(1,1),"delta");
+  txparams(5) = Parameter(1.13,GammaPrior(1,1),"delta");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
 
   Parameters dxparams(1);
@@ -156,12 +156,12 @@ int main(int argc, char* argv[])
 //  for(size_t i=0; i<7; i++) updates.add(txparams(i));
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
-  myMcmc->newSingleSiteLogMRW(txparams(0),20.0);
-  myMcmc->newSingleSiteLogMRW(txparams(1),0.1);
-  //myMcmc->newSingleSiteLogMRW(txparams(2),0.1);
+  myMcmc->newSingleSiteLogMRW(txparams(0),8.0);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.8);
+  myMcmc->newSingleSiteLogMRW(txparams(2),0.4);
   //myMcmc->newSingleSiteLogMRW(txparams(3),1000.0);
   //myMcmc->newSingleSiteLogMRW(txparams(4),0.1);
-  myMcmc->newSingleSiteLogMRW(txparams(5),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(5),0.7);
   //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
 
   stringstream parmFn;
