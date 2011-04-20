@@ -122,11 +122,18 @@ namespace EpiRisk
     void
     updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
         const double newTime, Likelihood& updatedLogLik);
+    void
+    updateRlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
+        const double newTime, Likelihood& updatedLogLik);
     /////////////////////////////////////////////
 
 
     bool
     updateI(const size_t index = 0);
+    bool
+    updateR(const size_t index = 0);
+    bool
+    updateB(); // Gibbs sampler to update parameter b.
     bool
     addI();
     bool

@@ -205,9 +205,14 @@ namespace EpiRisk
        */
       bool
       moveInfectionTime(const std::string id, const double newTime);
-      /*! Adds an occult infection
-       * @param susceptibleIndex the position of the susceptible to add in the susceptibles index.
+      /*! /brief Moves a removal time
+       *
+       * This function moves a removal time
+       * @param id The id of the individual for which to move the removal time
+       * @param newTime the new removal time
        */
+      bool
+      moveRemovalTime(const std::string id, const double newTime);
       //! Clears all infected individuals
       void
       clear(); // Clears all infected individuals
@@ -365,6 +370,17 @@ namespace EpiRisk
         }
       private:
         double newI_;
+      };
+
+      struct modifyR
+      {
+        modifyR(double newR) : newR_(newR) {}
+        void operator()(Individual& i)
+        {
+          i.setR(newR_);
+        }
+      private:
+        double newR_;
       };
 
       struct modifyStatus
@@ -608,6 +624,17 @@ namespace EpiRisk
       typename InfectiveIndex::iterator infIter = population_.project<byI>(idIter);
 
       return moveInfectionTime(infIter, newTime);
+    }
+
+  template<typename Covars>
+    bool
+    Population<Covars>::moveRemovalTime(const std::string id, const double newTime)
+    {
+    typename IdIndex::iterator idIter = idIndex_.find(id);
+    if (idIter == idIndex_.end()) throw data_exception("Id not found");
+
+    double oldTime = idIter->getR();
+    return idIndex_.modify(idIter, modifyR(newTime),modifyR(oldTime));
     }
 
   template<typename Covars>

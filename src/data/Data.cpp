@@ -29,6 +29,8 @@
 #include "Data.hpp"
 #include "stlStrTok.hpp"
 
+gsl_rng* localrng = gsl_rng_alloc(gsl_rng_mt19937);
+
 
 PopDataImporter::PopDataImporter(const string filename) : filename_(filename)
 {
@@ -76,10 +78,10 @@ PopDataImporter::next()
   if (tokens.size() != 5) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
-  record.data.x = atof(tokens[1].c_str()) / 1000;
-  record.data.y = atof(tokens[2].c_str()) / 1000;
+  record.data.x = atof(tokens[1].c_str()) / 1000.0;
+  record.data.y = atof(tokens[2].c_str()) / 1000.0;
   record.data.horses = atof(tokens[3].c_str());
-  record.data.area = atof(tokens[4].c_str());
+  record.data.area = atof(tokens[4].c_str()) / 1000000.0;
 
   return record;
 }
