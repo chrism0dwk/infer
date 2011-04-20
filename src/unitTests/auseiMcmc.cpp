@@ -97,6 +97,7 @@ int main(int argc, char* argv[])
 {
   // Tests out class Mcmc
 
+  try {
   mpi::environment env(argc,argv);
   mpi::communicator comm;
 
@@ -119,19 +120,21 @@ int main(int argc, char* argv[])
   delete popDataImporter;
   delete epiDataImporter;
 
-  Parameters txparams(7);
+  Parameters txparams(9);
   txparams(0) = Parameter(2e-6,GammaPrior(1,1),"epsilon");
   txparams(1) = Parameter(0.01,GammaPrior(1,1),"gamma_1");
   txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
-  txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
+  txparams(3) = Parameter(0.0001,GammaPrior(1,1),"xi");
   txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
   txparams(5) = Parameter(1.13,GammaPrior(1,1),"delta");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
+  txparams(7) = Parameter(7.0,GammaPrior(14.0,1),"a");
+  txparams(8) = Parameter(0.5,GammaPrior(1,2),"b");
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
-  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
+  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,2);
 
 //  UpdateBlock updates;
 //  for(size_t i=0; i<7; i++) updates.add(txparams(i));
@@ -140,7 +143,7 @@ int main(int argc, char* argv[])
   myMcmc->newSingleSiteLogMRW(txparams(0),8.0);
   myMcmc->newSingleSiteLogMRW(txparams(1),0.8);
   myMcmc->newSingleSiteLogMRW(txparams(2),0.4);
-  //myMcmc->newSingleSiteLogMRW(txparams(3),1000.0);
+  //myMcmc->newSingleSiteLogMRW(txparams(3),100.0);
   //myMcmc->newSingleSiteLogMRW(txparams(4),0.1);
   myMcmc->newSingleSiteLogMRW(txparams(5),0.7);
   //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
@@ -148,8 +151,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei.parms";
-  occFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei.occ";
+  parmFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei_ha.parms";
+  occFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei_ha.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -166,6 +169,11 @@ int main(int argc, char* argv[])
   delete myMcmc;
   delete writer;
   delete myPopulation;
+  }
+  catch (exception& e) {
+      cerr << "Exception occurred: " << e.what() << endl;
+      return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 

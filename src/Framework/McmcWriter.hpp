@@ -68,7 +68,7 @@ namespace EpiRisk
       // Write population here
       typename Population::InfectiveIterator it = population.infecBegin();
       while(it != population.infecEnd()) {
-          occFile_ << it->getId() << ":" << it->getI() << " ";
+          occFile_ << it->getId() << ":" << it->getR() - it->getN() << " ";
           it++;
       }
       occFile_ << "\n";
