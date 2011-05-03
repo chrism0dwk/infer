@@ -172,10 +172,10 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().sheep;
-      //pow(i.getCovariates().cattle,txparams_(6)) +
-      //                 txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
-      //                 txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
+  double infectivity = //i.getCovariates().cattle + txparams_(4)*i.getCovariates().pigs + txparams_(5)*i.getCovariates().sheep;
+      pow(i.getCovariates().cattle,txparams_(6)) +
+                       txparams_(4)*pow(i.getCovariates().pigs,txparams_(7)) +
+                       txparams_(5)*pow(i.getCovariates().sheep,txparams_(8));
   return infectivity;
 }
 
@@ -183,10 +183,10 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
-      //pow(j.getCovariates().cattle,txparams_(11)) +
-      //                             txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
-      //                             txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
+  double susceptibility = //j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
+      pow(j.getCovariates().cattle,txparams_(11)) +
+                                   txparams_(9)*pow(j.getCovariates().pigs,txparams_(12)) +
+                                   txparams_(10)*pow(j.getCovariates().sheep,txparams_(13));
 
   return susceptibility;
 }

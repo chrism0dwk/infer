@@ -74,9 +74,9 @@ namespace EpiRisk
       StochasticNode* tmp = new StochasticNode(param);
       updateblock_.push_back(tmp);
     }
-    void add(StochasticNode* node)
+    void add(StochasticNode& node)
     {
-      StochasticNode* tmp = node->clone();
+      StochasticNode* tmp = node.clone();
       updateblock_.push_back(tmp);
     }
     StochasticNode*

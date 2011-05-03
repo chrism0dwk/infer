@@ -183,18 +183,18 @@ int main(int argc, char* argv[])
   InfSuscSN xi_s(txparams[0],txparams[5]);
   txInfec.add(txparams[0]);
   txInfec.add(txparams[1]);
-  txInfec.add(&xi_p);
-  txInfec.add(&xi_s);
+  txInfec.add(xi_p);
+  txInfec.add(xi_s);
   AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txInfec",txInfec, 1000);
   //tx->setCovariance(speciesCovar);
 
   UpdateBlock txSuscep;
-  //InfSuscSN zeta_p(txparams[0],txparams[9]);
-  //InfSuscSN zeta_s(txparams[0],txparams[10]);
+  InfSuscSN zeta_p(txparams[0],txparams[9]);
+  InfSuscSN zeta_s(txparams[0],txparams[10]);
   txSuscep.add(txparams[0]);
   txSuscep.add(txparams[1]);
-  txSuscep.add(txparams[9]);
-  txSuscep.add(txparams[10]);
+  txSuscep.add(zeta_p);
+  txSuscep.add(zeta_s);
   tx = myMcmc->newAdaptiveMultiLogMRW("txSuscep",txSuscep, 1000);
   //tx->setCovariance(speciesCovar);
 
@@ -218,8 +218,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/Users/stsiab/Documents/InFER/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".parms";
-  occFn << "/Users/stsiab/Documents/InFER/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
