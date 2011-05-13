@@ -475,6 +475,7 @@ namespace EpiRisk
               }
               Events oldEvents = ref->getEvents();
               idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
+
             }
         }
       catch (fileEOF& e)

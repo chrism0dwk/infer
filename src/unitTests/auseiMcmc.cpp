@@ -110,11 +110,27 @@ using namespace EpiRisk;
     }
   };
 
+  void dumpData(Population<TestCovars>* popn)
+  {
+    for(Population<TestCovars>::PopulationIterator it = popn->begin();
+        it != popn->end();
+        it++)
+      {
+        const TestCovars& covars(it->getCovariates());
+        cout << it->getId() << "\t"
+             << covars.x << "\t"
+             << covars.y << "\t"
+             << covars.horses << "\t"
+             << covars.area << "\n";
+      }
+  }
+
 
 
 int main(int argc, char* argv[])
 {
   // Tests out class Mcmc
+
 
   try {
   mpi::environment env(argc,argv);
@@ -136,6 +152,7 @@ int main(int argc, char* argv[])
   myPopulation->importEpiData(*epiDataImporter);
   myPopulation->setObsTime(145.0);
 
+
   delete popDataImporter;
   delete epiDataImporter;
 
@@ -143,7 +160,7 @@ int main(int argc, char* argv[])
   txparams(0) = Parameter(2e-6,GammaPrior(1,1),"epsilon");
   txparams(1) = Parameter(0.01,GammaPrior(1,1),"gamma_1");
   txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
-  txparams(3) = Parameter(0.0001,GammaPrior(1,1),"xi");
+  txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
   txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
   txparams(5) = Parameter(1.13,GammaPrior(1,1),"delta");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
@@ -159,19 +176,19 @@ int main(int argc, char* argv[])
 //  for(size_t i=0; i<7; i++) updates.add(txparams(i));
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
-  myMcmc->newSingleSiteLogMRW(txparams(0),8.0);
-  myMcmc->newSingleSiteLogMRW(txparams(1),0.8);
-  myMcmc->newSingleSiteLogMRW(txparams(2),0.4);
-  //myMcmc->newSingleSiteLogMRW(txparams(3),100.0);
-  //myMcmc->newSingleSiteLogMRW(txparams(4),0.1);
-  myMcmc->newSingleSiteLogMRW(txparams(5),0.7);
+  myMcmc->newSingleSiteLogMRW(txparams(0),1.0);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(2),0.1);
+  myMcmc->newSingleSiteLogMRW(txparams(3),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(4),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
   //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei_ha.parms";
-  occFn << "/Users/stsiab/Documents/Australia/Simon/output/ausei_ha.occ";
+  parmFn << "/scratch/stsiab/ausei/output/ausei_nc_area.parms";
+  occFn << "/scratch/stsiab/ausei/output/ausei_nc_area.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -181,15 +198,12 @@ int main(int argc, char* argv[])
 
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
-  if(comm.rank() == 0) {
-      cout << "Infection acceptance: " << acceptance["I"] << endl;
-  }
-
   delete myMcmc;
   delete writer;
   delete myPopulation;
+
   }
-  catch (exception& e) {
+  catch (std::exception& e) {
       cerr << "Exception occurred: " << e.what() << endl;
       return EXIT_FAILURE;
   }
