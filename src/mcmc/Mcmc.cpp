@@ -23,6 +23,7 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/mpi/collectives.hpp>
 #include <ctime>
+#include <queue>
 
 //#ifdef __LINUX__
 //#include <acml_mv.h>
@@ -38,7 +39,9 @@ using namespace EpiRisk;
 const double a = 7.0;
 const double b = 0.5;
 const double tuneI = 2.0;
-const double numRUpdates = 20;
+const double numRUpdates = 100;
+const double tuneGamma = 0.0006;
+const double ncProp = 0.5;
 
 inline
 double
@@ -168,23 +171,23 @@ Mcmc::getLogLikelihood() const
 }
 
 
-//inline
+inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().horses;// + txparams_(3) * i.getCovariates().area;
+  double infectivity = i.getCovariates().horses + txparams_(3) * i.getCovariates().area;
   return infectivity;
 }
 
-//inline
+inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().horses;// + txparams_(4) * j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses + txparams_(4) * j.getCovariates().area;
   return susceptibility;
 }
 
-//inline
+inline
 double
 Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
     TestCovars>::Individual& j) const
@@ -199,7 +202,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
     return 0.0;
 }
 
-//inline
+inline
 double
 Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
     TestCovars>::Individual& j) const
@@ -213,7 +216,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
     return 0.0;
 }
 
-//inline
+inline
 double
 Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     const double Ij)
@@ -245,7 +248,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
   return sumPressure;
 }
 
-//inline
+inline
 double
 Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
     const double Ij)
@@ -576,7 +579,7 @@ Mcmc::updateR(const size_t index)
 
   Likelihood logLikCan;
   updateRlogLikelihood(it, newR, logLikCan);
-  all_reduce(comm_, logLikCan.local, logLikCan.global, plus<double> ());
+  //all_reduce(comm_, logLikCan.local, logLikCan.global, plus<double> ());
 
   double piCan = logLikCan.global + log(gsl_ran_gamma_pdf(newR - it->getN(),txparams_(7),1.0/txparams_(8)));
   double piCur = logLikelihood_.global + log(gsl_ran_gamma_pdf(it->getR() - it->getN(),txparams_(7),1.0/txparams_(8)));
@@ -618,6 +621,72 @@ Mcmc::updateB()
   txparams_(8) = random_->gamma(a,b);
 
   return true;
+}
+
+
+bool
+Mcmc::updateBpnc()
+{
+  // Partially non-centred update for b
+
+  double oldB = txparams_(8);
+
+  // Current prior value for b
+  double logPiCur = log(txparams_(8).prior());
+
+  // Propose gamma by logRW
+  txparams_(8) = txparams_(8) * exp(random_->gaussian(0,tuneGamma));
+  double logPiCan = log(txparams_(8).prior());
+
+  // Mark infection times for non-centering with probability ncProp
+  // add to conditional posterior (NC likelihood components cancel)
+  typedef list< Population<TestCovars>::InfectiveIterator > UndoList;
+  UndoList undoList;
+  for(Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
+      it != pop_.infecEnd();
+      it++) {
+
+      if(random_->uniform() < ncProp) undoList.push_front(it);
+      else {
+          logPiCur += log( gsl_ran_gamma_pdf(it->getR() - it->getN(), txparams_(7), 1/oldB) );
+          logPiCan += log( gsl_ran_gamma_pdf(it->getR() - it->getN(), txparams_(7), 1/txparams_(8)) );
+      }
+  }
+
+  // Non-center individuals who are marked
+  for(UndoList::const_iterator it = undoList.begin();
+      it != undoList.end();
+      it++) {
+      double ncR = ( ((*it)->getR() - (*it)->getN()) * oldB / txparams_(8) ) + (*it)->getN() ;
+      pop_.moveRemovalTime((*it)->getId(),ncR);
+  }
+
+  // Calculate log likelihood
+  Likelihood logLikCan;
+  calcLogLikelihood(logLikCan);
+
+  logPiCur += logLikelihood_.global;
+  logPiCan += logLikCan.global;
+
+  // q-ratio
+  double qRatio = log( txparams_(8) / oldB );
+
+  // Accept/reject
+  if(log(random_->uniform()) < logPiCan - logPiCur + qRatio) {
+      // Accept
+      logLikelihood_ = logLikCan;
+      return true;
+  }
+  else {
+      // Reject the move, resetting the changes to the removal times
+      while(!undoList.empty()) {
+          double oldR = ( (undoList.front()->getR() - undoList.front()->getN()) * txparams_(8) / oldB ) + undoList.front()->getN() ;
+          pop_.moveRemovalTime(undoList.front()->getId(),oldR);
+          undoList.pop_front();
+      }
+      txparams_(8) = oldB;
+      return false;
+  }
 }
 
 bool
@@ -710,6 +779,7 @@ Mcmc::run(const size_t numIterations,
     }
 
   acceptance["R"] = 0.0;
+  acceptance["gamma"] = 0.0;
 
   for (size_t k = 0; k < numIterations; ++k)
     {
@@ -737,7 +807,7 @@ Mcmc::run(const size_t numIterations,
           acceptance["R"] += updateR(toMove);
         }
 
-      updateB();
+      acceptance["gamma"] += updateBpnc();
 
       updateDIC();
 
@@ -766,6 +836,7 @@ Mcmc::run(const size_t numIterations,
           cout << it->getTag() << ": " << it->getAcceptance() << "\n";
         }
       cout << "Recovery times: " << acceptance["R"] / (numIterations * numRUpdates) << "\n";
+      cout << "b: " << acceptance["gamma"] / numIterations << "\n";
       cout << "============\n";
     }
   return acceptance;

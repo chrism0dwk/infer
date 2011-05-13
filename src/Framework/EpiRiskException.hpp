@@ -130,7 +130,7 @@ namespace EpiRisk {
   class fileEOF : public std::exception
   {
   public:
-    fileEOF() : exception() {};
+    //fileEOF() : exception() {};
     virtual const char* what() const throw()
     {
       return "End of file";

@@ -135,6 +135,8 @@ namespace EpiRisk
     bool
     updateB(); // Gibbs sampler to update parameter b.
     bool
+    updateBpnc(); // Partially non-centred update for b
+    bool
     addI();
     bool
     deleteI();

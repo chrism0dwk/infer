@@ -66,7 +66,7 @@ namespace EpiRisk
     double qratio = param_ / oldValue;
 
     // Accept or reject
-    if(log(random_.uniform()) < logPiCan - logPiCur + qratio)
+    if(log(random_.uniform()) < logPiCan - logPiCur + qratio && param_ > 0.0)
       {
         logLikelihood_ = logLikCan;
         acceptance_++;

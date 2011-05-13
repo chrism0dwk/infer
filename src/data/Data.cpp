@@ -34,6 +34,7 @@ PopDataImporter::open()
     // Take out header line
     string row;
     getline(dataFile_,row);
+
 }
 
 void
@@ -62,7 +63,7 @@ PopDataImporter::next()
   record.data.x = atof(tokens[1].c_str()) / 1000.0;
   record.data.y = atof(tokens[2].c_str()) / 1000.0;
   record.data.horses = atof(tokens[3].c_str());
-  record.data.area = atof(tokens[4].c_str()) / 1000000.0;
+  record.data.area = atof(tokens[4].c_str());
 
   return record;
 }
@@ -117,12 +118,10 @@ EpiDataImporter::next()
 
   stlStrTok(tokens,row,",");
   if (tokens.size() != 4) throw EpiRisk::fileEOF();
-
   record.id = tokens[0];
   record.data.I = atof(tokens[1].c_str());
   record.data.N = atof(tokens[2].c_str());
   record.data.R = atof(tokens[3].c_str());
-
   return record;
 }
 

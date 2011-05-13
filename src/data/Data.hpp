@@ -27,6 +27,7 @@ class PopDataImporter : public EpiRisk::DataImporter<TestCovars>
 private:
   ifstream dataFile_;
   string filename_;
+
 public:
   PopDataImporter(const string filename);
   virtual ~PopDataImporter();
@@ -42,6 +43,7 @@ class EpiDataImporter : public EpiRisk::DataImporter<EpiRisk::Events>
 private:
   ifstream dataFile_;
   string filename_;
+
 public:
   EpiDataImporter(const string filename);
   virtual ~EpiDataImporter();
