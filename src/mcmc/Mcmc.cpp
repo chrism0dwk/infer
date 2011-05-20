@@ -40,7 +40,7 @@ const double a = 7.0;
 const double b = 0.5;
 const double tuneI = 2.0;
 const double numRUpdates = 100;
-const double tuneGamma = 0.0006;
+const double tuneGamma = 0.001;
 const double ncProp = 0.5;
 
 inline
@@ -175,7 +175,7 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().horses + txparams_(3) * i.getCovariates().area;
+  double infectivity = i.getCovariates().horses / i.getCovariates().area;// + txparams_(3) * i.getCovariates().area;
   return infectivity;
 }
 
@@ -183,7 +183,7 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().horses + txparams_(4) * j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses / j.getCovariates().area;// + txparams_(4) * j.getCovariates().area;
   return susceptibility;
 }
 

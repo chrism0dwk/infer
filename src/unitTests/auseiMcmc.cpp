@@ -157,19 +157,19 @@ int main(int argc, char* argv[])
 //  for(size_t i=0; i<7; i++) updates.add(txparams(i));
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
-  myMcmc->newSingleSiteLogMRW(txparams(0),1.0);
-  myMcmc->newSingleSiteLogMRW(txparams(1),0.4);
-  myMcmc->newSingleSiteLogMRW(txparams(2),0.1);
-  myMcmc->newSingleSiteLogMRW(txparams(3),0.4);
-  myMcmc->newSingleSiteLogMRW(txparams(4),0.4);
-  myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
+  myMcmc->newSingleSiteLogMRW(txparams(0),0.1);
+  myMcmc->newSingleSiteLogMRW(txparams(1),1.0);
+  myMcmc->newSingleSiteLogMRW(txparams(2),100.0);
+  //myMcmc->newSingleSiteLogMRW(txparams(3),0.4);
+  //myMcmc->newSingleSiteLogMRW(txparams(4),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(5),0.7);
   //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/ausei/output/ausei_nc_area.parms";
-  occFn << "/scratch/stsiab/ausei/output/ausei_nc_area.occ";
+  parmFn << "/scratch/stsiab/ausei/output/ausei_nc_density.parms";
+  occFn << "/scratch/stsiab/ausei/output/ausei_nc_density.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
