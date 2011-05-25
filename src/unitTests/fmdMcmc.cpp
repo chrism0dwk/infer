@@ -146,80 +146,70 @@ int main(int argc, char* argv[])
   covMatrix.close();
 
 
-  Parameters txparams(14);
-  txparams(0) = Parameter(2e-6,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(1.8e-7,GammaPrior(1,1),"gamma2");
-  txparams(2) = Parameter(1,GammaPrior(1,1),"delta");
-  txparams(3) = Parameter(1e-6,GammaPrior(1,1),"epsilon");
-  txparams(4) = Parameter(0.18,GammaPrior(3,3),"xi_p");
-  txparams(5) = Parameter(0.13,GammaPrior(1,1),"xi_s");
-  txparams(6) = Parameter(1,BetaPrior(2,2),"psi_c");
-  txparams(7) = Parameter(1,BetaPrior(2,2),"psi_p");
-  txparams(8) = Parameter(1,BetaPrior(2,2),"psi_s");
-  txparams(9) = Parameter(0.14,GammaPrior(3,3),"zeta_p");
-  txparams(10) = Parameter(1.7,GammaPrior(1,1),"zeta_s");
-  txparams(11) = Parameter(1,BetaPrior(2,2),"phi_c");
-  txparams(12) = Parameter(1,BetaPrior(2,2),"phi_p");
-  txparams(13) = Parameter(1,BetaPrior(2,2),"phi_s");
+  Parameters txparams(16);
+  txparams(0) = Parameter(0.0065,GammaPrior(1,1),"gamma1");
+  txparams(1) = Parameter(0.0065,GammaPrior(1,1),"gamma2");
+  txparams(2) = Parameter(1.1,GammaPrior(1,1),"delta");
+  txparams(3) = Parameter(0.000035,GammaPrior(1,1),"epsilon");
+  txparams(4) = Parameter(0.1,GammaPrior(1,1),"xi_c");
+  txparams(5) = Parameter(0.18,GammaPrior(1,1),"xi_p");
+  txparams(6) = Parameter(0.13,GammaPrior(1,1),"xi_s");
+  txparams(7) = Parameter(1,BetaPrior(2,2),"psi_c");
+  txparams(8) = Parameter(1,BetaPrior(2,2),"psi_p");
+  txparams(9) = Parameter(1,BetaPrior(2,2),"psi_s");
+  txparams(10) = Parameter(0.1,GammaPrior(1,1),"zeta_c");
+  txparams(11) = Parameter(0.14,GammaPrior(1,1),"zeta_p");
+  txparams(12) = Parameter(1.7,GammaPrior(1,1),"zeta_s");
+  txparams(13) = Parameter(1,BetaPrior(2,2),"phi_c");
+  txparams(14) = Parameter(1,BetaPrior(2,2),"phi_p");
+  txparams(15) = Parameter(1,BetaPrior(2,2),"phi_s");
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
+  Random::Variates alpha(3); alpha(0) = alpha(1) = alpha(2) = 1.0;
 
-//  myMcmc->newSingleSiteLogMRW(txparams[0],0.2);
-//  myMcmc->newSingleSiteLogMRW(txparams[1],0.4);
-//  myMcmc->newSingleSiteLogMRW(txparams[2],0.2);
+//  myMcmc->newSingleSiteLogMRW(txparams[0],0.1);
 //  myMcmc->newSingleSiteLogMRW(txparams[3],0.1);
-//  myMcmc->newSingleSiteLogMRW(txparams[4],3.0);
-//  myMcmc->newSingleSiteLogMRW(txparams[5],0.4);
-//  myMcmc->newSingleSiteLogMRW(txparams[9],3.0);
-//  myMcmc->newSingleSiteLogMRW(txparams[10],0.4);
-
 
 
   UpdateBlock txInfec;
-  InfSuscSN xi_p(txparams[0],txparams[4]);
-  InfSuscSN xi_s(txparams[0],txparams[5]);
-  txInfec.add(txparams[0]);
-  txInfec.add(txparams[1]);
-  txInfec.add(xi_p);
-  txInfec.add(xi_s);
-  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txInfec",txInfec, 1000);
-  //tx->setCovariance(speciesCovar);
+  txInfec.add(txparams[4]);
+  txInfec.add(txparams[5]);
+  txInfec.add(txparams[6]);
+  myMcmc->newDirichletMRW("txInfec",txInfec, alpha);
 
   UpdateBlock txSuscep;
-  InfSuscSN zeta_p(txparams[0],txparams[9]);
-  InfSuscSN zeta_s(txparams[0],txparams[10]);
-  txSuscep.add(txparams[0]);
-  txSuscep.add(txparams[1]);
-  txSuscep.add(zeta_p);
-  txSuscep.add(zeta_s);
-  tx = myMcmc->newAdaptiveMultiLogMRW("txSuscep",txSuscep, 1000);
-  //tx->setCovariance(speciesCovar);
+  txSuscep.add(txparams[10]);
+  txSuscep.add(txparams[11]);
+  txSuscep.add(txparams[12]);
+  myMcmc->newDirichletMRW("txSuscep",txSuscep, alpha);
 
   UpdateBlock txDelta;
+  txDelta.add(txparams[0]);
+  txDelta.add(txparams[1]);
   txDelta.add(txparams[2]);
   txDelta.add(txparams[3]);
-  tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
+  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
 
   UpdateBlock txPsi;
-  txPsi.add(txparams[6]);
   txPsi.add(txparams[7]);
   txPsi.add(txparams[8]);
+  txPsi.add(txparams[9]);
   myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
 
   UpdateBlock txPhi;
-  txPhi.add(txparams[11]);
-  txPhi.add(txparams[12]);
   txPhi.add(txparams[13]);
+  txPhi.add(txparams[14]);
+  txPhi.add(txparams[15]);
   myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestPowSN.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestFull1.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestFull1.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

@@ -202,7 +202,7 @@ namespace EpiRisk
         // Returns true if *this is in the Individual
         // class at time
 
-        return events_.I <= time && time < events_.N;
+        return events_.I < time && time <= events_.N;
       }
       ;
 
@@ -212,7 +212,7 @@ namespace EpiRisk
         // Returns true is *this is Notified
         // at time
 
-        return events_.N <= time && time < events_.R;
+        return events_.N < time && time <= events_.R;
       }
       ;
 
@@ -221,7 +221,7 @@ namespace EpiRisk
       {
         // Returns true if *this is Removed
         // at time
-        return events_.R <= time;
+        return events_.R < time;
       }
       ;
 

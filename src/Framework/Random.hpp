@@ -67,6 +67,8 @@ namespace EpiRisk
     extreme(const double a, const double b);
     double
     gaussianTail(const double mean, const double var);
+    Variates
+    dirichlet(const Variates& alpha);
   };
 
 }

@@ -138,5 +138,20 @@ namespace EpiRisk
   {
     return gsl_ran_gaussian_tail(rng_,-mean,sqrt(var));
   }
+  Random::Variates
+  Random::dirichlet(const Variates& alpha)
+  {
+    size_t k = alpha.size();
+    double* calpha = new double[k]; for(size_t i=0; i<k; i++) calpha[i] = alpha(i);
+    double* crv = new double[k];
+
+    gsl_ran_dirichlet(rng_,k,calpha,crv);
+
+    Random::Variates rv(k); for(size_t i=0; i<k; i++) rv(i) = crv[i];
+
+    delete[] calpha;
+    delete[] crv;
+    return rv;
+  }
 
 }

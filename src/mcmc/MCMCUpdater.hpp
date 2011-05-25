@@ -33,7 +33,6 @@
 #include "EmpCovar.hpp"
 #include "Mcmc.hpp"
 
-
 namespace EpiRisk
 {
 
@@ -60,14 +59,12 @@ namespace EpiRisk
     }
   };
 
-
-
   // MCMC UPDATERS
   class McmcUpdate
   {
   public:
-    McmcUpdate(const std::string& tag, Random& rng,
-        Likelihood& logLikelihood, Mcmc* const env );
+    McmcUpdate(const std::string& tag, Random& rng, Likelihood& logLikelihood,
+        Mcmc* const env);
     virtual
     ~McmcUpdate();
     virtual
@@ -90,14 +87,14 @@ namespace EpiRisk
     size_t numUpdates_;
   };
 
-
-
   class SingleSiteLogMRW : public McmcUpdate
   {
     Parameter& param_;
     const double tuning_;
   public:
-    SingleSiteLogMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    SingleSiteLogMRW(const std::string& tag, Parameter& param,
+        const double tuning, Random& rng, Likelihood& logLikelihood,
+        Mcmc* const env);
     ~SingleSiteLogMRW();
     void
     update();
@@ -105,33 +102,32 @@ namespace EpiRisk
 
   //! Adaptive Multisite Linear Random Walk algorithm
   class AdaptiveMultiMRW : public McmcUpdate
-    {
-    public:
-      typedef EmpCovar<Identity>::CovMatrix Covariance;
-      AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
-          Likelihood& logLikelihood, Mcmc* const env  );
-      ~AdaptiveMultiMRW();
-      void
-      setCovariance(EmpCovar<Identity>::CovMatrix& covariance);
-      Covariance
-      getCovariance() const;
-      void
-      update();
-    private:
-      UpdateBlock& updateGroup_;
-      size_t burnin_;
-      EmpCovar<Identity>* empCovar_;
-      EmpCovar<Identity>::CovMatrix* stdCov_;
-    };
-
+  {
+  public:
+    typedef EmpCovar<Identity>::CovMatrix Covariance;
+    AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& rng, Likelihood& logLikelihood, Mcmc* const env);
+    ~AdaptiveMultiMRW();
+    void
+    setCovariance(EmpCovar<Identity>::CovMatrix& covariance);
+    Covariance
+    getCovariance() const;
+    void
+    update();
+  private:
+    UpdateBlock& updateGroup_;
+    size_t burnin_;
+    EmpCovar<Identity>* empCovar_;
+    EmpCovar<Identity>::CovMatrix* stdCov_;
+  };
 
   //! Adaptive Multisite Logarithmic Random Walk algorithm
   class AdaptiveMultiLogMRW : public McmcUpdate
   {
   public:
     typedef EmpCovar<LogTransform>::CovMatrix Covariance;
-    AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
-        Likelihood& logLikelihood, Mcmc* const env  );
+    AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& rng, Likelihood& logLikelihood, Mcmc* const env);
     ~AdaptiveMultiLogMRW();
     void
     setCovariance(EmpCovar<LogTransform>::CovMatrix& covariance);
@@ -144,6 +140,21 @@ namespace EpiRisk
     size_t burnin_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
+  };
+
+  //! Dirichlet independence sampler for species parameters
+  class DirichletMRW : public McmcUpdate
+  {
+  public:
+    DirichletMRW(const std::string& tag, UpdateBlock& params,
+        Random::Variates& alpha, Random& rng, Likelihood& logLikelihood,
+        Mcmc* const env);
+    ~DirichletMRW();
+    void
+    update();
+  private:
+    UpdateBlock& updateGroup_;
+    Random::Variates& alpha_;
   };
 
 }
