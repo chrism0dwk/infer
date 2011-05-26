@@ -56,7 +56,7 @@ namespace EpiRisk
   class SingleSiteLogMRW;
   class AdaptiveMultiLogMRW;
   class AdaptiveMultiMRW;
-  class IndependenceDirichlet;
+  class SpeciesMRW;
 
   struct DIC {
      double Dbar;
@@ -173,8 +173,8 @@ namespace EpiRisk
     newAdaptiveMultiLogMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
     AdaptiveMultiMRW*
     newAdaptiveMultiMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
-    IndependenceDirichlet*
-    newIndependenceDirichlet(const string tag, UpdateBlock& params, Random::Variates& alpha);
+    SpeciesMRW*
+    newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC

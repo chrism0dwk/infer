@@ -142,19 +142,23 @@ namespace EpiRisk
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };
 
-  //! Dirichlet independence sampler for species parameters
-  class DirichletMRW : public McmcUpdate
+  //! Species MRW is a non-centred Multisite update for species inf/susc
+  class SpeciesMRW : public McmcUpdate
   {
   public:
-    DirichletMRW(const std::string& tag, UpdateBlock& params,
-        Random::Variates& alpha, Random& rng, Likelihood& logLikelihood,
+    SpeciesMRW(const std::string& tag, UpdateBlock& params,
+        std::vector<double>& constants, size_t burnin, Random& rng, Likelihood& logLikelihood,
         Mcmc* const env);
-    ~DirichletMRW();
+    ~SpeciesMRW();
     void
     update();
   private:
     UpdateBlock& updateGroup_;
-    Random::Variates& alpha_;
+    std::vector<double> constants_;
+    size_t burnin_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
   };
 
 }

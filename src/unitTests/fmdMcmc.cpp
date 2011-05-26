@@ -147,17 +147,17 @@ int main(int argc, char* argv[])
 
 
   Parameters txparams(16);
-  txparams(0) = Parameter(0.0065,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(0.0065,GammaPrior(1,1),"gamma2");
+  txparams(0) = Parameter(1.0,GammaPrior(1,1),"gamma1");
+  txparams(1) = Parameter(1.0,GammaPrior(1,1),"gamma2");
   txparams(2) = Parameter(1.1,GammaPrior(1,1),"delta");
   txparams(3) = Parameter(0.000035,GammaPrior(1,1),"epsilon");
-  txparams(4) = Parameter(0.1,GammaPrior(1,1),"xi_c");
+  txparams(4) = Parameter(1.0,GammaPrior(1,1),"xi_c");
   txparams(5) = Parameter(0.18,GammaPrior(1,1),"xi_p");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"xi_s");
   txparams(7) = Parameter(1,BetaPrior(2,2),"psi_c");
   txparams(8) = Parameter(1,BetaPrior(2,2),"psi_p");
   txparams(9) = Parameter(1,BetaPrior(2,2),"psi_s");
-  txparams(10) = Parameter(0.1,GammaPrior(1,1),"zeta_c");
+  txparams(10) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
   txparams(11) = Parameter(0.14,GammaPrior(1,1),"zeta_p");
   txparams(12) = Parameter(1.7,GammaPrior(1,1),"zeta_s");
   txparams(13) = Parameter(1,BetaPrior(2,2),"phi_c");
@@ -168,23 +168,29 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
-  Random::Variates alpha(3); alpha(0) = alpha(1) = alpha(2) = 1.0;
+  std::vector<double> infAlpha(3);
+  infAlpha[0] = 757.34;
+  infAlpha[1] = 633.37;
+  infAlpha[2] = 87.0;
+
+  std::vector<double> suscAlpha(3);
+  std::fill(suscAlpha.begin(),suscAlpha.end(),7936);
 
 //  myMcmc->newSingleSiteLogMRW(txparams[0],0.1);
 //  myMcmc->newSingleSiteLogMRW(txparams[3],0.1);
 
 
   UpdateBlock txInfec;
-  txInfec.add(txparams[4]);
+  txInfec.add(txparams[0]);
   txInfec.add(txparams[5]);
   txInfec.add(txparams[6]);
-  myMcmc->newDirichletMRW("txInfec",txInfec, alpha);
+  myMcmc->newSpeciesMRW("txInfec",txInfec, infAlpha);
 
   UpdateBlock txSuscep;
-  txSuscep.add(txparams[10]);
+  txSuscep.add(txparams[0]);
   txSuscep.add(txparams[11]);
   txSuscep.add(txparams[12]);
-  myMcmc->newDirichletMRW("txSuscep",txSuscep, alpha);
+  myMcmc->newSpeciesMRW("txSuscep",txSuscep, suscAlpha);
 
   UpdateBlock txDelta;
   txDelta.add(txparams[0]);
@@ -193,23 +199,23 @@ int main(int argc, char* argv[])
   txDelta.add(txparams[3]);
   AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
 
-  UpdateBlock txPsi;
-  txPsi.add(txparams[7]);
-  txPsi.add(txparams[8]);
-  txPsi.add(txparams[9]);
-  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
-
-  UpdateBlock txPhi;
-  txPhi.add(txparams[13]);
-  txPhi.add(txparams[14]);
-  txPhi.add(txparams[15]);
-  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
+//  UpdateBlock txPsi;
+//  txPsi.add(txparams[7]);
+//  txPsi.add(txparams[8]);
+//  txPsi.add(txparams[9]);
+//  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
+//
+//  UpdateBlock txPhi;
+//  txPhi.add(txparams[13]);
+//  txPhi.add(txparams[14]);
+//  txPhi.add(txparams[15]);
+//  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestFull1.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestFull1.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

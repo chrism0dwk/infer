@@ -162,11 +162,11 @@ Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup, size_t bu
 }
 
 
-//! Pushes an IndependenceDirichlet updater onto the MCMC stack
-IndependenceDirichlet*
-Mcmc::newIndependenceDirichlet(const string tag, UpdateBlock& params, Random::Variates& alpha)
+//! Pushes an SpeciesMRW updater onto the MCMC stack
+SpeciesMRW*
+Mcmc::newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha)
 {
-  IndependenceDirichlet* update = new IndependenceDirichlet(tag,params,alpha,*random_,logLikelihood_,this);
+  SpeciesMRW* update = new SpeciesMRW(tag,params,alpha,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
 
   return update;
@@ -227,7 +227,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 25.0) {
-      return txparams_(1)*infectivity(i,j) * susceptibility(i,j)* txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
+      return txparams_(0)*txparams_(1)*infectivity(i,j) * susceptibility(i,j)* txparams_(2) / (txparams_(2)*txparams_(2) + distance*distance);
   }
   else
     return 0.0;

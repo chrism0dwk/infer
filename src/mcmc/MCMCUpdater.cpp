@@ -318,78 +318,76 @@ namespace EpiRisk
     ++numUpdates_;
   }
 
-  DirichletMRW::DirichletMRW(const string& tag,
-      UpdateBlock& params, Random::Variates& alpha, Random& rng,
+  SpeciesMRW::SpeciesMRW(const string& tag,
+      UpdateBlock& params, std::vector<double>& alpha, size_t burnin, Random& rng,
       Likelihood& logLikelihood, Mcmc* env) :
-    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), alpha_(
-        alpha)
+    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), constants_(
+        alpha), burnin_(burnin)
   {
-
   }
 
-  DirichletMRW::~DirichletMRW()
+  SpeciesMRW::~SpeciesMRW()
   {
 
   }
 
   void
-  DirichletMRW::update()
+  SpeciesMRW::update()
   {
-    // Calculate current posterior
-    double logPiCur = logLikelihood_.global;
-    for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCur += log(updateGroup_[p]->prior());
+    // Save parameters
+    std::vector<double> oldParams(updateGroup_.size());
+    for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i]->getValue();
 
-    // Save old values
-    double* oldParams = new double[updateGroup_.size()];
-    for (size_t i = 0; i < updateGroup_.size(); i++)
-      oldParams[i] = updateGroup_[i]->getValue();
+    // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
+    double R = updateGroup_[0]->getValue()*(constants_[0] + updateGroup_[1]->getValue()*constants_[1] + updateGroup_[2]->getValue()*constants_[2]);
 
-    // Propose values
-    Random::Variates newParams = random_.dirichlet(alpha_);
+    // Current posterior
+    double logPiCur = logLikelihood_.global
+        + log(updateGroup_[0]->prior())
+        + log(updateGroup_[1]->prior())
+        + log(updateGroup_[2]->prior());
 
-    // Copy into parameter list
-    for (size_t p = 0; p < newParams.size(); p++)
-      {
-        updateGroup_[p]->setValue(newParams(p));
-      }
+    // Make proposal
+    ublas::vector<double> transform(updateGroup_.size());
+    transform(0) = updateGroup_[0]->getValue() * constants_[0];
+    transform(1) = updateGroup_[0]->getValue() * updateGroup_[1]->getValue() * constants_[1];
+    transform(2) = updateGroup_[0]->getValue() * updateGroup_[2]->getValue() * constants_[2];
 
-    // Calculate likelihood
+    // Use indep gaussians here
+    transform(0) *= exp(random_.gaussian(0,0.01));
+    transform(1) *= exp(random_.gaussian(0,0.01));
+    transform(2) = R - transform(0) - transform(1);
+
+    // Transform back
+    updateGroup_[0]->setValue(transform(0) / constants_[0]);
+    updateGroup_[1]->setValue(transform(1) / (updateGroup_[0]->getValue() * constants_[1]));
+    updateGroup_[2]->setValue(transform(2) / (updateGroup_[0]->getValue() * constants_[2]));
+
+    // Calculate candidate posterior
     Likelihood logLikCan;
     env_->calcLogLikelihood(logLikCan);
 
-    // Calculate posterior
-    double logPiCan = logLikCan.global;
-    for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCan += log(updateGroup_[p]->prior());
+    double logPiCan = logLikCan.global
+        + log(updateGroup_[0]->prior())
+        + log(updateGroup_[1]->prior())
+        + log(updateGroup_[2]->prior());
 
     // q-Ratio
-    double* calpha = new double[updateGroup_.size()];
-    for(size_t p = 0; p<updateGroup_.size(); ++p) calpha[p] = alpha_[p];
-    double qRatio = gsl_ran_dirichlet_pdf(updateGroup_.size(), calpha,
-        oldParams);
-    double* cnewParams = new double[updateGroup_.size()];
-    for (size_t p = 0; p < updateGroup_.size(); ++p)
-      cnewParams[p] = updateGroup_[p]->getValue();
-    qRatio /= gsl_ran_dirichlet_pdf(updateGroup_.size(), calpha, cnewParams);
+    double qRatio = log(transform(0) / (oldParams[0]*constants_[0])) + log(transform(1) / (oldParams[0] * oldParams[1] * constants_[1]));
 
-    // Accept / reject
-    if (log(random_.uniform()) < logPiCan - logPiCur + log(qRatio))
+    // Accept/reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
       {
         logLikelihood_ = logLikCan;
         acceptance_++;
       }
     else
       {
-        for (size_t p; p < updateGroup_.size(); ++p)
-          updateGroup_[p]->setValue(oldParams[p]);
+        for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i]->setValue(oldParams[i]);
       }
 
     ++numUpdates_;
 
-    delete[] oldParams;
-    delete[] calpha;
-    delete[] cnewParams;
   }
 
 }
