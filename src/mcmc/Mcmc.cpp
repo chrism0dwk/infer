@@ -90,8 +90,6 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Paramete
   // Random number generation
   random_ = new Random(randomSeed);
 
-
-
   // Set up load balancing
 //  for(size_t p=0; p<mpiprocs_;++p) elements_.push_back(0);
 //  loadBalance();
@@ -170,12 +168,28 @@ Mcmc::getLogLikelihood() const
   return logLikelihood_.global;
 }
 
+inline
+double
+Mcmc::h(const Population<TestCovars>::Individual& i, const double time) const
+{
+  double timeSinceI = max(time - i.getI(), 0.0);
+  return i.getCovariates().epi->numInfecAt(timeSinceI);
+}
+
+inline
+double
+Mcmc::H(const Population<TestCovars>::Individual& i, const double time) const
+{
+  double timeSinceI = max(time - i.getI(),0.0);
+  return i.getCovariates().epi->integNumInfecAt(timeSinceI);
+}
+
 
 inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().horses / i.getCovariates().area;// + txparams_(3) * i.getCovariates().area;
+  double infectivity = i.getCovariates().horses; //+ txparams_(3);// * i.getCovariates().area;
   return infectivity;
 }
 
@@ -183,7 +197,7 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().horses / j.getCovariates().area;// + txparams_(4) * j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses; //+ txparams_(4) * j.getCovariates().area;
   return susceptibility;
 }
 
@@ -196,7 +210,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 100.0)
     {
-      return txparams_(1) * infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
+      return txparams_(1) /* infectivity(i,j) */ * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
     }
   else
     return 0.0;
@@ -210,7 +224,7 @@ Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
   double distance = dist(i.getCovariates().x, i.getCovariates().y,
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 100.0) {
-      return txparams_(2) * infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
+      return txparams_(2) /* infectivity(i,j) */ * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
   }
   else
     return 0.0;
@@ -234,7 +248,7 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
         { // Skip i==j
           if (i->getN() >= Ij)
             {
-              sumPressure += beta(*i, *j);
+              sumPressure += beta(*i, *j) * h(*i, Ij);
             }
           else if (i->getR() >= Ij)
             {
@@ -264,11 +278,12 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * (min(i->getN(), Ij) - min(i->getI(), Ij));
+      double hfunc = (H(*i,min(i->getN(), Ij)) - H(*i,min(i->getI(), Ij)));
+      integPressure += beta(*i, *j) * hfunc;
 
       // Notified -> Susceptible pressure
-      integPressure += betastar(*i, *j) * (min(i->getR(), Ij) - min(i->getN(),
-          Ij));
+      //integPressure += betastar(*i, *j) * (min(i->getR(), Ij) - min(i->getN(),
+      //    Ij));
     }
 
   integPressure += txparams_(0) * (min(Ij, pop_.getObsTime()) - I1);
@@ -310,7 +325,7 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
           logLikelihood.local = NEGINF;
           break;
       }
-      else logLikelihood.local += integPressureOn(k, k->getI());
+      else logLikelihood.local += tmp;
     }
 
   all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());
@@ -437,10 +452,10 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       else
         {
           if (j->isIAt((*i)->getI()))
-            myPressure -= beta(*j, **i);
+            myPressure -= beta(*j, **i) * h(*j,(*i)->getI());
 
           if (newTime <= (*i)->getI() && (*i)->getI() < j->getN())
-            myPressure += beta(*j, **i);
+            myPressure += beta(*j, **i) * h(*j,(*i)->getI());  // THIS AIN'T CORRECT!!!
         }
 
       updatedLogLik.productCache.insert(make_pair((*i)->getId(), myPressure));
@@ -462,10 +477,10 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       else
         {
           double myBeta = beta(*j, *i);
-          logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(j->getI(),
-              i->getI()));
-          logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
-              i->getI()));
+          logLikelihood += myBeta * (H(*j,min(j->getN(), i->getI())) - H(*j,min(j->getI(), // NOT CORRECT!!!
+              i->getI())));
+          logLikelihood -= myBeta * (H(*j,min(j->getN(), i->getI())) - H(*j,min(newTime, // NOT CORRECT!!!
+              i->getI())));
         }
     }
 
@@ -781,6 +796,7 @@ Mcmc::run(const size_t numIterations,
   acceptance["R"] = 0.0;
   acceptance["gamma"] = 0.0;
 
+  cout << "Running MCMC..." << flush;
   for (size_t k = 0; k < numIterations; ++k)
     {
       if (mpirank_ == 0 && k % 1 == 0)
@@ -801,13 +817,13 @@ Mcmc::run(const size_t numIterations,
           it != updateStack_.end();
           ++it) it->update();
 
-      for (size_t infec = 0; infec < numRUpdates; ++infec)
-        {
-          toMove = random_->integer(pop_.numInfected());
-          acceptance["R"] += updateR(toMove);
-        }
-
-      acceptance["gamma"] += updateBpnc();
+//      for (size_t infec = 0; infec < numRUpdates; ++infec)
+//        {
+//          toMove = random_->integer(pop_.numInfected());
+//          acceptance["R"] += updateR(toMove);
+//        }
+//
+//      acceptance["gamma"] += updateBpnc();
 
       updateDIC();
 

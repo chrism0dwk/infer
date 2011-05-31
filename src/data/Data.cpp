@@ -26,8 +26,12 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <cstdlib>
+#include <limits>
 #include "Data.hpp"
 #include "stlStrTok.hpp"
+
+#define NEGINF (-numeric_limits<double>::infinity())
+#define POSINF (numeric_limits<double>::infinity())
 
 gsl_rng* localrng = gsl_rng_alloc(gsl_rng_mt19937);
 
@@ -83,7 +87,9 @@ PopDataImporter::next()
   record.data.y = atof(tokens[2].c_str()) / 1000.0;
   record.data.horses = atof(tokens[3].c_str());
   record.data.area = atof(tokens[4].c_str());
-  record.data.epi = new SirDeterministic(horses,0.25);
+  record.data.epi = new EpiRisk::SirDeterministic(record.data.horses,1.0);
+
+  record.data.epi->simulate(0.5,0.2);
 
   return record;
 }
@@ -140,8 +146,8 @@ EpiDataImporter::next()
   if (tokens.size() != 4) throw EpiRisk::fileEOF();
   record.id = tokens[0];
   record.data.I = atof(tokens[1].c_str());
-  record.data.N = atof(tokens[2].c_str());
-  record.data.R = atof(tokens[3].c_str());
+  record.data.N = POSINF;//atof(tokens[2].c_str());
+  record.data.R = POSINF;//atof(tokens[3].c_str());
   return record;
 }
 

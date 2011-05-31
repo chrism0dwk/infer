@@ -32,14 +32,14 @@
 
 #include "Individual.hpp"
 #include "DataImporter.hpp"
-#include "SirDeterministic.cpp"
+#include "SirDeterministic.hpp"
 
 struct TestCovars {
   double x;
   double y;
   double horses;
   double area;
-  SirDeterministic* epi;
+  EpiRisk::SirDeterministic* epi;
 };
 
 
