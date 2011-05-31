@@ -25,16 +25,20 @@ namespace EpiRisk {
 		typedef std::map<double,CurveVal> EpiGraph;
 		
 	public:
-		SirDeterministic(const double N, const double delta = 0.5);
+		explicit SirDeterministic(const double N, const double delta = 0.5);
 		virtual ~SirDeterministic();
 		void simulate(const double beta, const double gamma, const double I0 = 1);
-		double numInfecAt(const double time);
-		double integNumInfecAt(const double time);
+		double numInfecAt(const double time) const;
+		double integNumInfecAt(const double time) const;
+		double getMaxTime() const;
+		double getMaxIntegral() const;
 	
 	private:
 		double N_;
 		double delta_;
-		EpiGraph iGraph_;		
+		EpiGraph iGraph_;
+		double maxT_;
+		double maxIntegral_;
 	};
 	
 }

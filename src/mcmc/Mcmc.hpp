@@ -100,6 +100,12 @@ namespace EpiRisk
     //// THESE SHOULD BE IN A "MODEL" CLASS ////
     virtual
     double
+    h(const Population<TestCovars>::Individual& i, const double time) const;
+    virtual
+    double
+    H(const Population<TestCovars>::Individual& i, const double time) const;
+    virtual
+    double
     susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
     virtual
     double

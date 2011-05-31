@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/mcmc
+INCLUDES = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/mcmc -I$(top_srcdir)/src/sim
 METASOURCES = AUTO
 bin_PROGRAMS = auseiMcmc
 

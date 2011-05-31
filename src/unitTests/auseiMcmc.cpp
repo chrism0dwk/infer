@@ -157,6 +157,7 @@ int main(int argc, char* argv[])
 //  for(size_t i=0; i<7; i++) updates.add(txparams(i));
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
+  cout << "Adding updaters" << endl;
   myMcmc->newSingleSiteLogMRW(txparams(0),0.1);
   myMcmc->newSingleSiteLogMRW(txparams(1),1.0);
   myMcmc->newSingleSiteLogMRW(txparams(2),100.0);
@@ -168,8 +169,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/ausei/output/ausei_nc_density.parms";
-  occFn << "/scratch/stsiab/ausei/output/ausei_nc_density.occ";
+  parmFn << "/Users/stsiab/Documents/Australia/Simon/data/ausei_nc.parms";
+  occFn << "/Users/stsiab/Documents/Australia/Simon/data/ausei_nc.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -177,6 +178,7 @@ int main(int argc, char* argv[])
   stringstream iters(argv[3]);
   iters >> numIters;
 
+  cout << "Running MCMC from " << __PRETTY_FUNCTION__ << endl;
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
   delete myMcmc;

@@ -84,19 +84,25 @@ namespace EpiRisk {
 			iGraph_.insert(std::make_pair(t,tmp));
 		}
 		
-		gsl_odeiv2_driver_free(driver);	
+		gsl_odeiv2_driver_free(driver);
+
+		// Cache max time
+		maxT_ = (iGraph_.end()--)->first;
+		maxIntegral_ = (iGraph_.end()--)->second.integral;
 		
 	}
 	
 	
 	
 	double
-	SirDeterministic::numInfecAt(const double time)
+	SirDeterministic::numInfecAt(const double time) const
 	{
-		EpiGraph::iterator upper, lower;
+	        if (time > maxT_) return 0.0;
+
+		EpiGraph::const_iterator upper, lower;
 		upper = iGraph_.upper_bound(time);
 		
-		if(upper == iGraph_.end()) return 0.0; // Return if we're past the end of the epidemic
+		//if(upper == iGraph_.end()) return 0.0; // Return if we're past the end of the epidemic
 		
 		// Set lower to the previous timepoint
 		lower = upper; 
@@ -111,22 +117,36 @@ namespace EpiRisk {
 	
 	
 	double
-	SirDeterministic::integNumInfecAt(const double time)
+	SirDeterministic::integNumInfecAt(const double time) const
 	{
-		EpiGraph::iterator upper,lower;
+	        if(time > maxT_)  return maxIntegral_;
+
+		EpiGraph::const_iterator upper,lower;
 		upper = iGraph_.upper_bound(time);
 		
-		if(upper == iGraph_.end()) return (--iGraph_.end())->second.integral; // Return whole integral if epidemic has finished
+		//if(upper == iGraph_.end()) return (--iGraph_.end())->second.integral; // Return whole integral if epidemic has finished
 		
 		// Set lower to previous timepoint
 		lower = upper;
 		lower--;
 		
 		// Now interpolate between timepoints
-		double rv = lower->second.integral + (lower->second.value + numInfecAt(time))/2 * (time - lower->first);
+		double numInfecAtTime = lower->second.value + (time - lower->first) * ( upper->second.value - lower->second.value) / delta_;
+		double rv = lower->second.integral + (lower->second.value + numInfecAtTime)/2 * (time - lower->first);
 		
 		return rv;
 	}
 
+	double
+	SirDeterministic::getMaxTime() const
+	{
+	  return maxT_;
+	}
+
+	double
+	SirDeterministic::getMaxIntegral() const
+	{
+	  return maxIntegral_;
+	}
 
 }
