@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
 
 
   Parameters txparams(16);
-  txparams(0) = Parameter(1.0,GammaPrior(1,1),"gamma1");
+  txparams(0) = Parameter(0.0065,GammaPrior(1,1),"gamma1");
   txparams(1) = Parameter(1.0,GammaPrior(1,1),"gamma2");
   txparams(2) = Parameter(1.1,GammaPrior(1,1),"delta");
   txparams(3) = Parameter(0.000035,GammaPrior(1,1),"epsilon");
@@ -159,7 +159,7 @@ int main(int argc, char* argv[])
   txparams(9) = Parameter(1,BetaPrior(2,2),"psi_s");
   txparams(10) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
   txparams(11) = Parameter(0.14,GammaPrior(1,1),"zeta_p");
-  txparams(12) = Parameter(1.7,GammaPrior(1,1),"zeta_s");
+  txparams(12) = Parameter(0.2,GammaPrior(1,1),"zeta_s");
   txparams(13) = Parameter(1,BetaPrior(2,2),"phi_c");
   txparams(14) = Parameter(1,BetaPrior(2,2),"phi_p");
   txparams(15) = Parameter(1,BetaPrior(2,2),"phi_s");
@@ -199,23 +199,23 @@ int main(int argc, char* argv[])
   txDelta.add(txparams[3]);
   AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
 
-//  UpdateBlock txPsi;
-//  txPsi.add(txparams[7]);
-//  txPsi.add(txparams[8]);
-//  txPsi.add(txparams[9]);
-//  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
-//
-//  UpdateBlock txPhi;
-//  txPhi.add(txparams[13]);
-//  txPhi.add(txparams[14]);
-//  txPhi.add(txparams[15]);
-//  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
+  UpdateBlock txPsi;
+  txPsi.add(txparams[7]);
+  txPsi.add(txparams[8]);
+  txPsi.add(txparams[9]);
+  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
+
+  UpdateBlock txPhi;
+  txPhi.add(txparams[13]);
+  txPhi.add(txparams[14]);
+  txPhi.add(txparams[15]);
+  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth1.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOrth1.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

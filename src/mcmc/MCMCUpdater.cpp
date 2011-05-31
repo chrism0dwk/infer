@@ -324,6 +324,20 @@ namespace EpiRisk
     McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), constants_(
         alpha), burnin_(burnin)
   {
+    // Initialize the standard covariance
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); ++i)
+      {
+        for (size_t j = 0; j < updateGroup_.size(); ++j)
+          {
+            if (i == j)
+              (*stdCov_)(i, j) = 0.01 / updateGroup_.size();
+            else
+              (*stdCov_)(i, j) = 0.0;
+          }
+      }
+
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_);
   }
 
   SpeciesMRW::~SpeciesMRW()
@@ -353,10 +367,27 @@ namespace EpiRisk
     transform(1) = updateGroup_[0]->getValue() * updateGroup_[1]->getValue() * constants_[1];
     transform(2) = updateGroup_[0]->getValue() * updateGroup_[2]->getValue() * constants_[2];
 
+    // Propose as in Haario, Sachs, Tamminen (2001)
+//    Random::Variates logvars;
+//    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+//      {
+//        try
+//          {
+//            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+//                / updateGroup_.size());
+//          }
+//        catch (cholesky_error& e)
+//          {
+//            logvars = random_.mvgauss(*stdCov_);
+//          }
+//      }
+//    else
+//      logvars = random_.mvgauss(*stdCov_);
+
     // Use indep gaussians here
-    transform(0) *= exp(random_.gaussian(0,0.01));
-    transform(1) *= exp(random_.gaussian(0,0.01));
-    transform(2) = R - transform(0) - transform(1);
+    transform(1) *= exp(random_.gaussian(0,0.8));
+    transform(2) *= exp(random_.gaussian(0,0.1));
+    transform(0) = R - transform(1) - transform(2);
 
     // Transform back
     updateGroup_[0]->setValue(transform(0) / constants_[0]);
@@ -373,7 +404,7 @@ namespace EpiRisk
         + log(updateGroup_[2]->prior());
 
     // q-Ratio
-    double qRatio = log(transform(0) / (oldParams[0]*constants_[0])) + log(transform(1) / (oldParams[0] * oldParams[1] * constants_[1]));
+    double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
     // Accept/reject
     if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)

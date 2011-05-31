@@ -38,7 +38,7 @@ using namespace EpiRisk;
 const double a = 0.015;
 const double b = 0.8;
 const double tuneI = 0.8;
-const double numIUpdates = 0;
+const double numIUpdates = 30;
 
 inline
 double
@@ -166,7 +166,7 @@ Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup, size_t bu
 SpeciesMRW*
 Mcmc::newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha)
 {
-  SpeciesMRW* update = new SpeciesMRW(tag,params,alpha,*random_,logLikelihood_,this);
+  SpeciesMRW* update = new SpeciesMRW(tag,params,alpha,1,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
 
   return update;
