@@ -160,10 +160,10 @@ int main(int argc, char* argv[])
   cout << "Adding updaters" << endl;
   myMcmc->newSingleSiteLogMRW(txparams(0),0.1);
   myMcmc->newSingleSiteLogMRW(txparams(1),1.0);
-  myMcmc->newSingleSiteLogMRW(txparams(2),100.0);
+  //myMcmc->newSingleSiteLogMRW(txparams(2),100.0);
   //myMcmc->newSingleSiteLogMRW(txparams(3),0.4);
   //myMcmc->newSingleSiteLogMRW(txparams(4),0.4);
-  myMcmc->newSingleSiteLogMRW(txparams(5),0.7);
+  myMcmc->newSingleSiteLogMRW(txparams(5),5.0);
   //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
 
   stringstream parmFn;
