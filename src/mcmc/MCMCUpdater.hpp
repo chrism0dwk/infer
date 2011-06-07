@@ -146,5 +146,22 @@ namespace EpiRisk
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };
 
+
+
+  //! Single site update for within farm epidemic
+  class WithinFarmBetaLogMRW : public McmcUpdate
+  {
+  public:
+    WithinFarmBetaLogMRW(Parameter& param,  const double gamma, Population<TestCovars>& pop_, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    ~WithinFarmBetaLogMRW();
+    void
+    update();
+  private:
+    Parameter& param_;
+    const double tuning_;
+    const double gamma_;
+    Population<TestCovars>& pop_;
+  };
+
 }
 #endif /* MCMCUPDATER_HPP_ */

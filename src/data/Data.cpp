@@ -89,7 +89,7 @@ PopDataImporter::next()
   record.data.area = atof(tokens[4].c_str());
   record.data.epi = new EpiRisk::SirDeterministic(record.data.horses,1.0);
 
-  record.data.epi->simulate(0.5,0.2);
+  record.data.epi->simulate(0.1,0.143);
 
   return record;
 }
