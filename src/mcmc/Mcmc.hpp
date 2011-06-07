@@ -56,6 +56,7 @@ namespace EpiRisk
   class SingleSiteLogMRW;
   class AdaptiveMultiLogMRW;
   class AdaptiveMultiMRW;
+  class WithinFarmBetaLogMRW;
 
   struct DIC {
      double Dbar;
@@ -187,6 +188,8 @@ namespace EpiRisk
     newAdaptiveMultiLogMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
     AdaptiveMultiMRW*
     newAdaptiveMultiMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
+    WithinFarmBetaLogMRW*
+    newWithinFarmBetaLogMRW(Parameter& param, const double gamma, const double tuning);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC

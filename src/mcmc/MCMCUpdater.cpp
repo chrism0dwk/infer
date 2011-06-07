@@ -293,4 +293,71 @@ namespace EpiRisk
     ++numUpdates_;
   }
 
+
+  WithinFarmBetaLogMRW::WithinFarmBetaLogMRW(Parameter& param, const double gamma, Population<TestCovars>& pop, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* env)
+  : McmcUpdate(param.getTag(),rng,logLikelihood,env), param_(param), gamma_(gamma),tuning_(tuning), pop_(pop)
+  {
+    // Simulate on farm epidemics
+    for ( Population<TestCovars>::PopulationIterator it = pop_.begin();
+          it != pop_.end();
+          it++)
+      {
+        it->getCovariates().epi->simulate(param_,gamma_);
+      }
+  }
+
+  WithinFarmBetaLogMRW::~WithinFarmBetaLogMRW()
+  {
+  }
+
+  void
+  WithinFarmBetaLogMRW::update()
+  {
+    double oldParam = param_;
+
+    // Current conditional posterior
+    double logPiCur = logLikelihood_.global + log(param_.prior());
+
+    // Propose new beta
+    param_ = oldParam * exp(random_.gaussian(0.0,tuning_));
+
+    // Resimulate on farm epidemics
+    for ( Population<TestCovars>::PopulationIterator it = pop_.begin();
+          it != pop_.end();
+          it++)
+      {
+        it->getCovariates().epi->simulate(param_,gamma_);
+      }
+
+    // Calculate candidate conditional posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+    double logPiCan = logLikCan.global + log(param_.prior());
+
+    // q ratio
+    double qRatio = log(param_ / oldParam);
+
+    // Accept/reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
+      {
+       logLikelihood_ = logLikCan;
+       acceptance_++;
+      }
+    else
+      {
+        // Roll back to old parameter
+        param_ = oldParam;
+
+        for ( Population<TestCovars>::PopulationIterator it = pop_.begin();
+              it != pop_.end();
+              it++)
+          {
+            it->getCovariates().epi->simulate(param_,gamma_);
+          }
+      }
+
+    numUpdates_++;
+  }
+
+
 }

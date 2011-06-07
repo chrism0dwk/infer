@@ -162,6 +162,17 @@ Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup, size_t bu
   return update;
 }
 
+
+//! Pushes an updater onto the MCMC stack
+WithinFarmBetaLogMRW*
+Mcmc::newWithinFarmBetaLogMRW(Parameter& param, const double gamma, const double tuning)
+{
+  WithinFarmBetaLogMRW* update = new WithinFarmBetaLogMRW(param,gamma,pop_,tuning,*random_,logLikelihood_,this);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
 double
 Mcmc::getLogLikelihood() const
 {
@@ -172,16 +183,16 @@ inline
 double
 Mcmc::h(const Population<TestCovars>::Individual& i, const double time) const
 {
-  double timeSinceI = max(time - i.getI(), 0.0);
-  return i.getCovariates().epi->numInfecAt(timeSinceI);
+  if (time <= i.getI()) return 0.0;
+  else return i.getCovariates().epi->numInfecAt(time - i.getI());
 }
 
 inline
 double
 Mcmc::H(const Population<TestCovars>::Individual& i, const double time) const
 {
-  double timeSinceI = max(time - i.getI(),0.0);
-  return i.getCovariates().epi->integNumInfecAt(timeSinceI);
+  if (time <= i.getI()) return 0.0;
+  else return i.getCovariates().epi->integNumInfecAt(time - i.getI());
 }
 
 
@@ -221,12 +232,7 @@ double
 Mcmc::betastar(const Population<TestCovars>::Individual& i, const Population<
     TestCovars>::Individual& j) const
 {
-  double distance = dist(i.getCovariates().x, i.getCovariates().y,
-      j.getCovariates().x, j.getCovariates().y);
-  if (distance <= 100.0) {
-      return txparams_(2) /* infectivity(i,j) */ * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
-  }
-  else
+
     return 0.0;
 }
 
@@ -278,7 +284,8 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      double hfunc = (H(*i,min(i->getN(), Ij)) - H(*i,min(i->getI(), Ij)));
+      //double hfunc = (H(*i,min(i->getN(), Ij)) - H(*i,min(i->getI(), Ij)));
+      double hfunc = H(*i,Ij);// - H(*i, min(i->getI(), Ij));
       integPressure += beta(*i, *j) * hfunc;
 
       // Notified -> Susceptible pressure

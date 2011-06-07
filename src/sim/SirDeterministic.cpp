@@ -31,7 +31,7 @@ namespace EpiRisk {
 	}	
 	
 	
-	SirDeterministic::SirDeterministic(const double N, const double delta) : N_(N),delta_(delta)
+	SirDeterministic::SirDeterministic(const double N, const double delta) : N_(N),delta_(delta),maxT_(0.0),maxIntegral_(0.0)
 	{
 	};
 	
@@ -87,8 +87,8 @@ namespace EpiRisk {
 		gsl_odeiv2_driver_free(driver);
 
 		// Cache max time
-		maxT_ = (iGraph_.end()--)->first;
-		maxIntegral_ = (iGraph_.end()--)->second.integral;
+		maxT_ = (--iGraph_.end())->first;
+		maxIntegral_ = (--iGraph_.end())->second.integral;
 		
 	}
 	

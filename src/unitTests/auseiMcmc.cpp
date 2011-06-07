@@ -138,12 +138,12 @@ int main(int argc, char* argv[])
   delete epiDataImporter;
 
   Parameters txparams(9);
-  txparams(0) = Parameter(2e-6,GammaPrior(1,1),"epsilon");
-  txparams(1) = Parameter(0.01,GammaPrior(1,1),"gamma_1");
+  txparams(0) = Parameter(0.00025,GammaPrior(1,1),"epsilon");
+  txparams(1) = Parameter(0.0001,GammaPrior(1,1),"gamma_1");
   txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
   txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
   txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
-  txparams(5) = Parameter(1.13,GammaPrior(1,1),"delta");
+  txparams(5) = Parameter(0.45,GammaPrior(1,1),"delta");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
   txparams(7) = Parameter(7.0,GammaPrior(14.0,1),"a");
   txparams(8) = Parameter(0.5,GammaPrior(1,2),"b");
@@ -158,19 +158,16 @@ int main(int argc, char* argv[])
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
   cout << "Adding updaters" << endl;
-  myMcmc->newSingleSiteLogMRW(txparams(0),0.1);
-  myMcmc->newSingleSiteLogMRW(txparams(1),1.0);
-  //myMcmc->newSingleSiteLogMRW(txparams(2),100.0);
-  //myMcmc->newSingleSiteLogMRW(txparams(3),0.4);
-  //myMcmc->newSingleSiteLogMRW(txparams(4),0.4);
-  myMcmc->newSingleSiteLogMRW(txparams(5),5.0);
-  //myMcmc->newSingleSiteLogMRW(txparams(6),0.4);
+  myMcmc->newSingleSiteLogMRW(txparams(0),5.0);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.07);
+  myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
+  myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.3);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/Users/stsiab/Documents/Australia/Simon/data/ausei_nc.parms";
-  occFn << "/Users/stsiab/Documents/Australia/Simon/data/ausei_nc.occ";
+  parmFn << "/scratch/stsiab/ausei/output/ausei_withinSIR1.parms";
+  occFn << "/scratch/stsiab/ausei/output/ausei_withinSIR1.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -178,7 +175,6 @@ int main(int argc, char* argv[])
   stringstream iters(argv[3]);
   iters >> numIters;
 
-  cout << "Running MCMC from " << __PRETTY_FUNCTION__ << endl;
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
 
   delete myMcmc;
