@@ -107,8 +107,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams, Paramete
 
   // Calculate log likelihood
   calcLogLikelihood(logLikelihood_);
-  all_reduce(comm_, logLikelihood_.local, logLikelihood_.global, plus<double> ());
-  if (mpirank_ == 0) std::cout << "Log likelihood starts at " << logLikelihood_.global << std::endl;
+
 
   // Set up DIC
   initializeDIC();
@@ -256,10 +255,6 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
             {
               sumPressure += beta(*i, *j) * h(*i, Ij);
             }
-          else if (i->getR() >= Ij)
-            {
-              sumPressure += betastar(*i, *j);
-            }
         }
       ++i;
     }
@@ -284,13 +279,7 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      //double hfunc = (H(*i,min(i->getN(), Ij)) - H(*i,min(i->getI(), Ij)));
-      double hfunc = H(*i,Ij);// - H(*i, min(i->getI(), Ij));
-      integPressure += beta(*i, *j) * hfunc;
-
-      // Notified -> Susceptible pressure
-      //integPressure += betastar(*i, *j) * (min(i->getR(), Ij) - min(i->getN(),
-      //    Ij));
+      integPressure += beta(*i, *j) * H(*i,Ij);
     }
 
   integPressure += txparams_(0) * (min(Ij, pop_.getObsTime()) - I1);
@@ -802,6 +791,9 @@ Mcmc::run(const size_t numIterations,
 
   acceptance["R"] = 0.0;
   acceptance["gamma"] = 0.0;
+
+  calcLogLikelihood(logLikelihood_);
+  if (mpirank_ == 0) std::cout << "Log likelihood starts at " << logLikelihood_.global << std::endl;
 
   cout << "Running MCMC..." << flush;
   for (size_t k = 0; k < numIterations; ++k)

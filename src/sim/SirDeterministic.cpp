@@ -69,10 +69,10 @@ namespace EpiRisk {
 		
 		// Parameters
 		double parms[2]; 
-		parms[0] = beta; 
+		parms[0] = beta / N_; // Density independent!
 		parms[1] = gamma;
 		
-		double y[3] = {N_,I0,0.0};
+		double y[3] = {N_-1,I0,0.0};
 		
 		gsl_odeiv2_system sys = {model, NULL, 3, parms};
 		gsl_odeiv2_driver* driver = gsl_odeiv2_driver_alloc_y_new(&sys, gsl_odeiv2_step_rkf45, 1e-4, 1e-4, 0.0);
