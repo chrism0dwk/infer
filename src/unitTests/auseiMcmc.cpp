@@ -138,18 +138,18 @@ int main(int argc, char* argv[])
   delete epiDataImporter;
 
   Parameters txparams(9);
-  txparams(0) = Parameter(0.00025,GammaPrior(1,1),"epsilon");
-  txparams(1) = Parameter(0.0001,GammaPrior(1,1),"gamma_1");
+  txparams(0) = Parameter(3e-4,GammaPrior(1,1),"epsilon");
+  txparams(1) = Parameter(0.0019,GammaPrior(1,1),"gamma_1");
   txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
   txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
   txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
-  txparams(5) = Parameter(0.45,GammaPrior(1,1),"delta");
+  txparams(5) = Parameter(0.1,GammaPrior(1,1),"delta");
   txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
   txparams(7) = Parameter(7.0,GammaPrior(14.0,1),"a");
-  txparams(8) = Parameter(0.5,GammaPrior(1,2),"b");
+  txparams(8) = Parameter(0.4,GammaPrior(1,1),"b");
 
   Parameters dxparams(1);
-  dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
+  dxparams(0) = Parameter(0.01,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,2);
 
@@ -161,13 +161,13 @@ int main(int argc, char* argv[])
   myMcmc->newSingleSiteLogMRW(txparams(0),5.0);
   myMcmc->newSingleSiteLogMRW(txparams(1),0.07);
   myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
-  myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.3);
+  myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.1);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/ausei/output/ausei_withinSIR1.parms";
-  occFn << "/scratch/stsiab/ausei/output/ausei_withinSIR1.occ";
+  parmFn << "/scratch/stsiab/ausei/output/ausei_withinSIR4.parms";
+  occFn << "/scratch/stsiab/ausei/output/ausei_withinSIR4.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
