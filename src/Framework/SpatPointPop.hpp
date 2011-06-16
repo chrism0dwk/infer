@@ -205,6 +205,14 @@ namespace EpiRisk
        */
       bool
       moveInfectionTime(const std::string id, const double newTime);
+      /*! /brief Updates I, N, and R event times
+       *
+       * @param individual a reference to the individual to update
+       * @param events an Events struct containing the new times
+       * @return whether the operation was successful
+       */
+      bool
+      updateEvents(const Individual& individual,Events events);
       /*! Adds an occult infection
        * @param susceptibleIndex the position of the susceptible to add in the susceptibles index.
        */
@@ -606,6 +614,15 @@ namespace EpiRisk
 
       return moveInfectionTime(infIter, newTime);
     }
+
+  template<typename Covars>
+  bool
+  Population<Covars>::updateEvents(const Individual& individual,Events events)
+  {
+    typename InfectiveIndex::iterator ref = infIndex_.iterator_to(individual);
+    Events oldEvents = individual.getEvents();
+    return infIndex_.modify(ref,modifyEvents(events),modifyEvents(oldEvents));
+  }
 
   template<typename Covars>
     double

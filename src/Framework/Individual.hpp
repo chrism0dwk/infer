@@ -181,10 +181,22 @@ namespace EpiRisk
         return events_.N;
       }
 
+      void
+      setN(const eventTime_t N)
+      {
+        events_.N = N;
+      }
+
       double
       getR() const
       {
         return events_.R;
+      }
+
+      void
+      setR(const eventTime_t R)
+      {
+        events_.R = R;
       }
 
       bool
