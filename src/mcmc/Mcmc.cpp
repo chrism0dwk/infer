@@ -198,8 +198,8 @@ Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Populati
 {
   double susceptibility = //j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
       pow(txparams_(10)*j.getCovariates().cattle/10,txparams_(13)) +
-                                   txparams_(11)*pow(j.getCovariates().pigs/10,txparams_(14)) +
-                                   txparams_(12)*pow(j.getCovariates().sheep/10,txparams_(15));
+                                   txparams_(11)*pow(j.getCovariates().pigs,txparams_(14)) +
+                                   txparams_(12)*pow(j.getCovariates().sheep,txparams_(15));
 
   return susceptibility;
 }
