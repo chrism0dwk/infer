@@ -455,8 +455,10 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
             myPressure += beta(*j, **i);
         }
 
-      updatedLogLik.productCache.insert(make_pair((*i)->getId(), myPressure));
-      logLikelihood += log(myPressure);
+      if(myPressure != 0.0) { // Zero pressure individual occurs when an occult is deleted
+          updatedLogLik.productCache.insert(make_pair((*i)->getId(), myPressure));
+          logLikelihood += log(myPressure);
+      }
     }
 
   // Integral part of likelihood
@@ -532,12 +534,18 @@ Mcmc::addI()
 
   double logPiCur = logLikelihood_.global;
 
+  // Which process will calculate the addition?
+  bool myAddition = false;
+  if(mpirank_ == random_->integer(comm_.size())) myAddition = true;
+
+  //Add to processInfectives and occultList
+  if(myAddition) processInfectives_.push_back(it);
+  occultList_.push_back(it);
+
   Likelihood logLikCan;
   updateIlogLikelihood(it,newI, logLikCan);
-  double glogLikCan;
-  all_reduce(comm_,logLikCan.local,logLikCan.global,plus<double>());
 
-  double logPiCan = glogLikCan + log(extremepdf(inProp,a,b));
+  double logPiCan = logLikCan.global + log(extremepdf(inProp,a,b));
 
   double qRatio = log( 1.0 / (occultList_.size() + 1) / (1.0 / numSusceptible * gaussianTailPdf(inProp,-1/b,1/(a*b*b))));
 
@@ -552,6 +560,9 @@ Mcmc::addI()
     }
   else
     {
+      // Delete from processInfectives and occultList
+      occultList_.pop_back();
+      if(myAddition) processInfectives_.erase(find(processInfectives_.begin(),processInfectives_.end(),it));
       return false;
     }
 }
@@ -560,6 +571,8 @@ bool
 Mcmc::deleteI()
 {
   size_t numSusceptible = pop_.numSusceptible();
+
+  if (occultList_.empty()) return false;
 
   ProcessInfectives::const_iterator idx = occultList_.begin();
   advance(idx,random_->integer(occultList_.size()));
@@ -570,10 +583,8 @@ Mcmc::deleteI()
 
   Likelihood logLikCan;
   updateIlogLikelihood(it,POSINF, logLikCan);
-  double glogLikCan;
-  all_reduce(comm_,logLikCan.local, logLikCan.global, plus<double>());
 
-  double logPiCan = glogLikCan;
+  double logPiCan = logLikCan.global;
 
   double qRatio = log( 1.0/(numSusceptible + 1) * gaussianTailPdf(it->getN() - it->getI(),-1/b,1/(a*b*b))  / 1.0/occultList_.size());
   // Perform accept/reject step.
@@ -584,6 +595,11 @@ Mcmc::deleteI()
     {
       pop_.moveInfectionTime(it,POSINF);
       logLikelihood_ = logLikCan;
+
+      // Delete from processInfectives and occultList
+      ProcessInfectives::iterator toErase = find(processInfectives_.begin(),processInfectives_.end(),it);
+      if(toErase != processInfectives_.end()) processInfectives_.erase(toErase);
+      occultList_.erase(find(occultList_.begin(),occultList_.end(),it));
       return true;
     }
   else
@@ -609,6 +625,8 @@ Mcmc::run(const size_t numIterations,
     }
 
   acceptance["I"] = 0.0;
+  acceptance["add"] = 0.0;
+  acceptance["delete"] = 0.0;
 
   for (size_t k = 0; k < numIterations; ++k)
     {
@@ -632,8 +650,21 @@ Mcmc::run(const size_t numIterations,
 
       for (size_t infec = 0; infec < numIUpdates; ++infec)
         {
-          toMove = random_->integer(pop_.numInfected());
-          acceptance["I"] += updateI(toMove);
+          size_t pickMove = random_->integer(3);
+          switch (pickMove) {
+          case 0:
+              toMove = random_->integer(pop_.numInfected());
+              acceptance["I"] += updateI(toMove);
+              break;
+          case 1:
+            acceptance["add"] += addI();
+            break;
+          case 2:
+            acceptance["delete"] += deleteI();
+            break;
+          default:
+            throw logic_error("Unknown move!");
+          }
         }
 
       updateDIC();
