@@ -43,4 +43,4 @@ CXX="$MPICXX"
 AC_SUBST([OPENMP_CXXFLAGS])
 AC_SUBST([GSL_LIBS])
 
-AC_OUTPUT(Makefile src/Makefile src/Framework/Makefile src/data/Makefile src/mcmc/Makefile src/unitTests/Makefile)
+AC_OUTPUT(Makefile src/Makefile src/Framework/Makefile src/data/Makefile src/mcmc/Makefile src/sim/Makefile src/unitTests/Makefile)
