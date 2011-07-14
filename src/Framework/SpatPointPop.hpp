@@ -59,8 +59,6 @@ using namespace std;
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
-#define POSINF ( numeric_limits<double>::infinity() )
-
 namespace EpiRisk
 {
 
@@ -304,13 +302,27 @@ namespace EpiRisk
       {
         InfectiveIndex& iIndex = population_.get<byI>();
         typename InfectiveIndex::iterator it = iIndex.begin();
-        while(it->getI() < obsTime_) {
+        while(it->getI() <= obsTime_) {
             cerr << it->getId() << "\t"
                 << it->getI() << "\t"
                 << it->getN() << "\t"
                 << it->getR() << endl;
             it++;
         }
+      }
+      /// Dumps the entire population to stderr
+      void
+      dumpPopulation()
+      {
+        for(PopulationIterator popIndex = population_.begin();
+            popIndex != population_.end();
+            popIndex++)
+          {
+            cerr << popIndex->getId() << "\t"
+                << popIndex->getI() << "\t"
+                << popIndex->getN() << "\t"
+                << popIndex->getR() << endl;
+          }
       }
       //@}
 

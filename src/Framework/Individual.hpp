@@ -97,12 +97,12 @@ namespace EpiRisk
       };
 
       Individual(string id, Covars& covariates) :
-        contactStart_(GSL_POSINF),known_(false),isDC_(false), hasBeenInfected_(false), infecByContact_(false), nonCentred_(false)
+        contactStart_(POSINF),known_(false),isDC_(false), hasBeenInfected_(false), infecByContact_(false), nonCentred_(false)
       {
         id_ = id;
-        events_.I = GSL_POSINF;
-        events_.N = GSL_POSINF;
-        events_.R = GSL_POSINF;
+        events_.I = POSINF;
+        events_.N = POSINF;
+        events_.R = POSINF;
 
         covariates_ = covariates;
       };

@@ -34,10 +34,9 @@
 #include <fstream>
 #include <tr1/memory>
 
+#include "types.hpp"
 #include "Random.hpp"
 #include "Model.hpp"
-
-#define POSINF (numeric_limits<double>::infinity())
 
 namespace EpiRisk
 {
@@ -445,7 +444,6 @@ namespace EpiRisk
           population_.setObsTime(currentTime);
 
         }
-
 
     }
 

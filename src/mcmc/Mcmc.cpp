@@ -23,6 +23,7 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/mpi/collectives.hpp>
 #include <ctime>
+#include <algorithm>
 
 //#ifdef __LINUX__
 //#include <acml_mv.h>
@@ -51,8 +52,9 @@ inline
 double
 extremecdf(const double x, const double a, const double b)
 {
-  return 1 - exp(-a * (exp(b * x) - 1));
+  return 1 - exp( -a * (exp(b*x)-1));
 }
+
 
 inline
 double
@@ -281,15 +283,14 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * (min(i->getN(), Ij) - min(i->getI(), Ij));
+      integPressure += beta(*i, *j) * (min(min(i->getN(),pop_.getObsTime()), Ij) - min(i->getI(), Ij));
 
       // Notified -> Susceptible pressure
-      integPressure += betastar(*i, *j) * (min(i->getR(), Ij) - min(i->getN(),
+      integPressure += betastar(*i, *j) * (min(min(i->getR(),pop_.getObsTime()), Ij) - min(min(i->getN(),pop_.getObsTime()),
           Ij));
     }
 
   integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);
-
   return -integPressure;
 }
 
@@ -438,13 +439,19 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
   for (ProcessInfectives::const_iterator i = processInfectives_.begin(); i
       != processInfectives_.end(); ++i)
     {
-      double myPressure = logLikelihood_.productCache.find((*i)->getId())->second;
-      logLikelihood -= log(myPressure);
+      double myPressure = 0.0;
+      // Subtract old pressure
+      map<string, double>::const_iterator myProduct = logLikelihood_.productCache.find((*i)->getId());
+      if( myProduct != logLikelihood_.productCache.end() ) {
+          myPressure = myProduct->second;
+          logLikelihood -= log(myPressure);
+      }
 
       if (*i == j) // Instantaneous pressure on j
         {
           // Product part of likelihood
-          myPressure = instantPressureOn(*i, newTime);
+          if(newTime == POSINF) myPressure = 0.0;
+          else myPressure = instantPressureOn(*i, newTime);
         }
       else
         {
@@ -476,9 +483,9 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       else
         {
           double myBeta = beta(*j, *i);
-          logLikelihood += myBeta * (min(j->getN(), i->getI()) - min(j->getI(),
+          logLikelihood += myBeta * (min(min(j->getN(),pop_.getObsTime()), i->getI()) - min(min(j->getI(),pop_.getObsTime()),
               i->getI()));
-          logLikelihood -= myBeta * (min(j->getN(), i->getI()) - min(newTime,
+          logLikelihood -= myBeta * (min(min(j->getN(),pop_.getObsTime()), i->getI()) - min(min(newTime,pop_.getObsTime()),
               i->getI()));
         }
     }
@@ -529,6 +536,7 @@ Mcmc::addI()
   Population<TestCovars>::InfectiveIterator it = pop_.infecEnd();
   advance(it,random_->integer(numSusceptible));
 
+//  cout << "Adding '" << it->getId() << "'" << endl;
   double inProp = random_->gaussianTail(-(1/b), 1/(a*b*b));
   double newI = pop_.getObsTime() - inProp;
 
@@ -544,22 +552,41 @@ Mcmc::addI()
 
   Likelihood logLikCan;
   updateIlogLikelihood(it,newI, logLikCan);
+//  cout << "Udpate likelihood = " << logLikCan.global << endl;
+//  pop_.moveInfectionTime(it,newI);
+//  Likelihood tmp; calcLogLikelihood(tmp);
+//  pop_.moveInfectionTime(it,POSINF);
+//  cout << "Calcliklihood = " << tmp.global << endl;
+//
+//  double canSum(0.0),tmpSum(0.0);
+//  for(map<string,double>::const_iterator it = logLikCan.productCache.begin();
+//      it != logLikCan.productCache.end();
+//      it++)
+//    {
+//      double canPress = it->second;
+//      double tmpPress = tmp.productCache[it->first];
+//      canSum += log(canPress); tmpSum += log(tmpPress);
+//      cout << it->first << "\t" << canPress << "\t" << tmpPress << "\t" << canPress - tmpPress << endl;
+//    }
+//    cout << "CanSum = " << canSum << ", TmpSum = " << tmpSum << endl;
 
-  double logPiCan = logLikCan.global + log(extremepdf(inProp,a,b));
+  double logPiCan = logLikCan.global + log(1-extremecdf(inProp,a,b));
 
-  double qRatio = log( 1.0 / (occultList_.size() + 1) / (1.0 / numSusceptible * gaussianTailPdf(inProp,-1/b,1/(a*b*b))));
+  double qRatio = log( (1.0 / (occultList_.size() + 1)) / (1.0 / numSusceptible * gaussianTailPdf(inProp,-1/b,1/(a*b*b))));
 
   double accept = logPiCan - logPiCur + qRatio;
   // Perform accept/reject step.
 
   if(log(random_->uniform()) < accept)
     {
+      //cout << "ACCEPT ADDITION" << endl;
       pop_.moveInfectionTime(it,newI);
       logLikelihood_ = logLikCan;
       return true;
     }
   else
     {
+      //cout << "REJECT ADDITION" << endl;
       // Delete from processInfectives and occultList
       occultList_.pop_back();
       if(myAddition) processInfectives_.erase(find(processInfectives_.begin(),processInfectives_.end(),it));
@@ -572,21 +599,25 @@ Mcmc::deleteI()
 {
   size_t numSusceptible = pop_.numSusceptible();
 
-  if (occultList_.empty()) return false;
+  if (occultList_.empty()) {
+      if (mpirank_ == 0) cout << "Occults empty. Not deleting" << endl;
+      return false;
+  }
 
   ProcessInfectives::const_iterator idx = occultList_.begin();
   advance(idx,random_->integer(occultList_.size()));
 
   Population<TestCovars>::InfectiveIterator it = *idx;
-
-  double logPiCur = logLikelihood_.global + log(extremepdf(it->getN() - it->getI(),a,b));
+//  cout << "Deleting '" << it->getId() << "'" << endl;
+  double logPiCur = logLikelihood_.global + log(1-extremecdf(pop_.getObsTime() - it->getI(),a,b));
 
   Likelihood logLikCan;
   updateIlogLikelihood(it,POSINF, logLikCan);
+  //cout << "LogLikCan = " << logLikCan.global << endl;
 
   double logPiCan = logLikCan.global;
 
-  double qRatio = log( 1.0/(numSusceptible + 1) * gaussianTailPdf(it->getN() - it->getI(),-1/b,1/(a*b*b))  / 1.0/occultList_.size());
+  double qRatio = log(  ( 1.0/(numSusceptible + 1) * gaussianTailPdf(pop_.getObsTime() - it->getI(),-1/b,1/(a*b*b)))  / (1.0/occultList_.size()));
   // Perform accept/reject step.
 
   double accept = logPiCan - logPiCur + qRatio;
@@ -595,7 +626,7 @@ Mcmc::deleteI()
     {
       pop_.moveInfectionTime(it,POSINF);
       logLikelihood_ = logLikCan;
-
+      //cout << "ACCEPT DELETION" << endl;
       // Delete from processInfectives and occultList
       ProcessInfectives::iterator toErase = find(processInfectives_.begin(),processInfectives_.end(),it);
       if(toErase != processInfectives_.end()) processInfectives_.erase(toErase);
@@ -604,6 +635,7 @@ Mcmc::deleteI()
     }
   else
     {
+      //cout << "REJECT DELETION" << endl;
       return false;
     }
 }
@@ -665,6 +697,7 @@ Mcmc::run(const size_t numIterations,
           default:
             throw logic_error("Unknown move!");
           }
+          if(mpirank_ == 0) cout << "Num occults = " << occultList_.size() << endl;
         }
 
       updateDIC();
@@ -693,7 +726,9 @@ Mcmc::run(const size_t numIterations,
         {
           cout << it->getTag() << ": " << it->getAcceptance() << "\n";
         }
-      acceptance["I"] /= (numIterations * numIUpdates);
+      acceptance["I"] /= (numIterations * numIUpdates / 3);
+      acceptance["add"] /= (numIterations * numIUpdates / 2);
+      acceptance["delete"] /= (numIterations * numIUpdates / 2);
     }
   return acceptance;
 

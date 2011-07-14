@@ -25,6 +25,7 @@
  */
 
 #include <cstdlib>
+#include "types.hpp"
 #include "Data.hpp"
 #include "stlStrTok.hpp"
 
@@ -138,9 +139,14 @@ EpiDataImporter::next()
   if (tokens.size() != 4) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
-  record.data.I = atof(tokens[1].c_str());
-  record.data.N = atof(tokens[2].c_str());
-  record.data.R = atof(tokens[3].c_str());
+  if(tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;
+  else record.data.I = atof(tokens[1].c_str());
+
+  if(tokens[2] == "Inf") record.data.N = EpiRisk::POSINF;
+  else record.data.N = atof(tokens[2].c_str());
+
+  if(tokens[3] == "Inf") record.data.R = EpiRisk::POSINF;
+  else record.data.R = atof(tokens[3].c_str());
 
   return record;
 }

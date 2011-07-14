@@ -35,6 +35,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 
+#include "types.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
 #include "Parameter.hpp"
@@ -43,7 +44,7 @@
 #include "McmcWriter.hpp"
 #include "MCMCUpdater.hpp"
 
-#define NEGINF (-numeric_limits<double>::infinity())
+
 
 namespace EpiRisk
 {
