@@ -87,16 +87,7 @@ namespace EpiRisk
           indexed_by<
             random_access< tag<bySeq> >,
             hashed_unique< tag<byId>, const_mem_fun<Individual,string,&Individual::getId> >,
-            ordered_non_unique<tag<byI>,composite_key<
-                                          Individual,
-                                          const_mem_fun<Individual,double,&Individual::getI>,
-                                          const_mem_fun<Individual,double,&Individual::getN>
-                                        >,
-                                        composite_key_compare<
-                                          std::less<double>,
-                                          std::greater<double>
-                                        >
-            >
+            ordered_non_unique<tag<byI>, const_mem_fun<Individual,double,&Individual::getI> >
           >
       >  PopulationContainer;
 
@@ -300,6 +291,7 @@ namespace EpiRisk
       void
       dumpInfected()
       {
+        cerr.precision(15);
         InfectiveIndex& iIndex = population_.get<byI>();
         typename InfectiveIndex::iterator it = iIndex.begin();
         while(it->getI() <= obsTime_) {
@@ -611,8 +603,9 @@ namespace EpiRisk
         const double newTime)
     {
       double oldTime = it->getI();
-
-      return infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
+      bool  rv = infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
+      if (rv == false) throw logic_error("Failed to modify infection time!!");
+      return rv;
 
     }
 

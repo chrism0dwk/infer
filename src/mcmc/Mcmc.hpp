@@ -94,6 +94,7 @@ namespace EpiRisk
     double integPressTime_;
     std::vector<size_t> elements_;
     ofstream mcmcOutput_;
+    ofstream stdout_;
 
     typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
     ProcessInfectives processInfectives_;
@@ -148,10 +149,20 @@ namespace EpiRisk
     void
     updateDIC();
 
+    double
+    getMeanI2N() const;
+
+    double
+    getMeanOccI() const;
+
     void
     dumpParms() const;
     void
     dumpProdCache();
+    void
+    checkProcPopConsistency();
+    void
+    checkInfecOrder();
     void
     loadBalance();
 

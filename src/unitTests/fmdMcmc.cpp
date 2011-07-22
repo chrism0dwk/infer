@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(50.0);
+  myPopulation->setObsTime(70.0);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -146,28 +146,30 @@ int main(int argc, char* argv[])
   covMatrix.close();
 
 
-  Parameters txparams(16);
-  txparams(0) = Parameter(0.01,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(4.15,GammaPrior(1,1),"gamma2");
-  txparams(2) = Parameter(1.15,GammaPrior(1,1),"delta");
-  txparams(3) = Parameter(7.72e-5,GammaPrior(1,1),"epsilon");
+  Parameters txparams(18);
+  txparams(0) = Parameter(0.0108081,GammaPrior(1,1),"gamma1");
+  txparams(1) = Parameter(4.15498,GammaPrior(1,1),"gamma2");
+  txparams(2) = Parameter(1.14985,GammaPrior(1,1),"delta");
+  txparams(3) = Parameter(7.72081e-05,GammaPrior(1,1),"epsilon");
   txparams(4) = Parameter(1.0,GammaPrior(1,1),"xi_c");
-  txparams(5) = Parameter(0.002,GammaPrior(1,1),"xi_p");
-  txparams(6) = Parameter(0.613,GammaPrior(1,1),"xi_s");
-  txparams(7) = Parameter(0.24,BetaPrior(2,2),"psi_c");
-  txparams(8) = Parameter(0.67,BetaPrior(2,2),"psi_p");
-  txparams(9) = Parameter(0.13,BetaPrior(2,2),"psi_s");
+  txparams(5) = Parameter(0.00205606,GammaPrior(1,1),"xi_p");
+  txparams(6) = Parameter(0.613016,GammaPrior(1,1),"xi_s");
+  txparams(7) = Parameter(0.237344,BetaPrior(2,2),"psi_c");
+  txparams(8) = Parameter(0.665464,BetaPrior(2,2),"psi_p");
+  txparams(9) = Parameter(0.129998,BetaPrior(2,2),"psi_s");
   txparams(10) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
-  txparams(11) = Parameter(0.0003,GammaPrior(1,1),"zeta_p");
-  txparams(12) = Parameter(0.26,GammaPrior(1,1),"zeta_s");
-  txparams(13) = Parameter(0.4,BetaPrior(2,2),"phi_c");
-  txparams(14) = Parameter(0.75,BetaPrior(2,2),"phi_p");
-  txparams(15) = Parameter(0.37,BetaPrior(2,2),"phi_s");
+  txparams(11) = Parameter(0.000295018,GammaPrior(1,1),"zeta_p");
+  txparams(12) = Parameter(0.259683,GammaPrior(1,1),"zeta_s");
+  txparams(13) = Parameter(0.402155,BetaPrior(2,2),"phi_c");
+  txparams(14) = Parameter(0.749019,BetaPrior(2,2),"phi_p");
+  txparams(15) = Parameter(0.365774,BetaPrior(2,2),"phi_s");
+  txparams(16) = Parameter(0.0,GammaPrior(1,1),"meanI2N");
+  txparams(17) = Parameter(0.0,GammaPrior(1,1),"meanOccI");
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
-  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,1);
+  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;
   infAlpha[1] = 633.37;
@@ -178,7 +180,6 @@ int main(int argc, char* argv[])
 
   myMcmc->newSingleSiteLogMRW(txparams[0],0.1);
   myMcmc->newSingleSiteLogMRW(txparams[3],0.1);
-
 
   UpdateBlock txInfec;
   txInfec.add(txparams[0]);
@@ -214,8 +215,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-1.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-1.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

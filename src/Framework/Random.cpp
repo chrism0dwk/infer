@@ -136,7 +136,7 @@ namespace EpiRisk
   double
   Random::gaussianTail(const double mean, const double var)
   {
-    return gsl_ran_gaussian_tail(rng_,-mean,sqrt(var));
+    return mean + gsl_ran_gaussian_tail(rng_,-mean,sqrt(var));
   }
   Random::Variates
   Random::dirichlet(const Variates& alpha)
