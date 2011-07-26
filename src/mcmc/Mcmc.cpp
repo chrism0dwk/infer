@@ -43,7 +43,7 @@ using namespace EpiRisk;
 const double a = 0.015;
 const double b = 0.8;
 const double tuneI = 2.0;
-const double numIUpdates = 10;
+const double numIUpdates = 0;
 
 inline
 double
@@ -774,7 +774,7 @@ Mcmc::run(const size_t numIterations,
           for (size_t infec = 0; infec < numIUpdates; ++infec)
             {
               cout << "Picked: ";
-              size_t pickMove = random_->integer(3);
+              size_t pickMove = random_->integer(1);
               switch (pickMove)
                 {
               case 0:

@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(70.0);
+  myPopulation->setObsTime(170.0);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
 
   Parameters txparams(18);
   txparams(0) = Parameter(0.0108081,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(4.15498,GammaPrior(1,1),"gamma2");
+  txparams(1) = Parameter(0.5,GammaPrior(1,1),"gamma2");
   txparams(2) = Parameter(1.14985,GammaPrior(1,1),"delta");
   txparams(3) = Parameter(7.72081e-05,GammaPrior(1,1),"epsilon");
   txparams(4) = Parameter(1.0,GammaPrior(1,1),"xi_c");
@@ -215,8 +215,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-1.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-1.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-2.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestOccs70-2.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
