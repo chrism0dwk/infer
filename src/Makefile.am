@@ -1,1 +1,1 @@
-SUBDIRS=data Framework mcmc unitTests
+SUBDIRS=data Framework mcmc sim unitTests
