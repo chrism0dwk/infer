@@ -211,7 +211,7 @@ namespace EpiRisk
       double cumulativePressure = 0.0;
 
       for (typename Model::PopulationType::PopulationIterator it =
-          population_.asPop(population_.infecEnd()); it != population_.end(); it++)
+          population_.asPop(++population_.infecEnd()); it != population_.end(); it++)
         {
           cumulativePressure += model_.instantPressureOn(population_.asI(it),
               model_.getObsTime());
@@ -392,6 +392,7 @@ namespace EpiRisk
           // Get next event
           shared_ptr<Event> event;
 
+#ifndef NDEBUG
           // Time of next infection
           try {
               checkPressureCDF();
@@ -401,6 +402,7 @@ namespace EpiRisk
               dumpPressureCDF();
               throw (logic_error&)e;
             }
+#endif
 
           double nextInfecTime = POSINF;
           if (!pressureCDF_.empty())
@@ -424,14 +426,25 @@ namespace EpiRisk
           // 2. Update populations
           if (Infection* infection = dynamic_cast<Infection*> (event.get()))
             {
+#ifndef NDEBUG
+              cout << "Infecting " << infection->getIndividual()->getId() << " at " << currentTime << endl;
+#endif
               infect(infection);
+
             }
           else if (Notification* notification = dynamic_cast<Notification*> (event.get()))
             {
+#ifndef NDEBUG
+              cout << "Notifying " << notification->getIndividual()->getId() << " at " << currentTime << endl;
+#endif
               notify(notification);
+
             }
           else if (Removal* removal = dynamic_cast<Removal*> (event.get()))
             {
+#ifndef NDEBUG
+              cout << "Removing " << removal->getIndividual()->getId() << " at " << currentTime << endl;
+#endif
               remove(removal);
             }
           else

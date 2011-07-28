@@ -40,10 +40,10 @@
 using namespace EpiRisk;
 
 // Constants
-const double a = 0.015;
-const double b = 0.8;
+const double a = 0.05;//0.015;
+const double b = 0.2;//0.8;
 const double tuneI = 2.0;
-const double numIUpdates = 0;
+const double numIUpdates = 100;
 
 inline
 double
@@ -213,7 +213,7 @@ Mcmc::susceptibility(const Population<TestCovars>::Individual& i,
     const Population<TestCovars>::Individual& j) const
 {
   double susceptibility = //j.getCovariates().cattle + txparams_(9)*j.getCovariates().pigs + txparams_(10)*j.getCovariates().sheep;
-      pow(txparams_(10) * j.getCovariates().cattle / 10, txparams_(13))
+      pow(txparams_(10) * j.getCovariates().cattle, txparams_(13))
           + txparams_(11) * pow(j.getCovariates().pigs, txparams_(14))
           + txparams_(12) * pow(j.getCovariates().sheep, txparams_(15));
 
@@ -774,7 +774,7 @@ Mcmc::run(const size_t numIterations,
           for (size_t infec = 0; infec < numIUpdates; ++infec)
             {
               cout << "Picked: ";
-              size_t pickMove = random_->integer(1);
+              size_t pickMove = random_->integer(3);
               switch (pickMove)
                 {
               case 0:
