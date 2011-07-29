@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(390.0);
+  myPopulation->setObsTime(100.0);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -215,8 +215,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestSim-occ.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestSim-occ.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestSim.trunc100.1.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmdTestSim.trunc100.1.p" << comm.size() << ".occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

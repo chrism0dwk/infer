@@ -43,7 +43,7 @@ using namespace EpiRisk;
 const double a = 0.05;//0.015;
 const double b = 0.2;//0.8;
 const double tuneI = 2.0;
-const double numIUpdates = 100;
+const double numIUpdates = 10;
 
 inline
 double
@@ -292,6 +292,10 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
 {
   double integPressure = 0.0;
   double I1 = min(Ij, pop_.infecBegin()->getI());
+
+  // Get the latest time that j can possibly be susceptible
+  double jMaxSuscepTime = min(min(Ij,pop_.getObsTime()),j->getN());
+
   Population<TestCovars>::InfectiveIterator infj = pop_.asI(j);
   Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij);
   for (Population<TestCovars>::InfectiveIterator i = pop_.infecBegin(); i
@@ -301,13 +305,10 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * (min(min(i->getN(), pop_.getObsTime()),
-          Ij) - min(i->getI(), Ij));
+      integPressure += beta(*i, *j) * (min(i->getN(), jMaxSuscepTime) - min(i->getI(), jMaxSuscepTime));
 
       // Notified -> Susceptible pressure
-      integPressure += betastar(*i, *j) * (min(
-          min(i->getR(), pop_.getObsTime()), Ij) - min(min(i->getN(),
-          pop_.getObsTime()), Ij));
+      integPressure += betastar(*i, *j) * (min(i->getR(), jMaxSuscepTime) - min(i->getN(),jMaxSuscepTime));
     }
 
   integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);
