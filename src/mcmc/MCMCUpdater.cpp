@@ -149,7 +149,7 @@ namespace EpiRisk
     // Save old values
     std::vector<double> oldParams(updateGroup_.size());
     for (size_t i = 0; i < updateGroup_.size(); i++)
-      oldParams[i] = updateGroup_[i]->getValue();
+      oldParams[i] = updateGroup_[i].getValue();
 
     // Update empirical covariance
     empCovar_->sample();
@@ -157,7 +157,7 @@ namespace EpiRisk
     // Calculate current posterior
     double logPiCur = logLikelihood_.global;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCur += log(updateGroup_[p]->prior());
+      logPiCur += log(updateGroup_[p].prior());
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates vars;
@@ -178,7 +178,7 @@ namespace EpiRisk
 
     // Log MRW proposal
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      updateGroup_[p]->setValue(updateGroup_[p]->getValue() + vars[p]);
+      updateGroup_[p].setValue(updateGroup_[p].getValue() + vars[p]);
 
     // Calculate candidate posterior
     Likelihood logLikCan;
@@ -186,7 +186,7 @@ namespace EpiRisk
 
     double logPiCan = logLikCan.global;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCan += log(updateGroup_[p]->prior());
+      logPiCan += log(updateGroup_[p].prior());
 
     // Proposal ratio
     double qRatio = 0.0; // Gaussian proposal cancels
@@ -201,7 +201,7 @@ namespace EpiRisk
     else
       {
         for (size_t p = 0; p < updateGroup_.size(); ++p)
-          updateGroup_[p]->setValue(oldParams[p]);
+          updateGroup_[p].setValue(oldParams[p]);
       }
 
     ++numUpdates_;
@@ -258,7 +258,7 @@ namespace EpiRisk
     // Save old values
     std::vector<double> oldParams(updateGroup_.size());
     for (size_t i = 0; i < updateGroup_.size(); i++)
-      oldParams[i] = updateGroup_[i]->getValue();
+      oldParams[i] = updateGroup_[i].getValue();
 
     // Update empirical covariance
     empCovar_->sample();
@@ -266,7 +266,7 @@ namespace EpiRisk
     // Calculate current posterior
     double logPiCur = logLikelihood_.global;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCur += log(updateGroup_[p]->prior());
+      logPiCur += log(updateGroup_[p].prior());
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
@@ -287,7 +287,7 @@ namespace EpiRisk
 
     // Log MRW proposal
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      updateGroup_[p]->setValue(updateGroup_[p]->getValue() * exp(logvars[p]));
+      updateGroup_[p].setValue(updateGroup_[p].getValue() * exp(logvars[p]));
 
     // Calculate candidate posterior
     Likelihood logLikCan;
@@ -295,12 +295,12 @@ namespace EpiRisk
 
     double logPiCan = logLikCan.global;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      logPiCan += log(updateGroup_[p]->prior());
+      logPiCan += log(updateGroup_[p].prior());
 
     // Proposal ratio
     double qRatio = 0.0;
     for (size_t p = 0; p < updateGroup_.size(); ++p)
-      qRatio += log(updateGroup_[p]->getValue() / oldParams[p]);
+      qRatio += log(updateGroup_[p].getValue() / oldParams[p]);
 
     // Accept or reject
     double accept = logPiCan - logPiCur + qRatio;
@@ -312,7 +312,7 @@ namespace EpiRisk
     else
       {
         for (size_t p = 0; p < updateGroup_.size(); ++p)
-          updateGroup_[p]->setValue(oldParams[p]);
+          updateGroup_[p].setValue(oldParams[p]);
       }
 
     ++numUpdates_;
@@ -324,25 +324,30 @@ namespace EpiRisk
     McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), constants_(
         alpha), burnin_(burnin)
   {
+
+    transformedGroup_.add(updateGroup_[1]);
+    transformedGroup_.add(updateGroup_[2]);
+
     // Initialize the standard covariance
-    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
-    for (size_t i = 0; i < updateGroup_.size(); ++i)
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(transformedGroup_.size());
+    for (size_t i = 0; i < transformedGroup_.size(); ++i)
       {
-        for (size_t j = 0; j < updateGroup_.size(); ++j)
+        for (size_t j = 0; j < transformedGroup_.size(); ++j)
           {
             if (i == j)
-              (*stdCov_)(i, j) = 0.01 / updateGroup_.size();
+              (*stdCov_)(i, j) = 0.01 / transformedGroup_.size();
             else
               (*stdCov_)(i, j) = 0.0;
           }
       }
 
-    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_);
+    empCovar_ = new EmpCovar<LogTransform> (transformedGroup_, *stdCov_);
   }
 
   SpeciesMRW::~SpeciesMRW()
   {
-
+    delete stdCov_;
+    delete empCovar_;
   }
 
   void
@@ -350,58 +355,61 @@ namespace EpiRisk
   {
     // Save parameters
     std::vector<double> oldParams(updateGroup_.size());
-    for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i]->getValue();
+    for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i].getValue();
+
+    // Sample posterior
+    empCovar_->sample();
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
-    double R = updateGroup_[0]->getValue()*(constants_[0] + updateGroup_[1]->getValue()*constants_[1] + updateGroup_[2]->getValue()*constants_[2]);
+    double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
 
     // Current posterior
     double logPiCur = logLikelihood_.global
-        + log(updateGroup_[0]->prior())
-        + log(updateGroup_[1]->prior())
-        + log(updateGroup_[2]->prior());
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
 
     // Make proposal
     ublas::vector<double> transform(updateGroup_.size());
-    transform(0) = updateGroup_[0]->getValue() * constants_[0];
-    transform(1) = updateGroup_[0]->getValue() * updateGroup_[1]->getValue() * constants_[1];
-    transform(2) = updateGroup_[0]->getValue() * updateGroup_[2]->getValue() * constants_[2];
+    transform(0) = updateGroup_[0].getValue() * constants_[0];
+    transform(1) = updateGroup_[0].getValue() * updateGroup_[1].getValue() * constants_[1];
+    transform(2) = updateGroup_[0].getValue() * updateGroup_[2].getValue() * constants_[2];
 
     // Propose as in Haario, Sachs, Tamminen (2001)
-//    Random::Variates logvars;
-//    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
-//      {
-//        try
-//          {
-//            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
-//                / updateGroup_.size());
-//          }
-//        catch (cholesky_error& e)
-//          {
-//            logvars = random_.mvgauss(*stdCov_);
-//          }
-//      }
-//    else
-//      logvars = random_.mvgauss(*stdCov_);
+    Random::Variates logvars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+                / transformedGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            logvars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      logvars = random_.mvgauss(*stdCov_);
 
     // Use indep gaussians here
-    transform(1) *= exp(random_.gaussian(0,0.8));
-    transform(2) *= exp(random_.gaussian(0,0.1));
+    transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
+    transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
     transform(0) = R - transform(1) - transform(2);
 
     // Transform back
-    updateGroup_[0]->setValue(transform(0) / constants_[0]);
-    updateGroup_[1]->setValue(transform(1) / (updateGroup_[0]->getValue() * constants_[1]));
-    updateGroup_[2]->setValue(transform(2) / (updateGroup_[0]->getValue() * constants_[2]));
+    updateGroup_[0].setValue(transform(0) / constants_[0]);
+    updateGroup_[1].setValue(transform(1) / (updateGroup_[0].getValue() * constants_[1]));
+    updateGroup_[2].setValue(transform(2) / (updateGroup_[0].getValue() * constants_[2]));
 
     // Calculate candidate posterior
     Likelihood logLikCan;
     env_->calcLogLikelihood(logLikCan);
 
     double logPiCan = logLikCan.global
-        + log(updateGroup_[0]->prior())
-        + log(updateGroup_[1]->prior())
-        + log(updateGroup_[2]->prior());
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
 
     // q-Ratio
     double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
@@ -414,11 +422,17 @@ namespace EpiRisk
       }
     else
       {
-        for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i]->setValue(oldParams[i]);
+        for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
       }
 
     ++numUpdates_;
 
+  }
+
+  SpeciesMRW::Covariance
+  SpeciesMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
   }
 
 }

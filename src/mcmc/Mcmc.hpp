@@ -28,6 +28,7 @@
 #include <iostream>
 #include <fstream>
 #include <list>
+#include <set>
 #include <vector>
 #include <map>
 #include <boost/mpi.hpp>
@@ -96,7 +97,17 @@ namespace EpiRisk
     ofstream mcmcOutput_;
     ofstream stdout_;
 
-    typedef list<Population<TestCovars>::InfectiveIterator> ProcessInfectives;
+    struct
+    ProcessInfectivesCmp
+    {
+      bool
+      operator()(const Population<TestCovars>::InfectiveIterator& lhs, const Population<TestCovars>::InfectiveIterator& rhs) const
+      {
+        return lhs->getId() < rhs->getId();
+      }
+    };
+
+    typedef set<Population<TestCovars>::InfectiveIterator, ProcessInfectivesCmp> ProcessInfectives;
     ProcessInfectives processInfectives_;
     ProcessInfectives occultList_;
 
@@ -182,11 +193,11 @@ namespace EpiRisk
     newSingleSiteLogMRW(Parameter& param, const double tuning);
     //! Creates a block update group
     AdaptiveMultiLogMRW*
-    newAdaptiveMultiLogMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
+    newAdaptiveMultiLogMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     AdaptiveMultiMRW*
-    newAdaptiveMultiMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
+    newAdaptiveMultiMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SpeciesMRW*
-    newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha);
+    newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha, const size_t burnin = 1000);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC

@@ -146,14 +146,18 @@ namespace EpiRisk
   class SpeciesMRW : public McmcUpdate
   {
   public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
     SpeciesMRW(const std::string& tag, UpdateBlock& params,
         std::vector<double>& constants, size_t burnin, Random& rng, Likelihood& logLikelihood,
         Mcmc* const env);
     ~SpeciesMRW();
     void
     update();
+    Covariance
+    getCovariance() const;
   private:
     UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
     std::vector<double> constants_;
     size_t burnin_;
     EmpCovar<LogTransform>* empCovar_;

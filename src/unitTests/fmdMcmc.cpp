@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(100.0);
+  myPopulation->setObsTime(242.0);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -178,45 +178,54 @@ int main(int argc, char* argv[])
   std::vector<double> suscAlpha(3);
   std::fill(suscAlpha.begin(),suscAlpha.end(),7936);
 
-  myMcmc->newSingleSiteLogMRW(txparams[0],0.1);
-  myMcmc->newSingleSiteLogMRW(txparams[3],0.1);
+  myMcmc->newSingleSiteLogMRW(txparams[0],0.3);
+  myMcmc->newSingleSiteLogMRW(txparams[3],0.8);
 
   UpdateBlock txInfec;
   txInfec.add(txparams[0]);
   txInfec.add(txparams[5]);
   txInfec.add(txparams[6]);
-  myMcmc->newSpeciesMRW("txInfec",txInfec, infAlpha);
+  myMcmc->newSpeciesMRW("txInfec",txInfec, infAlpha, 1000);
 
   UpdateBlock txSuscep;
   txSuscep.add(txparams[0]);
   txSuscep.add(txparams[11]);
   txSuscep.add(txparams[12]);
-  myMcmc->newSpeciesMRW("txSuscep",txSuscep, suscAlpha);
+  myMcmc->newSpeciesMRW("txSuscep",txSuscep, suscAlpha, 1000);
 
   UpdateBlock txDelta;
   txDelta.add(txparams[0]);
   txDelta.add(txparams[1]);
   txDelta.add(txparams[2]);
   txDelta.add(txparams[3]);
-  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
+  AdaptiveMultiLogMRW* updateDistance = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
+
 
   UpdateBlock txPsi;
   txPsi.add(txparams[7]);
   txPsi.add(txparams[8]);
   txPsi.add(txparams[9]);
-  myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
+  AdaptiveMultiLogMRW* updatePsi = myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
+
 
   UpdateBlock txPhi;
   txPhi.add(txparams[13]);
   txPhi.add(txparams[14]);
   txPhi.add(txparams[15]);
-  myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
+  AdaptiveMultiLogMRW* updatePhi = myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
+
+  AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
+  AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
+  AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 1000);
+
 
   stringstream parmFn;
   stringstream occFn;
+  stringstream covFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmdTestSim.trunc100.1.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmdTestSim.trunc100.1.p" << comm.size() << ".occ";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".occ";
+  covFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".cov";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -225,6 +234,13 @@ int main(int argc, char* argv[])
   iters >> numIters;
 
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
+
+  ofstream covFile(covFn.str().c_str());
+  if(covFile.is_open()) {
+      covFile << "txDistance:" << updateDistance->getCovariance() << "\n";
+      covFile << "txPsi:" << updatePsi->getCovariance() << "\n";
+      covFile << "txPhi:" << updatePhi->getCovariance() << "\n";
+  }
 
   if(comm.rank() == 0) {
       cout << "Infection acceptance: " << acceptance["I"] << endl;

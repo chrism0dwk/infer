@@ -178,12 +178,12 @@ namespace EpiRisk
       {
         for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(params_[i]->getValue());
+            double pi = transformFunc_(params_[i].getValue());
             sum_(i) += pi;
             sumSq_(i, i) += pi*pi;
             for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(params_[j]->getValue());
+                double pj = transformFunc_(params_[j].getValue());
                 sumSq_(i, j) += pi * pj;
               }
           }

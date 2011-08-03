@@ -111,7 +111,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams,
   advance(j, mpirank_);
   while (pos < pop_.numInfected())
     {
-      processInfectives_.push_back(j);
+      processInfectives_.insert(j);
       pos += mpiprocs_;
       advance(j, mpiprocs_);
     }
@@ -162,7 +162,7 @@ Mcmc::newAdaptiveMultiLogMRW(const string name, UpdateBlock& updateGroup,
 //! Pushes an updater onto the MCMC stack
 AdaptiveMultiMRW*
 Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup,
-    size_t burnin)
+    const size_t burnin)
 {
   // Create starting covariance matrix
   EmpCovar<Identity>::CovMatrix initCov(updateGroup.size());
@@ -180,9 +180,9 @@ Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup,
 //! Pushes an SpeciesMRW updater onto the MCMC stack
 SpeciesMRW*
 Mcmc::newSpeciesMRW(const string tag, UpdateBlock& params,
-    std::vector<double>& alpha)
+    std::vector<double>& alpha, const size_t burnin)
 {
-  SpeciesMRW* update = new SpeciesMRW(tag, params, alpha, 1, *random_,
+  SpeciesMRW* update = new SpeciesMRW(tag, params, alpha, burnin, *random_,
       logLikelihood_, this);
   updateStack_.push_back(update);
 
@@ -559,49 +559,37 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
 bool
 Mcmc::updateI(const size_t index)
 {
-  cout << __FUNCTION__ << endl;
   Population<TestCovars>::InfectiveIterator it = pop_.infecBegin();
   advance(it, index);
-
-//  if (it->getN() > pop_.getObsTime())
-//    {
-//      cout << "Rejecting move occult '" << it->getId() << "' (" << index
-//          << "), N(" << it->getN() << ") > " << pop_.getObsTime() << endl;
-//      ;
-//      return false;
-//    }
 
   double effectiveN = min(it->getN(), pop_.getObsTime());
   double newI = effectiveN - (effectiveN - it->getI()) * exp(random_->gaussian(
       0, tuneI));
   //double newI = it->getN() - random_->extreme(a, b); // Independence sampler
 
-  cout << "Moving '" << it->getId() << "' (" << index << "): " << it->getI()
-      << " -> " << newI << endl;
-
-  if (index == 0 or newI < pop_.I1().getI())
-    return false;
-
   Likelihood logLikCan;
   updateIlogLikelihood(it, newI, logLikCan);
+
+#ifndef NDEBUG
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
+#endif
 
   double piCan = logLikCan.global;
   double piCur = logLikelihood_.global;
 
-  if (it->getN() <= pop_.getObsTime())
+  if (occultList_.count(it) == 0)
     { // Known infection
-      piCan += log(extremepdf(it->getN() - newI, a, b));
-      piCur += log(extremepdf(it->getN() - it->getI(), a, b));
+      piCan += log(extremepdf(effectiveN - newI, a, b));
+      piCur += log(extremepdf(effectiveN - it->getI(), a, b));
     }
   else
     { // Occult
-      piCan += log(1 - extremecdf(pop_.getObsTime() - newI, a, b));
-      piCur += log(1 - extremecdf(pop_.getObsTime() - it->getI(), a, b));
+      piCan += log(1 - extremecdf(effectiveN - newI, a, b));
+      piCur += log(1 - extremecdf(effectiveN - it->getI(), a, b));
     }
 
-  double qRatio = log((it->getN() - newI) / (it->getN() - it->getI()));
+  double qRatio = log((effectiveN - newI) / (effectiveN - it->getI()));
   double accept = piCan - piCur + qRatio;
 
   if (log(random_->uniform()) < accept)
@@ -620,34 +608,28 @@ Mcmc::updateI(const size_t index)
 bool
 Mcmc::addI()
 {
-  cout << __FUNCTION__ << endl;
-  cout.precision(20);
   size_t numSusceptible = pop_.numSusceptible();
-  cout << "Loglikelihood: " << logLikelihood_.global << endl;
   Population<TestCovars>::InfectiveIterator it = pop_.infecEnd();
   advance(it, random_->integer(numSusceptible));
 
   double inProp = random_->gaussianTail(-(1.0 / b), 1.0 / (a * b * b));
-  double newI = pop_.getObsTime() - inProp;
-
-  cout << "Adding '" << it->getId() << "' at I=" << newI << endl;
+  double newI = min(pop_.getObsTime(),it->getN()) - inProp;
 
   double logPiCur = logLikelihood_.global;
 
-  // Which process will calculate the addition?
-  bool myAddition = false;
+
+  //Add to processInfectives for a random processor
   if (mpirank_ == random_->integer(comm_.size()))
-    myAddition = true;
+    processInfectives_.insert(it);
 
-  //Add to processInfectives and occultList
-  if (myAddition)
-    processInfectives_.push_back(it);
-
-  cout.precision(20);
   Likelihood logLikCan;
   updateIlogLikelihood(it, newI, logLikCan);
+
+#ifndef NDEBUG
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
+#endif
+
   double logPiCan = logLikCan.global + log(1.0 - extremecdf(inProp, a, b));
   double qRatio = log((1.0 / (occultList_.size() + 1))
       / ((1.0 / numSusceptible) * gaussianTailPdf(inProp, -1.0 / b, 1.0 / (a
@@ -658,19 +640,15 @@ Mcmc::addI()
   // Perform accept/reject step.
   if (log(random_->uniform()) < accept)
     {
-      cout << "ACCEPT ADDITION" << endl;
       pop_.moveInfectionTime(it, newI);
-      occultList_.push_back(it);
+      occultList_.insert(it);
       logLikelihood_ = logLikCan;
       return true;
     }
   else
     {
-      cout << "REJECT ADDITION" << endl;
       // Delete from processInfectives and occultList
-      if (myAddition)
-        processInfectives_.erase(find(processInfectives_.begin(),
-            processInfectives_.end(), it));
+      processInfectives_.erase(it);
       return false;
     }
 }
@@ -678,12 +656,12 @@ Mcmc::addI()
 bool
 Mcmc::deleteI()
 {
-  cout << __FUNCTION__ << endl;
   size_t numSusceptible = pop_.numSusceptible();
-  cout << "Loglikelihood: " << logLikelihood_.global << endl;
   if (occultList_.empty())
     {
+#ifndef NDEBUG
       cout << "Occults empty. Not deleting" << endl;
+#endif
       return false;
     }
 
@@ -691,18 +669,21 @@ Mcmc::deleteI()
   advance(idx, random_->integer(occultList_.size()));
 
   Population<TestCovars>::InfectiveIterator it = *idx;
-  cout << "Deleting '" << it->getId() << "'" << endl;
+  double inTime = min(pop_.getObsTime(),it->getN()) - it->getI();
   double logPiCur = logLikelihood_.global + log(1 - extremecdf(
-      pop_.getObsTime() - it->getI(), a, b));
+      inTime, a, b));
 
-  cout.precision(20);
   Likelihood logLikCan;
   updateIlogLikelihood(it, POSINF, logLikCan);
+
+#ifndef DEBUG
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
+#endif
+
   double logPiCan = logLikCan.global;
   double qRatio = log((1.0 / (numSusceptible + 1) * gaussianTailPdf(
-      pop_.getObsTime() - it->getI(), -1 / b, 1 / (a * b * b))) / (1.0
+      inTime, -1 / b, 1 / (a * b * b))) / (1.0
       / occultList_.size()));
 
   // Perform accept/reject step.
@@ -712,18 +693,13 @@ Mcmc::deleteI()
     {
       pop_.moveInfectionTime(it, POSINF);
       logLikelihood_ = logLikCan;
-      cout << "ACCEPT DELETION" << endl;
       // Delete from processInfectives and occultList
-      ProcessInfectives::iterator toErase = find(processInfectives_.begin(),
-          processInfectives_.end(), it);
-      if (toErase != processInfectives_.end())
-        processInfectives_.erase(toErase);
-      occultList_.erase(find(occultList_.begin(), occultList_.end(), it));
+      processInfectives_.erase(it);
+      occultList_.erase(it);
       return true;
     }
   else
     {
-      cout << "REJECT DELETION" << endl;
       return false;
     }
 }
@@ -735,8 +711,11 @@ Mcmc::run(const size_t numIterations,
   // Runs the MCMC
 
 
+#ifndef NDEBUG
   cout << "Starting with " << pop_.numSusceptible() << " susceptibles and "
       << pop_.numInfected() << " infectives" << endl;
+#endif
+
   map<string, double> acceptance;
   int toMove;
 
@@ -754,7 +733,7 @@ Mcmc::run(const size_t numIterations,
     {
       for (size_t k = 0; k < numIterations; ++k)
         {
-          if (k % 1 == 0)
+          if (k % 100 == 0)
             cout << "Iteration " << k << endl;
 
 //          if (k % 100 == 0)
@@ -774,7 +753,6 @@ Mcmc::run(const size_t numIterations,
 
           for (size_t infec = 0; infec < numIUpdates; ++infec)
             {
-              cout << "Picked: ";
               size_t pickMove = random_->integer(3);
               switch (pickMove)
                 {
@@ -791,10 +769,6 @@ Mcmc::run(const size_t numIterations,
               default:
                 throw logic_error("Unknown move!");
                 }
-              //checkInfecOrder();
-              //checkProcPopConsistency();
-              cout << "Num occults = " << occultList_.size() << endl;
-              cout << "gLogLikelihood: " << logLikelihood_.global << endl;
             }
 
           updateDIC();
