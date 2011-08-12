@@ -223,9 +223,9 @@ int main(int argc, char* argv[])
   stringstream occFn;
   stringstream covFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".occ";
-  covFn << "/scratch/stsiab/FMD2001/output/fmd2001NE.p" << comm.size() << ".cov";
+  parmFn << "/scratch/stsiab/FMD2001/output/fmd2001NE-dcOcc.p" << comm.size() << ".parms";
+  occFn << "/scratch/stsiab/FMD2001/output/fmd2001NE-dcOcc.p" << comm.size() << ".occ";
+  covFn << "/scratch/stsiab/FMD2001/output/fmd2001NE-dcOcc.p" << comm.size() << ".cov";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -241,6 +241,7 @@ int main(int argc, char* argv[])
       covFile << "txPsi:" << updatePsi->getCovariance() << "\n";
       covFile << "txPhi:" << updatePhi->getCovariance() << "\n";
   }
+  covFile.close();
 
   if(comm.rank() == 0) {
       cout << "Infection acceptance: " << acceptance["I"] << endl;

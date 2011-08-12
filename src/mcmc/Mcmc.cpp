@@ -43,7 +43,7 @@ using namespace EpiRisk;
 const double a = 0.05;//0.015;
 const double b = 0.2;//0.8;
 const double tuneI = 2.0;
-const double numIUpdates = 10;
+const double numIUpdates = 30;
 
 inline
 double
@@ -116,12 +116,23 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams,
       advance(j, mpiprocs_);
     }
 
+  // Set up DC list
+  for(Population<TestCovars>::PopulationIterator it = pop_.begin();
+      it != pop_.end();
+      it++)
+  {
+    if(it->getN() < POSINF and it->getI() == POSINF) dcList_.insert(pop_.asI(it));
+  }
+
   // Calculate log likelihood
   calcLogLikelihood(logLikelihood_);
   all_reduce(comm_, logLikelihood_.local, logLikelihood_.global,
       plus<double> ());
+
+#ifndef NDEBUG
   if (mpirank_ == 0)
     cout << "Log likelihood starts at " << logLikelihood_.global << std::endl;
+#endif
 
   // Set up DIC
   initializeDIC();
@@ -269,11 +280,11 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     {
       if (i != j)
         { // Skip i==j
-          if (i->getN() > Ij)
+          if (i->getN() >= Ij)
             {
               sumPressure += beta(*i, *j);
             }
-          else if (i->getR() > Ij)
+          else if (i->getR() >= Ij)
             {
               sumPressure += betastar(*i, *j);
             }
@@ -492,8 +503,9 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       if (*i == j) // Instantaneous pressure on j
         {
           // Product part of likelihood
-          if (newTime == POSINF)
+          if (newTime > pop_.getObsTime()) {
             myPressure = 0.0;
+          }
           else
             myPressure = instantPressureOn(*i, newTime);
         }
@@ -502,7 +514,7 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
           if (j->isIAt((*i)->getI()))
             myPressure -= beta(*j, **i);
 
-          if (newTime <= (*i)->getI() && (*i)->getI() < j->getN())
+          if (newTime < (*i)->getI() && (*i)->getI() <= j->getN())
             myPressure += beta(*j, **i);
         }
 
@@ -528,19 +540,15 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
       else
         {
           double myBeta = beta(*j, *i);
-          logLikelihood += myBeta * (min(min(j->getN(), pop_.getObsTime()),
-              i->getI()) - min(min(j->getI(), pop_.getObsTime()), i->getI()));
-          logLikelihood -= myBeta * (min(min(j->getN(), pop_.getObsTime()),
-              i->getI()) - min(min(newTime, pop_.getObsTime()), i->getI()));
+          double iMaxSuscTime = min(min(i->getI(), i->getN()), pop_.getObsTime());
+          logLikelihood += myBeta * (min(j->getN(),iMaxSuscTime) - min(min(j->getI(),j->getN()),iMaxSuscTime));
+          logLikelihood -= myBeta * (min(j->getN(),iMaxSuscTime) - min(min(newTime,j->getN()),iMaxSuscTime));
         }
     }
-  cout << "Process " << mpirank_ << " finished with loglikelihood = "
-      << logLikelihood << endl;
   updatedLogLik.local = logLikelihood;
 
   all_reduce(comm_, logLikelihood, updatedLogLik.global, plus<double> ());
-  cout << "all_reduce completed with logLikelihood = " << updatedLogLik.global
-      << endl;
+
   //  std::vector<double> components;
   //  gather(comm_,updatedLogLik.local,components,0);
   //  cout << "gather completed" << endl;
@@ -608,9 +616,14 @@ Mcmc::updateI(const size_t index)
 bool
 Mcmc::addI()
 {
-  size_t numSusceptible = pop_.numSusceptible();
-  Population<TestCovars>::InfectiveIterator it = pop_.infecEnd();
-  advance(it, random_->integer(numSusceptible));
+  size_t numSusceptible = dcList_.size();//pop_.numSusceptible();//
+  //Population<TestCovars>::InfectiveIterator it = pop_.infecEnd();
+  //advance(it, random_->integer(numSusceptible));
+
+  if (numSusceptible == 0) return false;
+  ProcessInfectives::iterator pi = dcList_.begin();
+  advance(pi, random_->integer(numSusceptible));
+  Population<TestCovars>::InfectiveIterator it = *pi;
 
   double inProp = random_->gaussianTail(-(1.0 / b), 1.0 / (a * b * b));
   double newI = min(pop_.getObsTime(),it->getN()) - inProp;
@@ -641,6 +654,7 @@ Mcmc::addI()
   if (log(random_->uniform()) < accept)
     {
       pop_.moveInfectionTime(it, newI);
+      dcList_.erase(it);
       occultList_.insert(it);
       logLikelihood_ = logLikCan;
       return true;
@@ -656,7 +670,7 @@ Mcmc::addI()
 bool
 Mcmc::deleteI()
 {
-  size_t numSusceptible = pop_.numSusceptible();
+  size_t numSusceptible = dcList_.size();//pop_.numSusceptible();//
   if (occultList_.empty())
     {
 #ifndef NDEBUG
@@ -668,6 +682,7 @@ Mcmc::deleteI()
   ProcessInfectives::const_iterator idx = occultList_.begin();
   advance(idx, random_->integer(occultList_.size()));
 
+//  cout << "Deleting " << (*idx)->getId() << " infected at " << (*idx)->getI() << endl;
   Population<TestCovars>::InfectiveIterator it = *idx;
   double inTime = min(pop_.getObsTime(),it->getN()) - it->getI();
   double logPiCur = logLikelihood_.global + log(1 - extremecdf(
@@ -676,14 +691,14 @@ Mcmc::deleteI()
   Likelihood logLikCan;
   updateIlogLikelihood(it, POSINF, logLikCan);
 
-#ifndef DEBUG
+#ifndef NDEBUG
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
 
   double logPiCan = logLikCan.global;
   double qRatio = log((1.0 / (numSusceptible + 1) * gaussianTailPdf(
-      inTime, -1 / b, 1 / (a * b * b))) / (1.0
+      inTime, -1.0 / b, 1.0 / (a * b * b))) / (1.0
       / occultList_.size()));
 
   // Perform accept/reject step.
@@ -695,6 +710,7 @@ Mcmc::deleteI()
       logLikelihood_ = logLikCan;
       // Delete from processInfectives and occultList
       processInfectives_.erase(it);
+      dcList_.insert(it);
       occultList_.erase(it);
       return true;
     }

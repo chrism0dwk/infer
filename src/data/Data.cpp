@@ -136,7 +136,7 @@ EpiDataImporter::next()
   getline(dataFile_,row);
 
   stlStrTok(tokens,row,",");
-  if (tokens.size() != 4) throw EpiRisk::fileEOF();
+  if (tokens.size() < 4) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
   if(tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;

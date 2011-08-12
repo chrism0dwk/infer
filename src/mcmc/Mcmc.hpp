@@ -110,6 +110,7 @@ namespace EpiRisk
     typedef set<Population<TestCovars>::InfectiveIterator, ProcessInfectivesCmp> ProcessInfectives;
     ProcessInfectives processInfectives_;
     ProcessInfectives occultList_;
+    ProcessInfectives dcList_;
 
     //// THESE SHOULD BE IN A "MODEL" CLASS ////
     virtual

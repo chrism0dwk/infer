@@ -467,6 +467,13 @@ namespace EpiRisk
                 throw parse_exception(
                     "Key in epidemic data not found in population data");
               Events oldEvents = ref->getEvents();
+
+              // Check data integrity
+              if (record.data.N > record.data.R) {
+                  cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
+                  record.data.N = record.data.R;
+              }
+
               idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
             }
         }

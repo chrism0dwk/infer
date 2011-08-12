@@ -77,7 +77,7 @@ namespace EpiRisk
     // Calculate candidate posterior
     Likelihood logLikCan;
     env_->calcLogLikelihood(logLikCan);
-
+    cout << "Candidate likelihood: " << logLikCan.global << endl;
     // Candidate posterior
     double logPiCan = logLikCan.global + log(param_.prior());
 
