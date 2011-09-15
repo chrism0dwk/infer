@@ -305,20 +305,8 @@ int main(int argc, char* argv[])
   std::vector<double> suscAlpha(3);
   std::fill(suscAlpha.begin(),suscAlpha.end(),7936);
 
-  myMcmc->newSingleSiteLogMRW(txparams[0],0.3);
-  myMcmc->newSingleSiteLogMRW(txparams[3],0.8);
-
-  UpdateBlock txInfec;
-  txInfec.add(txparams[0]);
-  txInfec.add(txparams[5]);
-  txInfec.add(txparams[6]);
-  myMcmc->newSpeciesMRW("txInfec",txInfec, infAlpha, 1000);
-
-  UpdateBlock txSuscep;
-  txSuscep.add(txparams[0]);
-  txSuscep.add(txparams[11]);
-  txSuscep.add(txparams[12]);
-  myMcmc->newSpeciesMRW("txSuscep",txSuscep, suscAlpha, 1000);
+//  myMcmc->newSingleSiteLogMRW(txparams[0],0.3);
+//  myMcmc->newSingleSiteLogMRW(txparams[3],0.8);
 
   UpdateBlock txDelta;
   txDelta.add(txparams[0]);
@@ -341,6 +329,18 @@ int main(int argc, char* argv[])
   txPhi.add(txparams[15]);
   AdaptiveMultiLogMRW* updatePhi = myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
 
+  UpdateBlock txInfec;
+  txInfec.add(txparams[0]);
+  txInfec.add(txparams[5]);
+  txInfec.add(txparams[6]);
+  InfectivityMRW* updateInfec = myMcmc->newInfectivityMRW("txInfec",txInfec, txPsi, 1000);
+
+  UpdateBlock txSuscep;
+  txSuscep.add(txparams[0]);
+  txSuscep.add(txparams[11]);
+  txSuscep.add(txparams[12]);
+  SusceptibilityMRW* updateSuscep = myMcmc->newSusceptibilityMRW("txSuscep",txSuscep, txPhi, 1000);
+
   AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
   AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
   AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 1000);
@@ -350,9 +350,9 @@ int main(int argc, char* argv[])
   stringstream occFn;
   stringstream covFn;
 
-  parmFn << "/scratch/stsiab/FMD2001/output/fmd2001-dc.p" << comm.size() << ".parms";
-  occFn << "/scratch/stsiab/FMD2001/output/fmd2001-dc.p" << comm.size() << ".occ";
-  covFn << "/scratch/stsiab/FMD2001/output/fmd2001-dc.p" << comm.size() << ".cov";
+  parmFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".parms";
+  occFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".occ";
+  covFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".cov";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
@@ -367,6 +367,8 @@ int main(int argc, char* argv[])
       covFile << "txDistance:" << updateDistance->getCovariance() << "\n";
       covFile << "txPsi:" << updatePsi->getCovariance() << "\n";
       covFile << "txPhi:" << updatePhi->getCovariance() << "\n";
+      covFile << "txInfec:" << updateInfec->getCovariance() << "\n";
+      covFile << "txSuscep:" << updateSuscep->getCovariance() << "\n";
   }
   covFile.close();
 

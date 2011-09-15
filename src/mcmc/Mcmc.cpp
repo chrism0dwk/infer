@@ -200,6 +200,30 @@ Mcmc::newSpeciesMRW(const string tag, UpdateBlock& params,
   return update;
 }
 
+//! Pushes an SusceptibilityMRW updater onto the MCMC stack
+SusceptibilityMRW*
+Mcmc::newSusceptibilityMRW(const string tag, UpdateBlock& params,
+    UpdateBlock& powers, const size_t burnin)
+{
+  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, powers, burnin, *random_,
+      logLikelihood_, this);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
+//! Pushes an InfectivityMRW updater onto the MCMC stack
+InfectivityMRW*
+Mcmc::newInfectivityMRW(const string tag, UpdateBlock& params,
+    UpdateBlock& powers, const size_t burnin)
+{
+  InfectivityMRW* update = new InfectivityMRW(tag, params, powers, burnin, *random_,
+      logLikelihood_, this);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
 double
 Mcmc::getLogLikelihood() const
 {

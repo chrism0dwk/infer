@@ -25,6 +25,7 @@
  */
 
 #include "MCMCUpdater.hpp"
+#include <algorithm>
 
 namespace EpiRisk
 {
@@ -318,6 +319,266 @@ namespace EpiRisk
     ++numUpdates_;
   }
 
+  InfectivityMRW::InfectivityMRW(const string& tag,
+      UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& rng,
+      Likelihood& logLikelihood, Mcmc* env) :
+    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), powers_(
+        powers), burnin_(burnin)
+  {
+
+    constants_.resize(3,0.0);
+
+    transformedGroup_.add(updateGroup_[1]);
+    transformedGroup_.add(updateGroup_[2]);
+
+    // Initialize the standard covariance
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(transformedGroup_.size());
+    for (size_t i = 0; i < transformedGroup_.size(); ++i)
+      {
+        for (size_t j = 0; j < transformedGroup_.size(); ++j)
+          {
+            if (i == j)
+              (*stdCov_)(i, j) = 0.01 / transformedGroup_.size();
+            else
+              (*stdCov_)(i, j) = 0.0;
+          }
+      }
+
+    empCovar_ = new EmpCovar<LogTransform> (transformedGroup_, *stdCov_);
+  }
+
+  InfectivityMRW::~InfectivityMRW()
+  {
+    delete stdCov_;
+    delete empCovar_;
+  }
+
+  void
+  InfectivityMRW::update()
+  {
+    // Save parameters
+    std::vector<double> oldParams(updateGroup_.size());
+    for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i].getValue();
+
+    // Sample posterior
+    empCovar_->sample();
+
+    // Calculate constants
+    std::fill(constants_.begin(),constants_.end(),0.0);
+    for(Population<TestCovars>::InfectiveIterator it = env_->pop_.infecBegin();
+        it != env_->pop_.infecEnd();
+        it++)
+      {
+        constants_[0] += pow(it->getCovariates().cattle,powers_[0].getValue());
+        constants_[1] += pow(it->getCovariates().pigs,powers_[1].getValue());
+        constants_[2] += pow(it->getCovariates().sheep,powers_[2].getValue());
+      }
+
+    // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
+    double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
+
+    // Current posterior
+    double logPiCur = logLikelihood_.global
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
+
+    // Make proposal
+    ublas::vector<double> transform(updateGroup_.size());
+    transform(0) = updateGroup_[0].getValue() * constants_[0];
+    transform(1) = updateGroup_[0].getValue() * updateGroup_[1].getValue() * constants_[1];
+    transform(2) = updateGroup_[0].getValue() * updateGroup_[2].getValue() * constants_[2];
+
+    // Propose as in Haario, Sachs, Tamminen (2001)
+    Random::Variates logvars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+                / transformedGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            logvars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      logvars = random_.mvgauss(*stdCov_);
+
+    // Use indep gaussians here
+    transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
+    transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
+    transform(0) = R - transform(1) - transform(2);
+
+    // Transform back
+    updateGroup_[0].setValue(transform(0) / constants_[0]);
+    updateGroup_[1].setValue(transform(1) / (updateGroup_[0].getValue() * constants_[1]));
+    updateGroup_[2].setValue(transform(2) / (updateGroup_[0].getValue() * constants_[2]));
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    double logPiCan = logLikCan.global
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
+
+    // q-Ratio
+    double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
+
+    // Accept/reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
+      }
+
+    ++numUpdates_;
+
+  }
+
+  InfectivityMRW::Covariance
+  InfectivityMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
+  }
+
+  SusceptibilityMRW::SusceptibilityMRW(const string& tag,
+      UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& rng,
+      Likelihood& logLikelihood, Mcmc* env) :
+    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), powers_(
+        powers), burnin_(burnin)
+  {
+
+    constants_.resize(3,0.0);
+
+    transformedGroup_.add(updateGroup_[1]);
+    transformedGroup_.add(updateGroup_[2]);
+
+    // Initialize the standard covariance
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(transformedGroup_.size());
+    for (size_t i = 0; i < transformedGroup_.size(); ++i)
+      {
+        for (size_t j = 0; j < transformedGroup_.size(); ++j)
+          {
+            if (i == j)
+              (*stdCov_)(i, j) = 0.01 / transformedGroup_.size();
+            else
+              (*stdCov_)(i, j) = 0.0;
+          }
+      }
+
+    empCovar_ = new EmpCovar<LogTransform> (transformedGroup_, *stdCov_);
+  }
+
+  SusceptibilityMRW::~SusceptibilityMRW()
+  {
+    delete stdCov_;
+    delete empCovar_;
+  }
+
+  void
+  SusceptibilityMRW::update()
+  {
+    // Save parameters
+    std::vector<double> oldParams(updateGroup_.size());
+    for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i].getValue();
+
+    // Sample posterior
+    empCovar_->sample();
+
+    // Calculate constants
+    std::fill(constants_.begin(),constants_.end(),0.0);
+    for(Population<TestCovars>::PopulationIterator it = env_->pop_.begin();
+        it != env_->pop_.end();
+        ++it)
+      {
+        constants_[0] += pow(it->getCovariates().cattle,powers_[0].getValue());
+        constants_[1] += pow(it->getCovariates().pigs,powers_[1].getValue());
+        constants_[2] += pow(it->getCovariates().sheep,powers_[2].getValue());
+      }
+
+    // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
+    double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
+
+    // Current posterior
+    double logPiCur = logLikelihood_.global
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
+
+    // Make proposal
+    ublas::vector<double> transform(updateGroup_.size());
+    transform(0) = updateGroup_[0].getValue() * constants_[0];
+    transform(1) = updateGroup_[0].getValue() * updateGroup_[1].getValue() * constants_[1];
+    transform(2) = updateGroup_[0].getValue() * updateGroup_[2].getValue() * constants_[2];
+
+    // Propose as in Haario, Sachs, Tamminen (2001)
+    Random::Variates logvars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+                / transformedGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            logvars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      logvars = random_.mvgauss(*stdCov_);
+
+    // Use indep gaussians here
+    transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
+    transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
+    transform(0) = R - transform(1) - transform(2);
+
+    // Transform back
+    updateGroup_[0].setValue(transform(0) / constants_[0]);
+    updateGroup_[1].setValue(transform(1) / (updateGroup_[0].getValue() * constants_[1]));
+    updateGroup_[2].setValue(transform(2) / (updateGroup_[0].getValue() * constants_[2]));
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    double logPiCan = logLikCan.global
+        + log(updateGroup_[0].prior())
+        + log(updateGroup_[1].prior())
+        + log(updateGroup_[2].prior());
+
+    // q-Ratio
+    double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
+
+    // Accept/reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
+      }
+
+    ++numUpdates_;
+
+  }
+
+  SusceptibilityMRW::Covariance
+  SusceptibilityMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
+  }
+
   SpeciesMRW::SpeciesMRW(const string& tag,
       UpdateBlock& params, std::vector<double>& alpha, size_t burnin, Random& rng,
       Likelihood& logLikelihood, Mcmc* env) :
@@ -434,5 +695,6 @@ namespace EpiRisk
   {
     return empCovar_->getCovariance();
   }
+
 
 }

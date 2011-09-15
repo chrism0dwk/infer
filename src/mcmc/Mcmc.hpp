@@ -59,6 +59,8 @@ namespace EpiRisk
   class AdaptiveMultiLogMRW;
   class AdaptiveMultiMRW;
   class SpeciesMRW;
+  class SusceptibilityMRW;
+  class InfectivityMRW;
 
   struct DIC {
      double Dbar;
@@ -80,6 +82,9 @@ namespace EpiRisk
     //// Update algorithms ////
 //    friend class McmcUpdater;
 //    friend class AdaptiveMultiLogMRW;
+
+    friend class SusceptibilityMRW;
+    friend class InfectivityMRW;
 
     Population<TestCovars>& pop_;
     Parameters& txparams_;
@@ -199,6 +204,10 @@ namespace EpiRisk
     newAdaptiveMultiMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SpeciesMRW*
     newSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha, const size_t burnin = 1000);
+    InfectivityMRW*
+    newInfectivityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    SusceptibilityMRW*
+    newSusceptibilityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC

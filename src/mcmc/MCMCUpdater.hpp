@@ -165,5 +165,54 @@ namespace EpiRisk
 
   };
 
+  //! InfectivityMRW is a non-centred Multisite update for species infectivity
+  class InfectivityMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    InfectivityMRW(const std::string& tag, UpdateBlock& params,
+        UpdateBlock& powers, size_t burnin, Random& rng, Likelihood& logLikelihood,
+        Mcmc* const env);
+    ~InfectivityMRW();
+    void
+    update();
+    Covariance
+    getCovariance() const;
+  private:
+    UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
+    UpdateBlock powers_;
+    std::vector<double> constants_;
+    size_t burnin_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
+
+  //! SusceptibilityMRW is a non-centred Multisite update for species inf/susc
+  class SusceptibilityMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    SusceptibilityMRW(const std::string& tag, UpdateBlock& params,
+        UpdateBlock& powers, size_t burnin, Random& rng, Likelihood& logLikelihood,
+        Mcmc* const env);
+    ~SusceptibilityMRW();
+    void
+    update();
+    Covariance
+    getCovariance() const;
+  private:
+    UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
+    UpdateBlock powers_;
+    std::vector<double> constants_;
+    size_t burnin_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
 }
 #endif /* MCMCUPDATER_HPP_ */

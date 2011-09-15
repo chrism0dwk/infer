@@ -2,11 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 #AC_PREREQ([2.61])
-AC_INIT(brandenburg, 0.3-1alpha, Chris Jewell <chris.jewell@warwick.ac.uk>)
+AC_INIT(brandenburg, 0.3-2alpha, Chris Jewell <chris.jewell@warwick.ac.uk>)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE(brandenburg, 0.3-1alpha)
+AM_INIT_AUTOMAKE(brandenburg, 0.3-2alpha)
 
 # Checks for programs.
 AC_PROG_CXXCPP
