@@ -1,0 +1,51 @@
+Using 1
+==25958== Cachegrind, a cache and branch-prediction profiler
+==25958== Copyright (C) 2002-2010, and GNU GPL'd, by Nicholas Nethercote et al.
+==25958== Using Valgrind-3.6.1 and LibVEX; rerun with -h for copyright info
+==25958== Command: ./fmdMcmc /home/stsiab/fmdData/fmd2001_northeast_uk_centredM.csv /home/stsiab/fmdData/fmd2001_northeast_uk_ips.csv /home/stsiab/fmdData/testcovar.txt 10
+==25958== 
+--25958-- warning: Unknown Intel cache config value (0xff), ignoring
+--25958-- warning: L2 cache not installed, ignore LL results.
+--------------------------------------------------------------------------
+[[9097,1],0]: A high-performance Open MPI point-to-point messaging module
+was unable to find any relevant network interfaces:
+
+Module: OpenFabrics (openib)
+  Host: exec9
+
+Another transport will be used instead, although this may result in
+lower performance.
+--------------------------------------------------------------------------
+Individual 8/325/6 has N > R.  Setting N = R
+Individual 8/327/31 has N > R.  Setting N = R
+Individual 31/338/308 has N > R.  Setting N = R
+Individual 31/372/23 has N > R.  Setting N = R
+Individual 31/480/23 has N > R.  Setting N = R
+Individual 48/313/12 has N > R.  Setting N = R
+Individual 8/405/6510 has N > R.  Setting N = R
+Individual 8/335/6503 has N > R.  Setting N = R
+Individual 8/395/6523 has N > R.  Setting N = R
+Individual 31/338/6516 has N > R.  Setting N = R
+Individual 31/338/6526 has N > R.  Setting N = R
+Individual 8/320/6521 has N > R.  Setting N = R
+Individual 48/480/6503 has N > R.  Setting N = R
+==25958== 
+==25958== I   refs:      262,543,746,217
+==25958== I1  misses:              9,501
+==25958== LLi misses:              9,405
+==25958== I1  miss rate:            0.00%
+==25958== LLi miss rate:            0.00%
+==25958== 
+==25958== D   refs:      122,203,809,819  (80,051,756,516 rd   + 42,152,053,303 wr)
+==25958== D1  misses:             79,287  (        27,252 rd   +         52,035 wr)
+==25958== LLd misses:             79,232  (        27,198 rd   +         52,034 wr)
+==25958== D1  miss rate:             0.0% (           0.0%     +            0.0%  )
+==25958== LLd miss rate:             0.0% (           0.0%     +            0.0%  )
+==25958== 
+==25958== LL refs:                88,788  (        36,753 rd   +         52,035 wr)
+==25958== LL misses:              88,637  (        36,603 rd   +         52,034 wr)
+==25958== LL miss rate:              0.0% (           0.0%     +            0.0%  )
+==25958== 
+==25958== Branches:       25,967,534,827  (24,052,975,707 cond +  1,914,559,120 ind)
+==25958== Mispredicts:     1,096,523,667  ( 1,094,568,301 cond +      1,955,366 ind)
+==25958== Mispred rate:              4.2% (           4.5%     +            0.1%   )

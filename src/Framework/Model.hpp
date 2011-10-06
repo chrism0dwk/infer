@@ -40,6 +40,7 @@ namespace EpiRisk
    * populations.
    */
 
+  // TODO: Parameters needs to be templatized!!
   template<typename Population>
   class Model
   {

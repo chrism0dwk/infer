@@ -161,6 +161,7 @@ namespace EpiRisk
     double postMeanDev_;
     map<string,double> meanInfecTimes_;
     Parameters meanParams_;
+    size_t numIUpdates_;
     void
     initializeDIC();
     void
@@ -208,6 +209,8 @@ namespace EpiRisk
     newInfectivityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
     SusceptibilityMRW*
     newSusceptibilityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    void
+    setNumIUpdates(const size_t n);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC

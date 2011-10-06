@@ -123,7 +123,7 @@ public:
   double NtoR() const;
 
 private:
-  FmdParameters params_;
+  FmdParameters& params_;
 };
 
 #endif /* FMDMODEL_HPP_ */

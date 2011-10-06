@@ -29,6 +29,8 @@
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
 #include <sstream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -260,7 +262,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(325.0);
+  myPopulation->setObsTime(201.4);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -297,6 +299,8 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
+  myMcmc->setNumIUpdates(20);
+
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;
   infAlpha[1] = 633.37;
@@ -341,8 +345,8 @@ int main(int argc, char* argv[])
   txSuscep.add(txparams[12]);
   SusceptibilityMRW* updateSuscep = myMcmc->newSusceptibilityMRW("txSuscep",txSuscep, txPhi, 1000);
 
-  AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
-  AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
+//  AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
+//  AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
   AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 1000);
 
 
@@ -350,9 +354,10 @@ int main(int argc, char* argv[])
   stringstream occFn;
   stringstream covFn;
 
-  parmFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".parms";
-  occFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".occ";
-  covFn << "/mnt/lustre/stsiab/FMD2001/output/fmd2001-dc3.p" << comm.size() << ".cov";
+  mkdir("/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84",S_IFDIR | S_IRWXU);
+  parmFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/parameters.asc";
+  occFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/infec.asc";
+  covFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/covariances.asc";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

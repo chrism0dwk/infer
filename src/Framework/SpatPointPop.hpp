@@ -207,7 +207,13 @@ namespace EpiRisk
        */
       //! Clears all infected individuals
       void
-      clear(); // Clears all infected individuals
+      clearInfections()
+      {
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          moveInfectionTime(asI(it),POSINF);
+      }
       /*! \brief Creates a connection graph
        * \param predicate a functor whose operator() method returns true if two individuals are connected
        */

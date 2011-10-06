@@ -1,0 +1,17 @@
+Using 1
+==2031== Cachegrind, a cache and branch-prediction profiler
+==2031== Copyright (C) 2002-2009, and GNU GPL'd, by Nicholas Nethercote et al.
+==2031== Using Valgrind-3.5.0 and LibVEX; rerun with -h for copyright info
+==2031== Command: ./fmdMcmc /home/stsiab/fmdData/fmd2001_northeast_uk_centredM.csv /home/stsiab/fmdData/fmd2001_northeast_uk_ips.csv /home/stsiab/fmdData/testcovar.txt 1
+==2031== 
+--------------------------------------------------------------------------
+[[6501,1],0]: A high-performance Open MPI point-to-point messaging module
+was unable to find any relevant network interfaces:
+
+Module: OpenFabrics (openib)
+  Host: exec4
+
+Another transport will be used instead, although this may result in
+lower performance.
+--------------------------------------------------------------------------
+/usr/sge/default/spool/exec4/job_scripts/126210: line 14:  2031 Segmentation fault      (core dumped) valgrind --tool=cachegrind ./fmdMcmc $HOME/fmdData/fmd2001_northeast_uk_centredM.csv $HOME/fmdData/fmd2001_northeast_uk_ips.csv $HOME/fmdData/testcovar.txt 1

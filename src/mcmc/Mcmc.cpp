@@ -43,7 +43,7 @@ using namespace EpiRisk;
 const double a = 0.05;//0.015;
 const double b = 0.2;//0.8;
 const double tuneI = 2.0;
-const double numIUpdates = 200;
+
 
 inline
 double
@@ -88,7 +88,7 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams,
     Parameters& detectParams, const size_t randomSeed) :
   pop_(population), txparams_(transParams), dxparams_(detectParams),
       integPressTime_(1.0), meanParams_(transParams), dicUpdates_(0),
-      postMeanDev_(0.0)
+      postMeanDev_(0.0),numIUpdates_(0)
 {
 
   // MPI setup
@@ -222,6 +222,13 @@ Mcmc::newInfectivityMRW(const string tag, UpdateBlock& params,
   updateStack_.push_back(update);
 
   return update;
+}
+
+//! Sets the number of infection time (and occult) updates per sweep of the MCMC
+void
+Mcmc::setNumIUpdates(const size_t n)
+{
+  numIUpdates_ = n;
 }
 
 double
@@ -791,7 +798,7 @@ Mcmc::run(const size_t numIterations,
               != updateStack_.end(); ++it)
             it->update();
 
-          for (size_t infec = 0; infec < numIUpdates; ++infec)
+          for (size_t infec = 0; infec < numIUpdates_; ++infec)
             {
               size_t pickMove = random_->integer(3);
               switch (pickMove)
@@ -841,9 +848,9 @@ Mcmc::run(const size_t numIterations,
         {
           cout << it->getTag() << ": " << it->getAcceptance() << "\n";
         }
-      acceptance["I"] /= (numIterations * numIUpdates / 3);
-      acceptance["add"] /= (numIterations * numIUpdates / 2);
-      acceptance["delete"] /= (numIterations * numIUpdates / 2);
+      acceptance["I"] /= (numIterations * numIUpdates_ / 3);
+      acceptance["add"] /= (numIterations * numIUpdates_ / 2);
+      acceptance["delete"] /= (numIterations * numIUpdates_ / 2);
     }
   return acceptance;
 
