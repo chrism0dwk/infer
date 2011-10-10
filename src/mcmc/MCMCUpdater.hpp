@@ -214,5 +214,18 @@ namespace EpiRisk
 
   };
 
+  //! SellkeSerializer writes out integrated infectious pressure for each individual
+  class SellkeSerializer : public McmcUpdate
+  {
+  public:
+    SellkeSerializer(const std::string, Random& rng, Likelihood& logLikelihood, Mcmc* const env);
+    virtual
+    ~SellkeSerializer();
+    void
+    update();
+  private:
+    ofstream outfile_;
+  };
+
 }
 #endif /* MCMCUPDATER_HPP_ */

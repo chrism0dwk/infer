@@ -1,6 +1,6 @@
 INCLUDES = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/mcmc -I$(top_srcdir)/src/sim -I$(top_srcdir)/src/diags
 METASOURCES = AUTO
-bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead
+bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead fmdSellkeDiagnostic
 
 noinst_HEADERS = fmdModel.hpp
 
@@ -18,3 +18,6 @@ testPosteriorReader_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top
 
 fmdOneStepAhead_SOURCES = fmdOneStepAhead.cpp fmdModel.cpp
 fmdOneStepAhead_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options
+
+fmdSellkeDiagnostic_SOURCES = fmdSellkeDiagnostic.cpp fmdModel.cpp
+fmdSellkeDiagnostic_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options

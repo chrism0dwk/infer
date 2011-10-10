@@ -224,6 +224,15 @@ Mcmc::newInfectivityMRW(const string tag, UpdateBlock& params,
   return update;
 }
 
+//! Pushes a SellkeSerializer onto the MCMC stack
+SellkeSerializer*
+Mcmc::newSellkeSerializer(const string filename)
+{
+  SellkeSerializer* update = new SellkeSerializer(filename, *random_, logLikelihood_, this);
+  updateStack_.push_back(update);
+  return update;
+}
+
 //! Sets the number of infection time (and occult) updates per sweep of the MCMC
 void
 Mcmc::setNumIUpdates(const size_t n)
@@ -378,12 +387,15 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
     }
 
   //Now calculate the integral
+  logLikelihood.integPressure.clear();
   size_t pos;
   Population<TestCovars>::PopulationIterator k;
   for (pos = mpirank_, k = pop_.begin() + mpirank_; pos < pop_.size(); pos
       += mpiprocs_, k += mpiprocs_)
     {
-      logLikelihood.local += integPressureOn(k, k->getI());
+      double tmp = integPressureOn(k, k->getI());
+      logLikelihood.integPressure.insert(make_pair(k->getId(), tmp));
+      logLikelihood.local += tmp;
     }
 
   all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());

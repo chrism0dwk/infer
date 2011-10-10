@@ -37,7 +37,7 @@ build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
 bin_PROGRAMS = fmdMcmc$(EXEEXT) fmdSim$(EXEEXT) \
 	testLikelihood$(EXEEXT) testPosteriorReader$(EXEEXT) \
-	fmdOneStepAhead$(EXEEXT)
+	fmdOneStepAhead$(EXEEXT) fmdSellkeDiagnostic$(EXEEXT)
 subdir = src/unitTests
 DIST_COMMON = $(noinst_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -62,6 +62,14 @@ am_fmdOneStepAhead_OBJECTS = fmdOneStepAhead.$(OBJEXT) \
 	fmdModel.$(OBJEXT)
 fmdOneStepAhead_OBJECTS = $(am_fmdOneStepAhead_OBJECTS)
 fmdOneStepAhead_DEPENDENCIES =  \
+	$(top_builddir)/src/data/libPosteriorReader.la \
+	$(top_builddir)/src/Framework/libstlstrtok.la \
+	$(top_builddir)/src/Framework/librandom.la \
+	$(top_builddir)/src/data/libdata.la
+am_fmdSellkeDiagnostic_OBJECTS = fmdSellkeDiagnostic.$(OBJEXT) \
+	fmdModel.$(OBJEXT)
+fmdSellkeDiagnostic_OBJECTS = $(am_fmdSellkeDiagnostic_OBJECTS)
+fmdSellkeDiagnostic_DEPENDENCIES =  \
 	$(top_builddir)/src/data/libPosteriorReader.la \
 	$(top_builddir)/src/Framework/libstlstrtok.la \
 	$(top_builddir)/src/Framework/librandom.la \
@@ -97,11 +105,11 @@ CXXLINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(fmdMcmc_SOURCES) $(fmdOneStepAhead_SOURCES) \
-	$(fmdSim_SOURCES) $(testLikelihood_SOURCES) \
-	$(testPosteriorReader_SOURCES)
+	$(fmdSellkeDiagnostic_SOURCES) $(fmdSim_SOURCES) \
+	$(testLikelihood_SOURCES) $(testPosteriorReader_SOURCES)
 DIST_SOURCES = $(fmdMcmc_SOURCES) $(fmdOneStepAhead_SOURCES) \
-	$(fmdSim_SOURCES) $(testLikelihood_SOURCES) \
-	$(testPosteriorReader_SOURCES)
+	$(fmdSellkeDiagnostic_SOURCES) $(fmdSim_SOURCES) \
+	$(testLikelihood_SOURCES) $(testPosteriorReader_SOURCES)
 HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -112,7 +120,7 @@ AR = ar
 AUTOCONF = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoconf
 AUTOHEADER = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoheader
 AUTOMAKE = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run automake-1.11
-AWK = gawk
+AWK = mawk
 CC = 
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
@@ -239,6 +247,8 @@ testPosteriorReader_SOURCES = testPosteriorReader.cpp
 testPosteriorReader_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la
 fmdOneStepAhead_SOURCES = fmdOneStepAhead.cpp fmdModel.cpp
 fmdOneStepAhead_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options
+fmdSellkeDiagnostic_SOURCES = fmdSellkeDiagnostic.cpp fmdModel.cpp
+fmdSellkeDiagnostic_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options
 all: all-am
 
 .SUFFIXES:
@@ -322,6 +332,9 @@ fmdMcmc$(EXEEXT): $(fmdMcmc_OBJECTS) $(fmdMcmc_DEPENDENCIES)
 fmdOneStepAhead$(EXEEXT): $(fmdOneStepAhead_OBJECTS) $(fmdOneStepAhead_DEPENDENCIES) 
 	@rm -f fmdOneStepAhead$(EXEEXT)
 	$(CXXLINK) $(fmdOneStepAhead_OBJECTS) $(fmdOneStepAhead_LDADD) $(LIBS)
+fmdSellkeDiagnostic$(EXEEXT): $(fmdSellkeDiagnostic_OBJECTS) $(fmdSellkeDiagnostic_DEPENDENCIES) 
+	@rm -f fmdSellkeDiagnostic$(EXEEXT)
+	$(CXXLINK) $(fmdSellkeDiagnostic_OBJECTS) $(fmdSellkeDiagnostic_LDADD) $(LIBS)
 fmdSim$(EXEEXT): $(fmdSim_OBJECTS) $(fmdSim_DEPENDENCIES) 
 	@rm -f fmdSim$(EXEEXT)
 	$(CXXLINK) $(fmdSim_OBJECTS) $(fmdSim_LDADD) $(LIBS)
@@ -341,6 +354,7 @@ distclean-compile:
 include ./$(DEPDIR)/fmdMcmc.Po
 include ./$(DEPDIR)/fmdModel.Po
 include ./$(DEPDIR)/fmdOneStepAhead.Po
+include ./$(DEPDIR)/fmdSellkeDiagnostic.Po
 include ./$(DEPDIR)/fmdSim.Po
 include ./$(DEPDIR)/testLikelihood.Po
 include ./$(DEPDIR)/testPosteriorReader.Po

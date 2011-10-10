@@ -58,7 +58,7 @@ AR = ar
 AUTOCONF = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoconf
 AUTOHEADER = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoheader
 AUTOMAKE = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run automake-1.11
-AWK = gawk
+AWK = mawk
 CC = 
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
@@ -174,7 +174,7 @@ top_builddir = ../..
 top_srcdir = /home/stsiab/brandenburg/brandenburg
 INCLUDES = -I$(top_srcdir)/src/Framework
 METASOURCES = AUTO
-noinst_HEADERS = OneStepAhead.hpp
+noinst_HEADERS = OneStepAhead.hpp SellkeDiagnostic.hpp
 all: all-am
 
 .SUFFIXES:

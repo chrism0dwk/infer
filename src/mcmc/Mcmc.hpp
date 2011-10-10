@@ -36,6 +36,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 
+
 #include "types.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
@@ -61,6 +62,7 @@ namespace EpiRisk
   class SpeciesMRW;
   class SusceptibilityMRW;
   class InfectivityMRW;
+  class SellkeSerializer;
 
   struct DIC {
      double Dbar;
@@ -74,6 +76,7 @@ namespace EpiRisk
     double local;
     double global;
     map<string, double> productCache;
+    map<string, double> integPressure;
   };
 
   class Mcmc
@@ -85,6 +88,7 @@ namespace EpiRisk
 
     friend class SusceptibilityMRW;
     friend class InfectivityMRW;
+    friend class SellkeSerializer;
 
     Population<TestCovars>& pop_;
     Parameters& txparams_;
@@ -209,6 +213,8 @@ namespace EpiRisk
     newInfectivityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
     SusceptibilityMRW*
     newSusceptibilityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    SellkeSerializer*
+    newSellkeSerializer(const string filename);
     void
     setNumIUpdates(const size_t n);
     void

@@ -255,6 +255,10 @@ int main(int argc, char* argv[])
 
   typedef Population<TestCovars> MyPopulation;
 
+  // Make output directory
+  string outputFolder = "/storage/stsiab/FMD2001/sellkeDiagnostic/mcmc/osaTest.84.sellke";
+  mkdir(outputFolder.c_str(),S_IFDIR | S_IRWXU);
+
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
 
@@ -262,7 +266,7 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(201.4);
+  myPopulation->setObsTime(457.428);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -349,15 +353,17 @@ int main(int argc, char* argv[])
 //  AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
   AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 1000);
 
+  //SellkeSerializer* sellke = myMcmc->newSellkeSerializer(outputFolder + "/sellke.asc");
+
 
   stringstream parmFn;
   stringstream occFn;
   stringstream covFn;
 
-  mkdir("/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84",S_IFDIR | S_IRWXU);
-  parmFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/parameters.asc";
-  occFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/infec.asc";
-  covFn << "/storage/stsiab/FMD2001/oneStepAheadTest/mcmc/osaTest_misspec1.84/covariances.asc";
+
+  parmFn << outputFolder << "/parameters.asc";
+  occFn << outputFolder << "/infec.asc";
+  covFn << outputFolder << "/covariances.asc";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

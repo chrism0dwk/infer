@@ -174,7 +174,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 INCLUDES = -I$(top_srcdir)/src/Framework
 METASOURCES = AUTO
-noinst_HEADERS = OneStepAhead.hpp
+noinst_HEADERS = OneStepAhead.hpp SellkeDiagnostic.hpp
 all: all-am
 
 .SUFFIXES:
