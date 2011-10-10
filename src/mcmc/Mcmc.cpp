@@ -199,7 +199,7 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().horses; //+ txparams_(3);// * i.getCovariates().area;
+  double infectivity = i.getCovariates().horses + txparams_(3) * i.getCovariates().area;
   return infectivity;
 }
 
@@ -207,7 +207,7 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().horses; //+ txparams_(4) * j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses + txparams_(4) * j.getCovariates().area;
   return susceptibility;
 }
 
@@ -220,7 +220,7 @@ Mcmc::beta(const Population<TestCovars>::Individual& i, const Population<
       j.getCovariates().x, j.getCovariates().y);
   if (distance <= 100.0)
     {
-      return txparams_(1) /* infectivity(i,j) */ * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
+      return txparams_(1) * infectivity(i,j) * susceptibility(i,j) * txparams_(5) / (txparams_(5)*txparams_(5) + distance*distance);
     }
   else
     return 0.0;
