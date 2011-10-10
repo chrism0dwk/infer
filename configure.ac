@@ -1,12 +1,14 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
+VERSION = "0.4-1alpha"
+
 #AC_PREREQ([2.61])
 AC_INIT(brandenburg, 0.4-1alpha, Chris Jewell <chris.jewell@warwick.ac.uk>)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE(brandenburg, 0.4-1alpha)
+AM_INIT_AUTOMAKE
 
 # Checks for programs.
 AC_PROG_CXXCPP

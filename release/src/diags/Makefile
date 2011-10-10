@@ -58,7 +58,7 @@ AR = ar
 AUTOCONF = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoconf
 AUTOHEADER = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run autoheader
 AUTOMAKE = ${SHELL} /home/stsiab/brandenburg/brandenburg/missing --run automake-1.11
-AWK = mawk
+AWK = gawk
 CC = 
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2

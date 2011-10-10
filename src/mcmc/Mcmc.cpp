@@ -614,9 +614,9 @@ Mcmc::updateI(const size_t index)
   advance(it, index);
 
   double effectiveN = min(it->getN(), pop_.getObsTime());
-  double newI = effectiveN - (effectiveN - it->getI()) * exp(random_->gaussian(
-      0, tuneI));
-  //double newI = it->getN() - random_->extreme(a, b); // Independence sampler
+  //double newI = effectiveN - (effectiveN - it->getI()) * exp(random_->gaussian(
+  //    0, tuneI));
+  double newI = effectiveN - random_->extreme(a, b); // Independence sampler
 
   Likelihood logLikCan;
   updateIlogLikelihood(it, newI, logLikCan);
@@ -640,7 +640,8 @@ Mcmc::updateI(const size_t index)
       piCur += log(1 - extremecdf(effectiveN - it->getI(), a, b));
     }
 
-  double qRatio = log((effectiveN - newI) / (effectiveN - it->getI()));
+  double qRatio = log(extremecdf(effectiveN - it->getI(), a, b)/extremecdf(effectiveN - newI, a, b));
+      //log((effectiveN - newI) / (effectiveN - it->getI()));
   double accept = piCan - piCur + qRatio;
 
   if (log(random_->uniform()) < accept)
@@ -834,6 +835,7 @@ Mcmc::run(const size_t numIterations,
 
           txparams_(16) = getMeanI2N();
           txparams_(17) = getMeanOccI();
+          txparams_(18) = logLikelihood_.global;
 
           // Update the adaptive mcmc
           if (mpirank_ == 0)

@@ -944,6 +944,7 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/detail/convert.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/variables_map.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/version.hpp \
+ ../../config.h \
  /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/multi_index/random_access_index.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/multi_index/detail/rnd_node_iterator.hpp \
@@ -3099,6 +3100,8 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
 /usr/local/packages/boost_1_47_0/include/boost/program_options/variables_map.hpp:
 
 /usr/local/packages/boost_1_47_0/include/boost/program_options/version.hpp:
+
+../../config.h:
 
 /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp:
 

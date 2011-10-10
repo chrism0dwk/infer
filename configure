@@ -2971,8 +2971,8 @@ fi
 
 
 # Define the identity of the package.
- PACKAGE=brandenburg
- VERSION=0.4-1alpha
+ PACKAGE='brandenburg'
+ VERSION='0.4-1alpha'
 
 
 cat >>confdefs.h <<_ACEOF

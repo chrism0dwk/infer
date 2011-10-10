@@ -38,6 +38,7 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+#include "config.h"
 #include "SpatPointPop.hpp"
 #include "Mcmc.hpp"
 #include "Data.hpp"
@@ -248,15 +249,17 @@ int main(int argc, char* argv[])
   mpi::environment env(argc,argv);
   mpi::communicator comm;
 
-  if (argc != 5) {
-      cerr << "Usage: testSpatPointPop <pop file> <epi file> <covar matrix> <num iterations>" << endl;
+  cerr << PACKAGE_NAME << " " << PACKAGE_VERSION <<  " compiled " << __DATE__ << " " << __TIME__ << endl;
+
+  if (argc != 6) {
+      cerr << "Usage: testSpatPointPop <pop file> <epi file> <output folder> <obs time> <num iterations>" << endl;
       return EXIT_FAILURE;
   }
 
   typedef Population<TestCovars> MyPopulation;
 
   // Make output directory
-  string outputFolder = "/storage/stsiab/FMD2001/sellkeDiagnostic/mcmc/osaTest.84.sellke";
+  string outputFolder(argv[3]);
   mkdir(outputFolder.c_str(),S_IFDIR | S_IRWXU);
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
@@ -266,20 +269,20 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(457.428);
+  myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
   delete epiDataImporter;
 
   // Data covariance matrix
-  EmpCovar<LogTransform>::CovMatrix speciesCovar;
-  ifstream covMatrix;
-  covMatrix.open(argv[3],ios::in);
-  covMatrix >> speciesCovar;
-  covMatrix.close();
+//  EmpCovar<LogTransform>::CovMatrix speciesCovar;
+//  ifstream covMatrix;
+//  covMatrix.open(argv[3],ios::in);
+//  covMatrix >> speciesCovar;
+//  covMatrix.close();
 
 
-  Parameters txparams(18);
+  Parameters txparams(19);
   txparams(0) = Parameter(0.0108081,GammaPrior(1,1),"gamma1");
   txparams(1) = Parameter(0.5,GammaPrior(1,1),"gamma2");
   txparams(2) = Parameter(1.14985,GammaPrior(1,1),"delta");
@@ -298,12 +301,13 @@ int main(int argc, char* argv[])
   txparams(15) = Parameter(0.365774,BetaPrior(2,2),"phi_s");
   txparams(16) = Parameter(0.0,GammaPrior(1,1),"meanI2N");
   txparams(17) = Parameter(0.0,GammaPrior(1,1),"meanOccI");
+  txparams(18) = Parameter(0.0,GammaPrior(1,1),"logLikelihood");
 
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
-  myMcmc->setNumIUpdates(20);
+  myMcmc->setNumIUpdates(200);
 
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;
@@ -368,7 +372,7 @@ int main(int argc, char* argv[])
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
   size_t numIters;
-  stringstream iters(argv[4]);
+  stringstream iters(argv[5]);
   iters >> numIters;
 
   map<string,double> acceptance = myMcmc->run(numIters, *writer);
