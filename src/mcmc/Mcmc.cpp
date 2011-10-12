@@ -183,7 +183,7 @@ double
 Mcmc::h(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return i.getCovariates().epi->numInfecAt(time - i.getI());
+  else return i.getCovariates().epi->numInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 inline
@@ -191,7 +191,7 @@ double
 Mcmc::H(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return i.getCovariates().epi->integNumInfecAt(time - i.getI());
+  else return i.getCovariates().epi->integNumInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 
@@ -802,14 +802,14 @@ Mcmc::run(const size_t numIterations,
         cout << "Iteration " << k << endl;
 
       if(k % 100 == 0) {
-          DIC myDIC = getDIC();
-          if (mpirank_ == 0) {
-              cout << "=======DIC=======\n"
-                   << "Dbar: " << myDIC.Dbar << "\n"
-                   << "Dhat: " << myDIC.Dhat << "\n"
-                   << "pD: " << myDIC.pD << "\n"
-                   << "DIC: " << myDIC.DIC << endl;
-          }
+//          DIC myDIC = getDIC();
+//          if (mpirank_ == 0) {
+//              cout << "=======DIC=======\n"
+//                   << "Dbar: " << myDIC.Dbar << "\n"
+//                   << "Dhat: " << myDIC.Dhat << "\n"
+//                   << "pD: " << myDIC.pD << "\n"
+//                   << "DIC: " << myDIC.DIC << endl;
+//          }
       }
 
       for(boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
@@ -824,7 +824,7 @@ Mcmc::run(const size_t numIterations,
 //
 //      acceptance["gamma"] += updateBpnc();
 
-      updateDIC();
+      //updateDIC();
 
       if(mpirank_ == 0) cout << "gLogLikelihood: " << logLikelihood_.global << endl;
 
