@@ -578,6 +578,7 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
  /usr/local/packages/boost_1_47_0/include/boost/mpi/request.hpp \
  /usr/local/packages/gcc-4.4.0/lib/gcc/x86_64-unknown-linux-gnu/4.4.0/../../../../include/c++/4.4.0/sstream \
  /usr/local/packages/gcc-4.4.0/lib/gcc/x86_64-unknown-linux-gnu/4.4.0/../../../../include/c++/4.4.0/bits/sstream.tcc \
+ /usr/include/sys/stat.h /usr/include/bits/stat.h \
  /usr/local/packages/boost_1_47_0/include/boost/property_tree/ptree.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/property_tree/ptree_fwd.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/property_tree/string_path.hpp \
@@ -942,6 +943,7 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/detail/convert.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/variables_map.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/program_options/version.hpp \
+ ../../config.h \
  /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/multi_index/random_access_index.hpp \
  /usr/local/packages/boost_1_47_0/include/boost/multi_index/detail/rnd_node_iterator.hpp \
@@ -2362,6 +2364,10 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
 
 /usr/local/packages/gcc-4.4.0/lib/gcc/x86_64-unknown-linux-gnu/4.4.0/../../../../include/c++/4.4.0/bits/sstream.tcc:
 
+/usr/include/sys/stat.h:
+
+/usr/include/bits/stat.h:
+
 /usr/local/packages/boost_1_47_0/include/boost/property_tree/ptree.hpp:
 
 /usr/local/packages/boost_1_47_0/include/boost/property_tree/ptree_fwd.hpp:
@@ -3089,6 +3095,8 @@ fmdMcmc.o: /home/stsiab/brandenburg/brandenburg/src/unitTests/fmdMcmc.cpp \
 /usr/local/packages/boost_1_47_0/include/boost/program_options/variables_map.hpp:
 
 /usr/local/packages/boost_1_47_0/include/boost/program_options/version.hpp:
+
+../../config.h:
 
 /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp:
 

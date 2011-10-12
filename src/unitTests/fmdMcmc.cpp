@@ -307,7 +307,7 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
-  myMcmc->setNumIUpdates(200);
+  myMcmc->setNumIUpdates(1);
 
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;

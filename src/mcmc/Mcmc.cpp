@@ -377,7 +377,7 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
 
   logLikelihood.productCache.clear();
 
-  // First calculate the log product (happens on master node)
+  // First calculate the log product
   while (j != processInfectives_.end())
     {
       double tmp = instantPressureOn(*j, (*j)->getI());
@@ -557,8 +557,15 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
           if (j->isIAt((*i)->getI()))
             myPressure -= beta(*j, **i);
 
+          else if (j->isNAt((*i)->getI()) and j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime())
+            myPressure -= betastar(*j, **i);
+
           if (newTime < (*i)->getI() && (*i)->getI() <= j->getN())
             myPressure += beta(*j, **i);
+
+          else if (j->isNAt((*i)->getI()) and j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime())
+            myPressure += betastar(*j, **i);
+
         }
 
       if (myPressure != 0.0)
@@ -585,7 +592,11 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
           double myBeta = beta(*j, *i);
           double iMaxSuscTime = min(min(i->getI(), i->getN()), pop_.getObsTime());
           logLikelihood += myBeta * (min(j->getN(),iMaxSuscTime) - min(min(j->getI(),j->getN()),iMaxSuscTime));
+          if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
+            logLikelihood += betastar(*j, *i) * (min(j->getR(),iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
           logLikelihood -= myBeta * (min(j->getN(),iMaxSuscTime) - min(min(newTime,j->getN()),iMaxSuscTime));
+          if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
+            logLikelihood -= betastar(*j, *i) * (min(j->getR(),iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
         }
     }
   updatedLogLik.local = logLikelihood;
@@ -622,6 +633,17 @@ Mcmc::updateI(const size_t index)
   updateIlogLikelihood(it, newI, logLikCan);
 
 #ifndef NDEBUG
+  Likelihood tmp;
+  double oldI = it->getI();
+  pop_.moveInfectionTime(it, newI);
+  calcLogLikelihood(tmp);
+  pop_.moveInfectionTime(it, oldI);
+
+  if(fabs(logLikCan.global - tmp.global) > 1e-11 and mpirank_ == 0) {
+      size_t rank = distance(pop_.infecBegin(),it);
+      cerr.precision(20);
+      cerr << "Log likelihood error in " << __FUNCTION__ << " for individual " << it->getId() << " (I=" << it->getI() << ", I*=" << POSINF << ", rank=" << rank << ")  Update=" << logLikCan.global << ", Full=" << tmp.global << endl;
+  }
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
@@ -683,6 +705,17 @@ Mcmc::addI()
   updateIlogLikelihood(it, newI, logLikCan);
 
 #ifndef NDEBUG
+//  Likelihood tmp;
+//  double oldI = it->getI();
+//  pop_.moveInfectionTime(it, newI);
+//  calcLogLikelihood(tmp);
+//  pop_.moveInfectionTime(it, oldI);
+//
+//  if(fabs(logLikCan.global - tmp.global) > 1e-11 and mpirank_ == 0) {
+//      size_t rank = distance(pop_.infecBegin(),it);
+//      cerr.precision(20);
+//      cerr << "Log likelihood error in " << __FUNCTION__ << " for individual " << it->getId() << " (I=" << it->getI() << ", I*=" << newI << ", rank=" << rank << ")  Update=" << logLikCan.global << ", Full=" << tmp.global << endl;
+//  }
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
@@ -718,6 +751,7 @@ Mcmc::deleteI()
   if (occultList_.empty())
     {
 #ifndef NDEBUG
+      cout << __FUNCTION__ << endl;
       cout << "Occults empty. Not deleting" << endl;
 #endif
       return false;
@@ -736,6 +770,19 @@ Mcmc::deleteI()
   updateIlogLikelihood(it, POSINF, logLikCan);
 
 #ifndef NDEBUG
+//  Likelihood tmp;
+//  double oldI = it->getI();
+//  pop_.moveInfectionTime(it, POSINF);
+//  processInfectives_.erase(it);
+//  calcLogLikelihood(tmp);
+//  processInfectives_.insert(it);
+//  pop_.moveInfectionTime(it, oldI);
+//
+//  if(fabs(logLikCan.global - tmp.global) > 1e-11 and mpirank_ == 0) {
+//      size_t rank = distance(pop_.infecBegin(), it);
+//      cerr.precision(20);
+//      cerr << "Log likelihood error in " << __FUNCTION__ << " for individual " << it->getId() << " (I=" << it->getI() << ", I*=" << POSINF << ", rank=" << rank << ")  Update=" << logLikCan.global << ", Full=" << tmp.global << endl;
+//  }
   if (logLikCan.global != logLikCan.global)
     cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
@@ -830,7 +877,8 @@ Mcmc::run(const size_t numIterations,
                 throw logic_error("Unknown move!");
                 }
             }
-
+          cout.precision(20);
+          cout << "Log likelihood = " << logLikelihood_.global << endl;
           updateDIC();
 
           txparams_(16) = getMeanI2N();

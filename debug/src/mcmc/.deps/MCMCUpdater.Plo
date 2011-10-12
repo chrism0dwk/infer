@@ -1055,7 +1055,9 @@ MCMCUpdater.lo: \
  /home/stsiab/brandenburg/brandenburg/src/Framework/DataImporter.hpp \
  /home/stsiab/brandenburg/brandenburg/src/Framework/Parameter.hpp \
  /home/stsiab/brandenburg/brandenburg/src/Framework/McmcWriter.hpp \
- /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp
+ /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp \
+ /usr/local/packages/boost_1_47_0/include/boost/serialization/map.hpp \
+ /usr/local/packages/boost_1_47_0/include/boost/serialization/utility.hpp
 
 /home/stsiab/brandenburg/brandenburg/src/mcmc/MCMCUpdater.hpp:
 
@@ -3234,3 +3236,7 @@ MCMCUpdater.lo: \
 /home/stsiab/brandenburg/brandenburg/src/Framework/McmcWriter.hpp:
 
 /home/stsiab/brandenburg/brandenburg/src/Framework/SpatPointPop.hpp:
+
+/usr/local/packages/boost_1_47_0/include/boost/serialization/map.hpp:
+
+/usr/local/packages/boost_1_47_0/include/boost/serialization/utility.hpp:
