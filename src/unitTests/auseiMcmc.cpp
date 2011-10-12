@@ -131,11 +131,14 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(145.0);
+  myPopulation->setObsTime(120.0);
 
 
   delete popDataImporter;
   delete epiDataImporter;
+
+  cout << "Population size: " << myPopulation->size() << endl;
+  cout << "Num infectives: " << myPopulation->numInfected() << endl;
 
   Parameters txparams(9);
   txparams(0) = Parameter(3e-4,GammaPrior(1,1),"epsilon");
@@ -158,16 +161,18 @@ int main(int argc, char* argv[])
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
   cout << "Adding updaters" << endl;
-  myMcmc->newSingleSiteLogMRW(txparams(0),5.0);
-  myMcmc->newSingleSiteLogMRW(txparams(1),0.07);
+  myMcmc->newSingleSiteLogMRW(txparams(0),1.0);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.03);
+  myMcmc->newSingleSiteLogMRW(txparams(3),1.0);
+  myMcmc->newSingleSiteLogMRW(txparams(4),0.5);
   myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
-  myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.1);
+  myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.01);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/scratch/stsiab/ausei/output/ausei_withinSIR4.parms";
-  occFn << "/scratch/stsiab/ausei/output/ausei_withinSIR4.occ";
+  parmFn << "/storage/stsiab/ausei/output/ausei_withinSIR6.parms";
+  occFn << "/storage/stsiab/ausei/output/ausei_withinSIR6.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

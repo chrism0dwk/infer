@@ -67,7 +67,7 @@ namespace EpiRisk {
 		iGraph_.insert(std::make_pair(0.0,tmp));
 						   
 		// Run model forward
-		while (y[1]>=1.0)
+		while (y[1]>=0.5)
 		{
 			
 			int status = gsl_odeiv2_driver_apply (driver, &t, t+delta_, y);
