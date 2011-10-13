@@ -115,7 +115,7 @@ main(int argc, char* argv[])
 
       if (vm.count("linenum"))
               {
-                linenum = vm["linenum"].as<double> ();
+                linenum = vm["linenum"].as<int> ();
               }
             else
               {
