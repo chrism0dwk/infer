@@ -82,11 +82,13 @@ main(int argc, char* argv[])
   // Simulates from Gillespie sim
 
   string configFilename;
+  int linenum;
+
   try
     {
       po::options_description desc("Allowed options");
       desc.add_options()("help,h", "Show help message")("config,c", po::value<
-          string>(), "config file to use");
+          string>(), "config file to use")("linenum,l", po::value<int>(), "posterior line number");
 
       po::variables_map vm;
       po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -107,6 +109,15 @@ main(int argc, char* argv[])
           cerr << "Config file required" << "\n";
           cerr << desc << "\n";
           return EXIT_FAILURE;
+        }
+
+      if (vm.count("linenum"))
+        {
+          linenum = vm["linenum"].as<double> ();
+        }
+      else
+        {
+          linenum = -1;
         }
 
     }
@@ -152,7 +163,14 @@ main(int argc, char* argv[])
   OneStepAhead<FmdModel>* onestepahead = new OneStepAhead<FmdModel>(model, settings.output);
 
   int lineCounter = 1;
-  while(posterior.next())
+  bool oneline = false;
+  if (linenum != -1) {
+      for(int i=0; i<linenum; ++i) posterior.next();
+      lineCounter = linenum;
+      oneline = true;
+  }
+  posterior.next();
+  do
     {
 
       std::cout << "Line: " << lineCounter << std::endl;
@@ -180,9 +198,9 @@ main(int argc, char* argv[])
       }
 
 
-      onestepahead->compute();
+      onestepahead->compute(lineCounter);
       lineCounter++;
-    }
+    } while(posterior.next() and !oneline);
 
   delete onestepahead;
 

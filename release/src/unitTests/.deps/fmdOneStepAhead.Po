@@ -967,6 +967,8 @@ fmdOneStepAhead.o: \
  /usr/local/packages/boost_1_47_0/include/boost/numeric/ublas/triangular.hpp \
  /home/stsiab/brandenburg/brandenburg/src/diags/OneStepAhead.hpp \
  /usr/local/packages/gsl-1.15/include/gsl/gsl_cdf.h \
+ /usr/include/sys/file.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+ /usr/include/bits/uio.h /usr/include/sys/stat.h /usr/include/bits/stat.h \
  /home/stsiab/brandenburg/brandenburg/src/Framework/types.hpp \
  /home/stsiab/brandenburg/brandenburg/src/data/PosteriorReader.hpp
 
@@ -2969,6 +2971,18 @@ fmdOneStepAhead.o: \
 /home/stsiab/brandenburg/brandenburg/src/diags/OneStepAhead.hpp:
 
 /usr/local/packages/gsl-1.15/include/gsl/gsl_cdf.h:
+
+/usr/include/sys/file.h:
+
+/usr/include/fcntl.h:
+
+/usr/include/bits/fcntl.h:
+
+/usr/include/bits/uio.h:
+
+/usr/include/sys/stat.h:
+
+/usr/include/bits/stat.h:
 
 /home/stsiab/brandenburg/brandenburg/src/Framework/types.hpp:
 

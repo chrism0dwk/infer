@@ -32,6 +32,8 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/mpi/collectives.hpp>
 
+#define ADAPTIVESCALE 4.0
+
 namespace EpiRisk
 {
 
@@ -171,7 +173,7 @@ namespace EpiRisk
       {
         try
           {
-            vars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+            vars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
                 / updateGroup_.size());
           }
         catch (cholesky_error& e)
@@ -280,7 +282,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
                 / updateGroup_.size());
           }
         catch (cholesky_error& e)
@@ -400,7 +402,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
                 / transformedGroup_.size());
           }
         catch (cholesky_error& e)
@@ -530,7 +532,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
                 / transformedGroup_.size());
           }
         catch (cholesky_error& e)
@@ -647,7 +649,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * 5.6644
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
                 / transformedGroup_.size());
           }
         catch (cholesky_error& e)

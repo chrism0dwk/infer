@@ -27,6 +27,9 @@
 #include <set>
 #include <string>
 #include <gsl/gsl_cdf.h>
+#include <sstream>
+#include <cstdio>
+#include <sys/file.h>
 
 #include "types.hpp"
 #include "Random.hpp"
@@ -40,24 +43,37 @@ namespace EpiRisk
     {
     public:
       OneStepAhead(const ModelT& model, const string outputfilename) :
-        model_(model)
+        model_(model),fileLocked_(false)
       {
-        outputFile_.open(outputfilename.c_str(),ios::out);
-        if(!outputFile_.is_open())
+        outputFile_ = fopen(outputfilename.c_str(),"ab");
+        if(outputFile_ == NULL)
           {
             string msg = "Cannot open output file '";
             msg += outputfilename;
             msg += "'";
             throw runtime_error(msg.c_str());
           }
+
+        string indexFilename = outputfilename + ".idx";
+        indexFile_ = fopen(indexFilename.c_str(),"ab");
+        if(indexFile_ == NULL)
+          {
+            string msg = "Cannot open index file";
+            throw runtime_error(msg.c_str());
+          }
       }
       ~OneStepAhead()
       {
-        outputFile_.close();
+        if (fileLocked_) unlockfiles();
+        fclose(outputFile_);
+        fclose(indexFile_);
       }
       void
-      compute()
+      compute(const size_t idx)
       {
+
+        stringstream output;
+
         // Construct the event list
         events_.clear();
         for(typename ModelT::PopulationType::InfectiveIterator it = (++model_.getPopulation().infecBegin());
@@ -84,19 +100,58 @@ namespace EpiRisk
                 double timediff = it->getTime() - prevEvent->getTime();
                 double pressure = model_.instantPressureOn(it->getIndividual(), it->getTime());
                 if(!isFirst) {
-                    outputFile_ << " ";
+                    output << " ";
                 }
                 else isFirst = false;
-                outputFile_ << /*it->getIndividual()->getId() << ":" <<*/ gsl_cdf_exponential_P(timediff,1.0/pressure);
+                output << /*it->getIndividual()->getId() << ":" <<*/ gsl_cdf_exponential_P(timediff,1.0/pressure);
               }
 
           }
-        outputFile_ << "\n";
+        output << "\n";
+
+        // Write to output files
+        try {
+
+            stringstream s; s << idx << ":";
+            lockfiles();
+            s << ftell(outputFile_) << "\n";
+            fputs(s.str().c_str(),indexFile_);
+            fputs(output.str().c_str(),outputFile_);
+            unlockfiles();
+        }
+        catch (runtime_error& e)
+        {
+            throw e;
+        }
+
+
       }
 
     private:
       const ModelT& model_;
-      ofstream outputFile_;
+      FILE* outputFile_;
+      FILE* indexFile_;
+      bool fileLocked_;
+      void
+      lockfiles()
+      {
+        int rv;
+        rv = flock(fileno(outputFile_),LOCK_EX);
+        if (rv == -1) throw runtime_error("Cannot lock output file");
+
+        rv = flock(fileno(indexFile_),LOCK_EX);
+        if (rv == -1) throw runtime_error("Cannot lock index file");
+        fileLocked_ = true;
+      }
+
+      void
+      unlockfiles()
+      {
+        flock(fileno(outputFile_),LOCK_UN);
+        flock(fileno(indexFile_),LOCK_UN);
+        fileLocked_ = false;
+      }
+
       class Event
       {
       public:
