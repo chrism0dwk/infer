@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
   cout << "Adding updaters" << endl;
   myMcmc->newSingleSiteLogMRW(txparams(0),1.0);
   myMcmc->newSingleSiteLogMRW(txparams(1),0.03);
-  myMcmc->newSingleSiteLogMRW(txparams(3),1.0);
+  myMcmc->newSingleSiteLogMRW(txparams(3),10.0);
   myMcmc->newSingleSiteLogMRW(txparams(4),0.5);
   myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
   myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.01);
@@ -190,8 +190,8 @@ int main(int argc, char* argv[])
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/storage/stsiab/ausei/output/ausei_withinSIR6.parms";
-  occFn << "/storage/stsiab/ausei/output/ausei_withinSIR6.occ";
+  parmFn << "/storage/stsiab/ausei/output/ausei_withinSIR7.parms";
+  occFn << "/storage/stsiab/ausei/output/ausei_withinSIR7.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 
