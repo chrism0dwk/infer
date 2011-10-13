@@ -123,7 +123,7 @@ namespace EpiRisk
              stringstream s; s << idx << ":";
              lockfiles();
              fseek(outputFile_,0,SEEK_END);
-             fseek(indexFile_,0,SEEK_END);
+             //fseek(indexFile_,0,SEEK_END);
              s << ftell(outputFile_) << "\n";
              fputs(s.str().c_str(),indexFile_);
              fputs(output.str().c_str(),outputFile_);
