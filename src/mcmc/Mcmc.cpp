@@ -183,7 +183,7 @@ double
 Mcmc::h(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return i.getCovariates().epi->numInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
+  else return 1.0;//i.getCovariates().epi->numInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 inline
@@ -191,7 +191,7 @@ double
 Mcmc::H(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return i.getCovariates().epi->integNumInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
+  else return time-i.getI();//i.getCovariates().epi->integNumInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 
