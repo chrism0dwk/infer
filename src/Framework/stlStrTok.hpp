@@ -32,6 +32,6 @@
 
 using namespace std;
 
-void stlStrTok(vector<string>& tokens, const string myString, const char* delim = "\n");
+void stlStrTok(std::vector<string>& tokens, const std::string myString, const char* delim = "\n");
 
 #endif

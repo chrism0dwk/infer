@@ -25,6 +25,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 #include <gsl/gsl_randist.h>
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -43,6 +44,8 @@ namespace po = boost::program_options;
 #include "Mcmc.hpp"
 #include "Data.hpp"
 #include "McmcWriter.hpp"
+
+#define CONNECTIONCUTOFF 25.0
 
 
 using namespace EpiRisk;
@@ -119,6 +122,18 @@ using namespace EpiRisk;
     }
   };
 
+  struct ConnectionPredicate
+  {
+    bool operator() (Population<TestCovars>::Individual i, Population<TestCovars>::Individual j)
+    {
+      double dx = i.getCovariates().x - j.getCovariates().x;
+      double dy = i.getCovariates().y - j.getCovariates().y;
+
+      if(dx > CONNECTIONCUTOFF or dy > CONNECTIONCUTOFF) return false;
+      else return sqrt(dx*dx + dy*dy) <= CONNECTIONCUTOFF;
+    }
+  };
+
 
 struct ParamSetting
 {
@@ -143,6 +158,7 @@ struct Settings
 {
     string populationfile;
     string epidemicfile;
+    string connectionfile;
     string posteriorfile;
 
     double obstime;
@@ -166,6 +182,7 @@ struct Settings
 
       populationfile = pt.get<string> ("fmdMcmc.paths.population");
       epidemicfile = pt.get<string> ("fmdMcmc.paths.epidemic");
+      connectionfile = pt.get<string> ("fmdMcmc.paths.connections");
       posteriorfile = pt.get<string> ("fmdMcmc.paths.posterior");
 
       obstime = pt.get<double> ("fmdMcmc.options.obstime",POSINF);
@@ -269,10 +286,39 @@ int main(int argc, char* argv[])
 
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
+  //myPopulation->createConnectionGraph(ConnectionPredicate());
+  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
   delete epiDataImporter;
+
+//  ofstream confile;
+//  confile.open("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con",ios::out);
+//  size_t counter = 0;
+//  size_t numcons = 0;
+//  for(Population<TestCovars>::PopulationIterator it = myPopulation->begin();
+//      it != myPopulation->end();
+//      it++) {
+//
+//    for(Population<TestCovars>::PopulationIterator jt = myPopulation->begin();
+//        jt != it;
+//        jt++ )
+//      {
+//        double dx = it->getCovariates().x - jt->getCovariates().x;
+//        double dy = it->getCovariates().y - jt->getCovariates().y;
+//        if(dx <= 15.0 and dy <= 15.0) {
+//            if(sqrt(dx*dx + dy*dy) <= 15.0) {
+//                confile << it->getId() << "," << jt->getId() << endl;
+//                confile << jt->getId() << "," << it->getId() << endl;
+//            }
+//        }
+//      }
+//    cout << counter << ": " << numcons << endl;
+//    counter++;
+//  }
+//  confile.close();
+//  return 0;
 
   // Data covariance matrix
 //  EmpCovar<LogTransform>::CovMatrix speciesCovar;
@@ -307,7 +353,7 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
-  myMcmc->setNumIUpdates(1);
+  myMcmc->setNumIUpdates(0);
 
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;

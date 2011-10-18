@@ -54,6 +54,7 @@
 #include "Individual.hpp"
 #include "DataImporter.hpp"
 #include "EpiRiskException.hpp"
+#include "stlStrTok.hpp"
 
 using namespace std;
 using boost::multi_index_container;
@@ -219,7 +220,49 @@ namespace EpiRisk
        */
       template<class Predicate>
       void
-      createConnectionGraph(Predicate predicate);
+      createConnectionGraph(Predicate predicate)
+      {
+        size_t counter = 0;
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          {
+            cerr << counter << endl; ++ counter;
+            typename Individual::ConnectionList tmp;
+            for(PopulationIterator jt = population_.begin();
+                jt != it;
+                ++jt)
+              {
+                if (predicate(*it,*jt)) {
+                    const_cast<typename Individual::ConnectionList&>(it->getConnectionList()).insert(&(*jt));
+                    const_cast<typename Individual::ConnectionList&>(jt->getConnectionList()).insert(&(*it));
+                }
+              }
+          }
+      }
+
+      void
+      loadConnectionGraph(const string filename)
+      {
+        ifstream confile;
+        confile.open(filename.c_str(),ios::in);
+        if(!confile.is_open()) {
+            throw data_exception("Cannot open specified connections file");
+        }
+
+        string line;
+        getline(confile,line); // Skip CSV header
+
+        while(!confile.eof()) {
+            getline(confile,line);
+            std::vector<std::string> toks;
+            stlStrTok(toks,line,",");
+            if(toks.size() != 2) break;
+            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).insert(&(getById(toks[1])));
+        }
+
+        confile.close();
+      }
       //@}
 
       /// \name Data access methods

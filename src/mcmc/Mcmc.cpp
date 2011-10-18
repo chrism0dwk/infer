@@ -313,20 +313,21 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     return 1.0; // Return 1 if j is I1
 
   double sumPressure = 0.0;
-  Population<TestCovars>::InfectiveIterator i = pop_.infecBegin();
-  Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij); // Don't need people infected after me.
+  Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
+  Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin();
+  Population<TestCovars>::Individual::ConnectionList::const_iterator stop = j->getConnectionList().lower_bound(&tmp); // Don't need indivs infected after Ij
 
   while (i != stop)
     {
-      if (i != j)
+      if ((*i)->getId() != j->getId())
         { // Skip i==j
-          if (i->getN() >= Ij)
+          if ((*i)->getN() >= Ij)
             {
-              sumPressure += beta(*i, *j);
+              sumPressure += beta(**i, *j);
             }
-          else if (i->getR() >= Ij)
+          else if ((*i)->getR() >= Ij)
             {
-              sumPressure += betastar(*i, *j);
+              sumPressure += betastar(**i, *j);
             }
         }
       ++i;
@@ -347,19 +348,19 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
   // Get the latest time that j can possibly be susceptible
   double jMaxSuscepTime = min(min(Ij,pop_.getObsTime()),j->getN());
 
-  Population<TestCovars>::InfectiveIterator infj = pop_.asI(j);
-  Population<TestCovars>::InfectiveIterator stop = pop_.infecLowerBound(Ij);
-  for (Population<TestCovars>::InfectiveIterator i = pop_.infecBegin(); i
+  Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
+  Population<TestCovars>::Individual::ConnectionList::const_iterator stop = j->getConnectionList().lower_bound(&tmp);
+  for (Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin(); i
       != stop; // Don't need people infected after k
   ++i)
     {
-      if (i == infj)
+      if ((*i)->getId() == j->getId())
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * (min(i->getN(), jMaxSuscepTime) - min(i->getI(), jMaxSuscepTime));
+      integPressure += beta(**i, *j) * (min((*i)->getN(), jMaxSuscepTime) - min((*i)->getI(), jMaxSuscepTime));
 
       // Notified -> Susceptible pressure
-      integPressure += betastar(*i, *j) * (min(i->getR(), jMaxSuscepTime) - min(i->getN(),jMaxSuscepTime));
+      integPressure += betastar(**i, *j) * (min((*i)->getR(), jMaxSuscepTime) - min((*i)->getN(),jMaxSuscepTime));
     }
 
   integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);

@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <gsl/gsl_math.h>
+#include <boost/ptr_container/ptr_set.hpp>
 
 #include "types.hpp"
 #include "EpiRiskException.hpp"
@@ -59,13 +60,21 @@ namespace EpiRisk
   template<class Covars>
     class Individual
     {
+    private:
+    struct CmpConnections
+    {
+      bool operator()(const Individual* lhs, const Individual* rhs) const
+      {
+        return lhs->getI() < rhs->getI();
+      }
+    };
 
     public:
 
     typedef Covars CovarsType;
     typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
-    typedef std::vector<size_t> ConnectionList;
+    typedef multiset<const Individual*,CmpConnections> ConnectionList;
 
 
     private:
@@ -127,7 +136,7 @@ namespace EpiRisk
       bool
       operator<(Individual rhs) const
       {
-        return this->I_ < rhs.getI();
+        return this->getI() < rhs.getI();
       }
       ;
 
