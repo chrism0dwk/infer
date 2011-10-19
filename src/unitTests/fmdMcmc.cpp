@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con");
+  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_short.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;

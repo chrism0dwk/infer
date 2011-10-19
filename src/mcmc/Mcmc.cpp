@@ -313,13 +313,15 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     return 1.0; // Return 1 if j is I1
 
   double sumPressure = 0.0;
-  Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
-  Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin();
-  Population<TestCovars>::Individual::ConnectionList::const_iterator stop = j->getConnectionList().lower_bound(&tmp); // Don't need indivs infected after Ij
+  //Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
+  //Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin();
+  //Population<TestCovars>::Individual::ConnectionList::const_iterator stop = j->getConnectionList().lower_bound(&tmp); // Don't need indivs infected after Ij
 
-  while (i != stop)
-    {
-      if ((*i)->getId() != j->getId())
+  for(Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin();
+      i != j->getConnectionList().end();
+      i++)
+        {
+      if ((*i)->getId() != j->getId() and (*i)->getI() <= Ij)
         { // Skip i==j
           if ((*i)->getN() >= Ij)
             {
@@ -330,7 +332,6 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
               sumPressure += betastar(**i, *j);
             }
         }
-      ++i;
     }
   sumPressure += txparams_(3);
 
@@ -348,19 +349,18 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
   // Get the latest time that j can possibly be susceptible
   double jMaxSuscepTime = min(min(Ij,pop_.getObsTime()),j->getN());
 
-  Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
-  Population<TestCovars>::Individual::ConnectionList::const_iterator stop = j->getConnectionList().lower_bound(&tmp);
   for (Population<TestCovars>::Individual::ConnectionList::const_iterator i = j->getConnectionList().begin(); i
-      != stop; // Don't need people infected after k
+      != j->getConnectionList().end(); // Don't need people infected after k
   ++i)
     {
-      if ((*i)->getId() == j->getId())
-        continue; // Don't add pressure to ourselves
+      if ((*i)->getId() != j->getId() and (*i)->getI() <= Ij)
+        {
       // Infective -> Susceptible pressure
       integPressure += beta(**i, *j) * (min((*i)->getN(), jMaxSuscepTime) - min((*i)->getI(), jMaxSuscepTime));
 
       // Notified -> Susceptible pressure
       integPressure += betastar(**i, *j) * (min((*i)->getR(), jMaxSuscepTime) - min((*i)->getN(),jMaxSuscepTime));
+        }
     }
 
   integPressure += txparams_(3) * (min(Ij, pop_.getObsTime()) - I1);

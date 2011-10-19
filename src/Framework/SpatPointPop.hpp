@@ -234,8 +234,8 @@ namespace EpiRisk
                 ++jt)
               {
                 if (predicate(*it,*jt)) {
-                    const_cast<typename Individual::ConnectionList&>(it->getConnectionList()).insert(&(*jt));
-                    const_cast<typename Individual::ConnectionList&>(jt->getConnectionList()).insert(&(*it));
+                    const_cast<typename Individual::ConnectionList&>(it->getConnectionList()).push_back(&(*jt));
+                    const_cast<typename Individual::ConnectionList&>(jt->getConnectionList()).push_back(&(*it));
                 }
               }
           }
@@ -258,7 +258,7 @@ namespace EpiRisk
             std::vector<std::string> toks;
             stlStrTok(toks,line,",");
             if(toks.size() != 2) break;
-            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).insert(&(getById(toks[1])));
+            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).push_back(&(getById(toks[1])));
         }
 
         confile.close();
@@ -556,7 +556,13 @@ namespace EpiRisk
   const typename Population<Covars>::Individual&
   Population<Covars>::getById(const std::string id) const
   {
-    return *(idIndex_.find(id));
+    typename IdIndex::const_iterator it = idIndex_.find(id);
+    if(it == idIndex_.end())
+      {
+         std::stringstream ss; ss << "ID '" << id << "' not found in population!";
+         throw runtime_error(ss.str().c_str());
+      }
+    return *it;
   }
 
   template<typename Covars>

@@ -74,7 +74,7 @@ namespace EpiRisk
     typedef Covars CovarsType;
     typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
-    typedef multiset<const Individual*,CmpConnections> ConnectionList;
+    typedef std::vector<const Individual*> ConnectionList;
 
 
     private:

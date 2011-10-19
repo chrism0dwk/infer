@@ -1,4 +1,4 @@
-#Sun Sep 04 12:29:55 BST 2011
+#Tue Oct 18 15:50:00 BST 2011
 eclipse.preferences.version=1
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/operation=replace
@@ -16,7 +16,7 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/value=-I/usr/local/packages/gsl-1.15/include -I/usr/local/packages/boost_1_47_0/include -I/usr/local/packages/openmpi-1.4.3/include
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DBOOST_MPI_HOMOGENEOUS -O3 -g
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -DBOOST_MPI_HOMOGENEOUS -O3 -fomit-frame-pointer
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/value=-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/boost_1_47_0/lib
