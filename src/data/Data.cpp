@@ -68,6 +68,7 @@ PopDataImporter::next()
   record.data.y = atof(tokens[2].c_str()) / 1000.0;
   record.data.horses = atof(tokens[3].c_str());
   record.data.area = atof(tokens[4].c_str());
+  record.data.vaccdate = atof(tokens[5].c_str());
   record.data.epi = new EpiRisk::SirDeterministic(record.data.horses,0.25);
 
   return record;

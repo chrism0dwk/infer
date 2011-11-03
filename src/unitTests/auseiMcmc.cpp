@@ -68,6 +68,28 @@ using namespace EpiRisk;
     }
   };
 
+  class GaussianPrior : public Prior
+  {
+    double mu_;
+    double var_;
+  public:
+    GaussianPrior(const double mu, const double var) : mu_(mu),var_(var) {};
+    double operator()(const double x)
+    {
+      return gsl_ran_gaussian_pdf(x-mu_,sqrt(var_));
+    }
+    Prior*
+    create() const
+    {
+      return new GaussianPrior(mu_,var_);
+    }
+    Prior*
+    clone() const
+    {
+      return new GaussianPrior(*this);
+    }
+  };
+
 
   class InfSuscSN : public StochasticNode
   {
@@ -102,7 +124,8 @@ using namespace EpiRisk;
              << covars.x << "\t"
              << covars.y << "\t"
              << covars.horses << "\t"
-             << covars.area << "\n";
+             << covars.area << "\t"
+             << covars.vaccdate << "\n";
       }
   }
 
@@ -141,14 +164,14 @@ int main(int argc, char* argv[])
   cout << "Num infectives: " << myPopulation->numInfected() << endl;
 
   Parameters txparams(9);
-  txparams(0) = Parameter(3e-4,GammaPrior(1,1),"epsilon");
+  txparams(0) = Parameter(3e-4,GammaPrior(1,1),"epsilon0");
   txparams(1) = Parameter(0.0019,GammaPrior(1,1),"gamma_1");
-  txparams(2) = Parameter(0.01,GammaPrior(1,1),"gamma_2");
-  txparams(3) = Parameter(0.1,GammaPrior(1,1),"xi");
-  txparams(4) = Parameter(0.18,GammaPrior(1,1),"zeta");
+  txparams(2) = Parameter(0.01,GammaPrior(1,1),"epsilon10");
+  txparams(3) = Parameter(0.0,GaussianPrior(0,0.1),"xi");
+  txparams(4) = Parameter(0.0,GaussianPrior(0,0.1),"zeta");
   txparams(5) = Parameter(0.1,GammaPrior(1,1),"delta");
-  txparams(6) = Parameter(0.13,GammaPrior(1,1),"alpha");
-  txparams(7) = Parameter(7.0,GammaPrior(14.0,1),"a");
+  txparams(6) = Parameter(0.13,BetaPrior(2,2),"theta");
+  txparams(7) = Parameter(0.0001,GammaPrior(1,1),"epsilon44");
   txparams(8) = Parameter(0.4,GammaPrior(1,1),"b");
 
   Parameters dxparams(1);
@@ -161,18 +184,27 @@ int main(int argc, char* argv[])
 //  AdaptiveMultiLogMRW* tx = myMcmc->newAdaptiveMultiLogMRW("allparams",updates, 1000);
 
   cout << "Adding updaters" << endl;
-  myMcmc->newSingleSiteLogMRW(txparams(0),1.0);
-  myMcmc->newSingleSiteLogMRW(txparams(1),0.03);
-  myMcmc->newSingleSiteLogMRW(txparams(3),0.1);
-  myMcmc->newSingleSiteLogMRW(txparams(4),0.5);
+  myMcmc->newSingleSiteLogMRW(txparams(1),0.1);
   myMcmc->newSingleSiteLogMRW(txparams(5),0.1);
-  //myMcmc->newWithinFarmBetaLogMRW(txparams(8),0.143,0.01);
+  myMcmc->newSingleSiteMRW(txparams(6),0.6);
+  myMcmc->newWithinFarmBetaLogMRW(txparams(8),1.0,1.0/6.0,1.0);
+
+  UpdateBlock background;
+  background.add(txparams(0));
+  background.add(txparams(2));
+  background.add(txparams(7));
+  myMcmc->newAdaptiveMultiLogMRW("background",background,500);
+
+  UpdateBlock area;
+  area.add(txparams(3));
+  area.add(txparams(4));
+  myMcmc->newAdaptiveMultiMRW("area",area,500);
 
   stringstream parmFn;
   stringstream occFn;
 
-  parmFn << "/storage/stsiab/ausei/output/ausei_withinSIR7.parms";
-  occFn << "/storage/stsiab/ausei/output/ausei_withinSIR7.occ";
+  parmFn << "/storage/stsiab/ausei/output/ausei_withinSIR12.parms";
+  occFn << "/storage/stsiab/ausei/output/ausei_withinSIR12.occ";
 
   McmcWriter<MyPopulation>* writer = new McmcWriter<MyPopulation>(parmFn.str(),occFn.str());
 

@@ -119,6 +119,14 @@ Mcmc::~Mcmc()
 }
 
 //! Pushes an updater onto the MCMC stack
+SingleSiteMRW*
+Mcmc::newSingleSiteMRW(Parameter& param, double tuning)
+{
+  SingleSiteMRW* update = new SingleSiteMRW(param.getTag(), param, tuning, *random_, logLikelihood_,this);
+  updateStack_.push_back(update);
+}
+
+//! Pushes an updater onto the MCMC stack
 SingleSiteLogMRW*
 Mcmc::newSingleSiteLogMRW(Parameter& param, const double tuning)
 {
@@ -164,9 +172,9 @@ Mcmc::newAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup, size_t bu
 
 //! Pushes an updater onto the MCMC stack
 WithinFarmBetaLogMRW*
-Mcmc::newWithinFarmBetaLogMRW(Parameter& param, const double gamma, const double tuning)
+Mcmc::newWithinFarmBetaLogMRW(Parameter& param, const double alpha, const double gamma, const double tuning)
 {
-  WithinFarmBetaLogMRW* update = new WithinFarmBetaLogMRW(param,gamma,pop_,tuning,*random_,logLikelihood_,this);
+  WithinFarmBetaLogMRW* update = new WithinFarmBetaLogMRW(param,alpha, gamma,pop_,tuning,*random_,logLikelihood_,this);
   updateStack_.push_back(update);
 
   return update;
@@ -183,7 +191,7 @@ double
 Mcmc::h(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return 1.0;//i.getCovariates().epi->numInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
+  else return i.getCovariates().epi->numInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 inline
@@ -191,7 +199,7 @@ double
 Mcmc::H(const Population<TestCovars>::Individual& i, const double time) const
 {
   if (time <= i.getI()) return 0.0;
-  else return time-i.getI();//i.getCovariates().epi->integNumInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
+  else return i.getCovariates().epi->integNumInfecAt(time - i.getI()) / (double)i.getCovariates().horses;
 }
 
 
@@ -199,7 +207,7 @@ inline
 double
 Mcmc::infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double infectivity = i.getCovariates().horses + txparams_(3) * i.getCovariates().area;
+  double infectivity = i.getCovariates().horses * pow(i.getCovariates().area,(double)txparams_(3));
   return infectivity;
 }
 
@@ -207,7 +215,7 @@ inline
 double
 Mcmc::susceptibility(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const
 {
-  double susceptibility = j.getCovariates().horses + txparams_(4) * j.getCovariates().area;
+  double susceptibility = j.getCovariates().horses * pow(j.getCovariates().area,(double)txparams_(4));
   return susceptibility;
 }
 
@@ -253,12 +261,15 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
         { // Skip i==j
           if (i->getN() >= Ij)
             {
-              sumPressure += beta(*i, *j) * h(*i, Ij);
+              sumPressure += beta(*i, *j) * h(*i, Ij) * (j->getCovariates().vaccdate < Ij ? txparams_(6) : 1.0);
             }
         }
       ++i;
     }
-  sumPressure += txparams_(0);
+
+  if(Ij < 10.0) sumPressure += txparams_(0);
+  else if(10.0 <= Ij and Ij < 44.0) sumPressure += txparams_(2);
+  else sumPressure += txparams_(7);
 
   return sumPressure;
 }
@@ -279,10 +290,23 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
       if (i == infj)
         continue; // Don't add pressure to ourselves
       // Infective -> Susceptible pressure
-      integPressure += beta(*i, *j) * H(*i,Ij);
+      double vaccdate = j->getCovariates().vaccdate;
+      double integral;
+      if(Ij > vaccdate) {
+          integral = H(*i,vaccdate);
+          integral += txparams_(6) * (H(*i,Ij) - integral);
+        }
+      else
+        {
+          integral = H(*i,Ij);
+        }
+      integPressure += beta(*i,*j) * integral;
+
     }
 
-  integPressure += txparams_(0) * (min(Ij, pop_.getObsTime()) - I1);
+  integPressure += txparams_(0) * (min(Ij, 10.0) - I1);
+  integPressure += txparams_(2) * (min(Ij, 44.0) - min(10.0,Ij));
+  integPressure += txparams_(7) * (min(Ij, pop_.getObsTime()) - min(44.0,Ij));
 
   return -integPressure;
 }

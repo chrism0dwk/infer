@@ -53,6 +53,7 @@ namespace EpiRisk
 
   // FWD DECLS
   class McmcUpdate;
+  class SingleSiteMRW;
   class SingleSiteLogMRW;
   class AdaptiveMultiLogMRW;
   class AdaptiveMultiMRW;
@@ -180,6 +181,9 @@ namespace EpiRisk
     map<string, double>
         run(const size_t numIterations,
             McmcWriter<Population<TestCovars> >& writer);
+    //! Creates a single site MRW updater
+    SingleSiteMRW*
+    newSingleSiteMRW(Parameter& param, const double tuning);
     //! Creates a single site log MRW updater
     SingleSiteLogMRW*
     newSingleSiteLogMRW(Parameter& param, const double tuning);
@@ -189,7 +193,7 @@ namespace EpiRisk
     AdaptiveMultiMRW*
     newAdaptiveMultiMRW(const string tag, UpdateBlock& params, size_t burnin = 1000);
     WithinFarmBetaLogMRW*
-    newWithinFarmBetaLogMRW(Parameter& param, const double gamma, const double tuning);
+    newWithinFarmBetaLogMRW(Parameter& param, const double alpha, const double gamma, const double tuning);
     void
     calcLogLikelihood(Likelihood& logLikelihood);
     DIC
