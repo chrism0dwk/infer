@@ -40,11 +40,13 @@ namespace EpiRisk {
 	model (double t, const double y[], double f[], void* params)
 	{
 		double beta = *(double *)params;
-		double gamma = *((double *)params + 1);
+		double alpha = *((double *)params + 1);
+		double gamma = *((double *)params + 2);
 		
-		f[0] = -beta*y[0]*y[1];
-		f[1] = beta*y[0]*y[1] - gamma*y[1];
-		f[2] = gamma*y[1];
+		f[0] = -beta*y[0]*y[2];
+		f[1] = beta*y[0]*y[2] - alpha*y[1];
+		f[2] = alpha*y[1] - gamma*y[2];
+		f[3] = gamma*y[2];
 		
 		return GSL_SUCCESS;
 	}	
@@ -62,19 +64,20 @@ namespace EpiRisk {
 
 	
 	void
-	SirDeterministic::simulate(const double beta, const double gamma, const double I0)
+	SirDeterministic::simulate(const double beta, const double alpha, const double gamma, const double I0)
 	{
 		
 		iGraph_.clear();
 		
 		// Parameters
-		double parms[2]; 
+		double parms[3];
 		parms[0] = beta / N_; // Density independent!
-		parms[1] = gamma;
+		parms[1] = alpha;
+		parms[2] = gamma;
 		
-		double y[3] = {N_-1,I0,0.0};
+		double y[4] = {N_-I0,I0,0.0,0.0};
 		
-		gsl_odeiv2_system sys = {model, NULL, 3, parms};
+		gsl_odeiv2_system sys = {model, NULL, 4, parms};
 		gsl_odeiv2_driver* driver = gsl_odeiv2_driver_alloc_y_new(&sys, gsl_odeiv2_step_rkf45, 1e-4, 1e-4, 0.0);
 		
 		double t = 0.0;
@@ -84,9 +87,9 @@ namespace EpiRisk {
 		tmp.value  = 1.0;
 		tmp.integral = 0.0;
 		iGraph_.insert(std::make_pair(0.0,tmp));
-						   
+
 		// Run model forward
-		while (y[1]>=0.5)
+		while (y[2]>=0.5 or y[1]>=0.5)
 		{
 			
 			int status = gsl_odeiv2_driver_apply (driver, &t, t+delta_, y);
@@ -96,9 +99,9 @@ namespace EpiRisk {
 			}
 			
 			double integral = (--iGraph_.end())->second.integral; // Integral at the previous time point
-			integral += ( (--iGraph_.end())->second.value + y[1] )/2 * delta_;
+			integral += ( (--iGraph_.end())->second.value + y[2] )/2 * delta_;
 	
-			tmp.value = y[1];
+			tmp.value = y[2];
 			tmp.integral = integral;
 			iGraph_.insert(std::make_pair(t,tmp));
 		}

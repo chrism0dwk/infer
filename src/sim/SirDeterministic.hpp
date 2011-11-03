@@ -46,7 +46,7 @@ namespace EpiRisk {
 	public:
 		explicit SirDeterministic(const double N, const double delta = 0.5);
 		virtual ~SirDeterministic();
-		void simulate(const double beta, const double gamma, const double I0 = 1);
+		void simulate(const double beta, const double alpha, const double gamma, const double I0 = 1.0);
 		double numInfecAt(const double time) const;
 		double integNumInfecAt(const double time) const;
 		double getMaxTime() const;

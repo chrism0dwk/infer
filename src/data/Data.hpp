@@ -39,6 +39,7 @@ struct TestCovars {
   double y;
   double horses;
   double area;
+  double vaccdate;
   EpiRisk::SirDeterministic* epi;
 };
 

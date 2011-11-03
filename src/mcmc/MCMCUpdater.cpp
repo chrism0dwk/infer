@@ -54,6 +54,57 @@ namespace EpiRisk
   }
 
 
+  SingleSiteMRW::SingleSiteMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env ) :
+      McmcUpdate(tag, rng, logLikelihood, env), param_(param), tuning_(tuning)
+  {
+  }
+
+  SingleSiteMRW::~SingleSiteMRW()
+  {
+  }
+
+  void
+  SingleSiteMRW::update()
+  {
+    double oldValue = param_;
+
+    // Calculate current posterior
+    double logPiCur = logLikelihood_.global + log(param_.prior());
+
+    // Proposal via log random walk
+    param_ = random_.gaussian(param_,tuning_);
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    // Candidate posterior
+    double logPiCan = logLikCan.global + log(param_.prior());
+
+    // q-ratio
+    double qratio = 0.0; // Gaussian proposals cancel
+
+    cout << param_.getTag() << ": " << logPiCan << ", " << logPiCur << "; ";
+
+    // Accept or reject
+    if(log(random_.uniform()) < logPiCan - logPiCur + qratio)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+        cout << "ACCEPT" << endl;
+      }
+    else
+      {
+        param_ = oldValue;
+        cout << "REJECT" << endl;
+      }
+
+    numUpdates_++;
+
+  }
+
+
+
   SingleSiteLogMRW::SingleSiteLogMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env ) :
       McmcUpdate(tag, rng, logLikelihood, env), param_(param), tuning_(tuning)
   {
@@ -313,15 +364,15 @@ namespace EpiRisk
   }
 
 
-  WithinFarmBetaLogMRW::WithinFarmBetaLogMRW(Parameter& param, const double gamma, Population<TestCovars>& pop, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* env)
-  : McmcUpdate(param.getTag(),rng,logLikelihood,env), param_(param), gamma_(gamma),tuning_(tuning), pop_(pop)
+  WithinFarmBetaLogMRW::WithinFarmBetaLogMRW(Parameter& param, const double alpha, const double gamma, Population<TestCovars>& pop, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* env)
+  : McmcUpdate(param.getTag(),rng,logLikelihood,env), param_(param), alpha_(alpha), gamma_(gamma),tuning_(tuning), pop_(pop)
   {
     // Simulate on farm epidemics
     for ( Population<TestCovars>::PopulationIterator it = pop_.begin();
           it != pop_.end();
           it++)
       {
-        it->getCovariates().epi->simulate(param_,gamma_);
+        it->getCovariates().epi->simulate(param_,alpha_, gamma_);
       }
   }
 
@@ -345,7 +396,7 @@ namespace EpiRisk
           it != pop_.end();
           it++)
       {
-        it->getCovariates().epi->simulate(param_,gamma_);
+        it->getCovariates().epi->simulate(param_,alpha_, gamma_);
       }
 
     // Calculate candidate conditional posterior
@@ -371,7 +422,7 @@ namespace EpiRisk
               it != pop_.end();
               it++)
           {
-            it->getCovariates().epi->simulate(param_,gamma_);
+            it->getCovariates().epi->simulate(param_,alpha_, gamma_);
           }
       }
 

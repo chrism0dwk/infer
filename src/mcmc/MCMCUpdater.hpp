@@ -91,6 +91,17 @@ namespace EpiRisk
   };
 
 
+  class SingleSiteMRW : public McmcUpdate
+  {
+    Parameter& param_;
+    const double tuning_;
+  public:
+    SingleSiteMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    ~SingleSiteMRW();
+    void
+    update();
+  };
+
 
   class SingleSiteLogMRW : public McmcUpdate
   {
@@ -152,13 +163,14 @@ namespace EpiRisk
   class WithinFarmBetaLogMRW : public McmcUpdate
   {
   public:
-    WithinFarmBetaLogMRW(Parameter& param,  const double gamma, Population<TestCovars>& pop_, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    WithinFarmBetaLogMRW(Parameter& param,  const double alpha, const double gamma, Population<TestCovars>& pop_, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
     ~WithinFarmBetaLogMRW();
     void
     update();
   private:
     Parameter& param_;
     const double tuning_;
+    const double alpha_;
     const double gamma_;
     Population<TestCovars>& pop_;
   };

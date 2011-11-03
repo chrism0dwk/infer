@@ -1,4 +1,4 @@
-#Sun Sep 04 12:29:55 BST 2011
+#Fri Oct 28 13:59:57 BST 2011
 eclipse.preferences.version=1
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/operation=replace
@@ -14,12 +14,18 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/value=-I/usr/local/packages/gsl-1.15/include -I/usr/local/packages/boost_1_47_0/include -I/usr/local/packages/openmpi-1.4.3/include
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CWD/delimiter=\:
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CWD/operation=replace
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CWD/value=/home/stsiab/brandenburg/ausei/release
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DBOOST_MPI_HOMOGENEOUS -O3 -g
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -DBOOST_MPI_HOMOGENEOUS -O3 -g
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/value=-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/boost_1_47_0/lib
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PWD/delimiter=\:
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PWD/operation=replace
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PWD/value=/home/stsiab/brandenburg/ausei/release
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/append=true
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/appendContributed=true
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CPPFLAGS/delimiter=\:
