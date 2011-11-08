@@ -45,7 +45,7 @@ namespace po = boost::program_options;
 #include "Data.hpp"
 #include "McmcWriter.hpp"
 
-#define CONNECTIONCUTOFF 25.0
+#define CONNECTIONCUTOFF 15.0
 
 
 using namespace EpiRisk;
@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_short.con");
+  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
-  myMcmc->setNumIUpdates(0);
+  myMcmc->setNumIUpdates(200);
 
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;
@@ -371,37 +371,37 @@ int main(int argc, char* argv[])
   txDelta.add(txparams[1]);
   txDelta.add(txparams[2]);
   txDelta.add(txparams[3]);
-  AdaptiveMultiLogMRW* updateDistance = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 1000);
+  AdaptiveMultiLogMRW* updateDistance = myMcmc->newAdaptiveMultiLogMRW("txDistance",txDelta, 300);
 
 
   UpdateBlock txPsi;
   txPsi.add(txparams[7]);
   txPsi.add(txparams[8]);
   txPsi.add(txparams[9]);
-  AdaptiveMultiLogMRW* updatePsi = myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 1000);
+  AdaptiveMultiLogMRW* updatePsi = myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 300);
 
 
   UpdateBlock txPhi;
   txPhi.add(txparams[13]);
   txPhi.add(txparams[14]);
   txPhi.add(txparams[15]);
-  AdaptiveMultiLogMRW* updatePhi = myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 1000);
+  AdaptiveMultiLogMRW* updatePhi = myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 300);
 
   UpdateBlock txInfec;
   txInfec.add(txparams[0]);
   txInfec.add(txparams[5]);
   txInfec.add(txparams[6]);
-  InfectivityMRW* updateInfec = myMcmc->newInfectivityMRW("txInfec",txInfec, txPsi, 1000);
+  InfectivityMRW* updateInfec = myMcmc->newInfectivityMRW("txInfec",txInfec, txPsi, 300);
 
   UpdateBlock txSuscep;
   txSuscep.add(txparams[0]);
   txSuscep.add(txparams[11]);
   txSuscep.add(txparams[12]);
-  SusceptibilityMRW* updateSuscep = myMcmc->newSusceptibilityMRW("txSuscep",txSuscep, txPhi, 1000);
+  SusceptibilityMRW* updateSuscep = myMcmc->newSusceptibilityMRW("txSuscep",txSuscep, txPhi, 300);
 
 //  AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
 //  AdaptiveMultiMRW* updatePsiLin = myMcmc->newAdaptiveMultiMRW("txPsiLin",txPsi, 1000);
-  AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 1000);
+  AdaptiveMultiMRW* updateDistanceLin = myMcmc->newAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
   //SellkeSerializer* sellke = myMcmc->newSellkeSerializer(outputFolder + "/sellke.asc");
 
@@ -440,8 +440,8 @@ int main(int argc, char* argv[])
   }
 
   delete myMcmc;
-  delete writer;
-  delete myPopulation;
+  //delete writer;
+  //delete myPopulation;
 
   return EXIT_SUCCESS;
 

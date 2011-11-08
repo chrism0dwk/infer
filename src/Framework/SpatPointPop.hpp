@@ -258,10 +258,18 @@ namespace EpiRisk
             std::vector<std::string> toks;
             stlStrTok(toks,line,",");
             if(toks.size() != 2) break;
+            if(toks[0] == toks[1]) continue; // Don't connect to self!
             const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).push_back(&(getById(toks[1])));
         }
 
         confile.close();
+
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          {
+            const_cast<Individual&>(*it).sortConnections();
+          }
       }
       //@}
 
@@ -330,6 +338,12 @@ namespace EpiRisk
       asI(const IteratorType& it)
       {
         return population_.project<byI>(it);
+      }
+      /// Converts an Individual to an InfectiveIterator
+      InfectiveIterator
+      asI(const Individual& x)
+      {
+        return infIndex_.iterator_to(x);
       }
       //@}
 
@@ -667,6 +681,13 @@ namespace EpiRisk
       double oldTime = it->getI();
       bool  rv = infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
       if (rv == false) throw logic_error("Failed to modify infection time!!");
+
+      for(typename Individual::ConnectionList::const_iterator jt = it->getConnectionList().begin();
+          jt != it->getConnectionList().end();
+          ++jt)
+        {
+          const_cast<Individual&>(**jt).sortConnections();
+        }
       return rv;
 
     }
@@ -688,7 +709,13 @@ namespace EpiRisk
   {
     typename InfectiveIndex::iterator ref = infIndex_.iterator_to(individual);
     Events oldEvents = individual.getEvents();
-    return infIndex_.modify(ref,modifyEvents(events),modifyEvents(oldEvents));
+    bool rv =  infIndex_.modify(ref,modifyEvents(events),modifyEvents(oldEvents));
+    for(typename Individual::ConnectionList::const_iterator it = individual.getConnectionList().begin();
+        it != individual.getConnectionList().end();
+        it++)
+      const_cast<Individual&>(**it).sortConnections();
+
+    return rv;
   }
 
   template<typename Covars>

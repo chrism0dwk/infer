@@ -37,6 +37,7 @@
 #include <boost/ptr_container/ptr_list.hpp>
 
 
+
 #include "types.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
@@ -166,6 +167,9 @@ namespace EpiRisk
     map<string,double> meanInfecTimes_;
     Parameters meanParams_;
     size_t numIUpdates_;
+    double timeCalc_,timeUpdate_;
+    size_t numCalc_,numUpdate_;
+
     void
     initializeDIC();
     void

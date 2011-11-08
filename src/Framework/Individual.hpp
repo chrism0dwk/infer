@@ -277,6 +277,12 @@ namespace EpiRisk
       {
         connections_ = connections;
       }
+
+      void
+      sortConnections()
+      {
+        sort(connections_.begin(),connections_.end(),CmpConnections());
+      }
       // Miscellaneous methods
       bool
       hasBeenInfected() const
