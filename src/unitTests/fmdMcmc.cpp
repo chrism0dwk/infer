@@ -45,7 +45,7 @@ namespace po = boost::program_options;
 #include "Data.hpp"
 #include "McmcWriter.hpp"
 
-#define CONNECTIONCUTOFF 15.0
+#define CONNECTIONCUTOFF 25.0
 
 
 using namespace EpiRisk;
@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con");
+  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_short.con");//uk_infec_25km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -439,7 +439,7 @@ int main(int argc, char* argv[])
       cout << "Deletion acceptance: " << acceptance["delete"] << endl;
   }
 
-  delete myMcmc;
+  //delete myMcmc;
   //delete writer;
   //delete myPopulation;
 

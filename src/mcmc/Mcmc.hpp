@@ -147,6 +147,10 @@ namespace EpiRisk
     void
     updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
         const double newTime, Likelihood& updatedLogLik);
+
+    void
+    newUpdateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
+        const double newTime, Likelihood& updatedLogLik);
     /////////////////////////////////////////////
 
 
