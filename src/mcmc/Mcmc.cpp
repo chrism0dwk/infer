@@ -408,27 +408,27 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
 
   // First calculate the log product
   // Don't calculate for I1
-  for (ProcessInfectives::const_iterator j = processInfectives_.begin();
-      j!= processInfectives_.end();
-      ++j)
+  for (ProcessInfectives::const_iterator j = processInfectives_.begin(); j
+      != processInfectives_.end(); ++j)
     {
-      if (*j == pop_.infecBegin()) continue;  // Don't add a product entry for I1
+      if (*j == pop_.infecBegin())
+        continue; // Don't add a product entry for I1
       double tmp = instantPressureOn(*j, (*j)->getI());
       logLikelihood.productCache.insert(make_pair((*j)->getId(), tmp));
       logLikelihood.local += log(tmp);
     }
 
-//  //Now calculate the integral
-//  logLikelihood.integPressure.clear();
-//  size_t pos;
-//  Population<TestCovars>::PopulationIterator k;
-//  for (pos = mpirank_, k = pop_.begin() + mpirank_; pos < pop_.size(); pos
-//      += mpiprocs_, k += mpiprocs_)
-//    {
-//      double tmp = integPressureOn(k, k->getI());
-//      logLikelihood.integPressure.insert(make_pair(k->getId(), tmp));
-//      logLikelihood.local += tmp;
-//    }
+  //  //Now calculate the integral
+  //  logLikelihood.integPressure.clear();
+  //  size_t pos;
+  //  Population<TestCovars>::PopulationIterator k;
+  //  for (pos = mpirank_, k = pop_.begin() + mpirank_; pos < pop_.size(); pos
+  //      += mpiprocs_, k += mpiprocs_)
+  //    {
+  //      double tmp = integPressureOn(k, k->getI());
+  //      logLikelihood.integPressure.insert(make_pair(k->getId(), tmp));
+  //      logLikelihood.local += tmp;
+  //    }
 
   all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());
   gettimeofday(&end, NULL);
@@ -593,9 +593,9 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
           updatedLogLik.productCache.erase(j->getId());
         }
 
-//      // Now adjust integral
-//      logLikelihood -= integPressureOn(pop_.asPop(j), j->getI());
-//      logLikelihood += integPressureOn(pop_.asPop(j), newTime);
+      //      // Now adjust integral
+      //      logLikelihood -= integPressureOn(pop_.asPop(j), j->getI());
+      //      logLikelihood += integPressureOn(pop_.asPop(j), newTime);
     }
 
   // Adjust product part -- iterate over connection list and update pressure on
@@ -607,7 +607,8 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
         {
 
           // Skip if i == I1 -- no pressure change
-          if (*i == &(pop_.I1())) continue;
+          if (*i == &(pop_.I1()))
+            continue;
 
           // Product First
           double myPressure = 0.0;
@@ -635,29 +636,31 @@ Mcmc::updateIlogLikelihood(const Population<TestCovars>::InfectiveIterator& j,
 
           updatedLogLik.productCache[(*i)->getId()] = myPressure;
           logLikelihood += log(myPressure);
-          if (logLikelihood == NEGINF) cerr << "Log Likelihood neg inf for individual " << (*i)->getId() << " with pressure " << myPressure << endl;
+          if (logLikelihood == NEGINF)
+            cerr << "Log Likelihood neg inf for individual " << (*i)->getId()
+                << " with pressure " << myPressure << endl;
         }
     }
 
-//  // Adjust the integral part
-//  size_t pos = 0;
-//  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
-//      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
-//    {
-//      double myBeta = beta(*j, **i);
-//      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
-//          pop_.getObsTime());
-//      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-//          j->getI(), j->getN()), iMaxSuscTime));
-//      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
-//        logLikelihood += betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
-//            - min(j->getN(), iMaxSuscTime));
-//      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-//          newTime, j->getN()), iMaxSuscTime));
-//      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
-//        logLikelihood -= betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
-//            - min(j->getN(), iMaxSuscTime));
-//    }
+  //  // Adjust the integral part
+  //  size_t pos = 0;
+  //  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
+  //      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
+  //    {
+  //      double myBeta = beta(*j, **i);
+  //      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
+  //          pop_.getObsTime());
+  //      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+  //          j->getI(), j->getN()), iMaxSuscTime));
+  //      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
+  //        logLikelihood += betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
+  //            - min(j->getN(), iMaxSuscTime));
+  //      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+  //          newTime, j->getN()), iMaxSuscTime));
+  //      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
+  //        logLikelihood -= betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
+  //            - min(j->getN(), iMaxSuscTime));
+  //    }
 
   updatedLogLik.local = logLikelihood;
 
@@ -677,41 +680,12 @@ Mcmc::newUpdateIlogLikelihood(
   timeval start, end;
   gettimeofday(&start, NULL);
 
+  const Population<TestCovars>::InfectiveIterator& I1(pop_.infecBegin());
+  const Population<TestCovars>::InfectiveIterator& I2(++pop_.infecBegin());
+
   // Calculates an updated likelihood for an infection time move
   double logLikelihood = logLikelihood_.local;
   updatedLogLik.productCache = logLikelihood_.productCache;
-
-  // Detect a change of I1
-  const Population<TestCovars>::InfectiveIterator& I1(pop_.infecBegin());
-  Population<TestCovars>::InfectiveIterator& I2(++pop_.infecBegin());
-  enum MOVETYPE
-  {
-    NORMAL = 1,
-    I1TOI = 2,
-    ITOI1 = 4,
-    I1TOI1 = 8
-  };
-  unsigned char MOVE;
-
-  if (j==I1 and newTime < I2->getI()) {
-      MOVE = I1TOI1;
-      if (mpirank_ == 0) cerr << "Moving I1! ************************************************************************" << endl;
-  }
-  else if (j!=I1 and newTime < I1->getI())
-    {
-      MOVE = ITOI1;
-      if (mpirank_ == 0) cerr << "Proposing new I1! ***************************************************" << endl;
-    }
-  else if (j==I1 and newTime > I2->getI())
-    {
-      MOVE = I1TOI;
-      cerr << "Moving I1 to I>1! ***************************************************" << endl;
-    }
-  else
-    {
-      MOVE = NORMAL;
-    }
-
 
   // Adjust pressure on the movee
   if (processInfectives_.count(j) != 0)
@@ -720,7 +694,6 @@ Mcmc::newUpdateIlogLikelihood(
       // Adjust product first
       double myPressure = 0.0;
 
-      // Delete pressure if required.
       map<string, double>::const_iterator myProduct =
           logLikelihood_.productCache.find(j->getId());
       if (myProduct != logLikelihood_.productCache.end())
@@ -729,41 +702,33 @@ Mcmc::newUpdateIlogLikelihood(
           logLikelihood -= log(myPressure);
         }
 
-      if (j!=I1 and I1->getI() < newTime and newTime < pop_.getObsTime())
+      if (newTime < pop_.getObsTime())
         {
-          myPressure = instantPressureOn(j, newTime);
-          updatedLogLik.productCache[j->getId()] = myPressure; // Automatically adds j to the productCache if it didn't exist before (ie Adding)
-          logLikelihood += log(myPressure);
+              myPressure = instantPressureOn(j, newTime);
+              updatedLogLik.productCache[j->getId()] = myPressure; // Automatically adds j to the productCache if it didn't exist before (ie Adding)
+              logLikelihood += log(myPressure);
         }
-      else if (j == I1 and newTime > I2->getI())
+      else
         {
-          myPressure = instantPressureOn(j,newTime);
-          updatedLogLik.productCache[j->getId()] = myPressure;
-          logLikelihood += log(myPressure);
-        }
-      else // Either I1 to I1, or deleting an infection.
-        {
-          size_t k = updatedLogLik.productCache.erase(j->getId());
-          if (k == 0) cerr << "Couldn't erase product, myPressure = " << myPressure << endl;
-          else cerr << "Deleted product, myPressure = " << myPressure << endl;
+          updatedLogLik.productCache.erase(j->getId());
         }
 
-//      // Now adjust integral
-//      logLikelihood -= integPressureOn(pop_.asPop(j), j->getI());
-//      logLikelihood += integPressureOn(pop_.asPop(j), newTime);
+      //      // Now adjust integral
+      //      logLikelihood -= integPressureOn(pop_.asPop(j), j->getI());
+      //      logLikelihood += integPressureOn(pop_.asPop(j), newTime);
     }
-
 
   // Adjust product part -- iterate over connection list and update pressure on
   //                        local process's infectives.
-
   Population<TestCovars>::Individual::ConnectionList::const_iterator i;
-  bool touchedI2 = false;
   for (i = j->getConnectionList().begin(); i != j->getConnectionList().end(); i++)
     {
       if (processInfectives_.count(pop_.asI(**i)) != 0)
         {
-          if (*i == &(*I2)) touchedI2 = true;
+
+          // Skip if i == I1 -- no pressure change
+          if (*i == &(pop_.I1()))
+            continue;
 
           // Product First
           double myPressure = 0.0;
@@ -775,18 +740,7 @@ Mcmc::newUpdateIlogLikelihood(
             {
               myPressure = myProduct->second;
               logLikelihood -= log(myPressure);
-
-              // Erase pressure on a new I1
-              if (j == I1 and *i == &(*I2) and newTime > I2->getI()) {
-                  updatedLogLik.productCache.erase((*i)->getId());
-                  continue;
-              }
             }
-          else if (newTime < I1->getI())// Condition reached for I1 -- is in processInfectives but not productCache
-            {
-              myPressure = txparams_(3);
-            }
-          else continue;
 
           if (j->isIAt((*i)->getI()))
             myPressure -= beta(*j, **i);
@@ -800,31 +754,80 @@ Mcmc::newUpdateIlogLikelihood(
               and newTime < pop_.getObsTime())
             myPressure += betastar(*j, **i);
 
-          if ((*i)->getId() == pop_.I1().getId()) cerr << "Adding pressure " << myPressure << " on old I1" << endl;
           updatedLogLik.productCache[(*i)->getId()] = myPressure;
           logLikelihood += log(myPressure);
+          if (logLikelihood == NEGINF)
+            cerr << "Log Likelihood neg inf for individual " << (*i)->getId()
+                << " with pressure " << myPressure << endl;
         }
     }
 
-//  // Adjust the integral part
-//  size_t pos = 0;
-//  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
-//      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
-//    {
-//      double myBeta = beta(*j, **i);
-//      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
-//          pop_.getObsTime());
-//      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-//          j->getI(), j->getN()), iMaxSuscTime));
-//      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
-//        logLikelihood += betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
-//            - min(j->getN(), iMaxSuscTime));
-//      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-//          newTime, j->getN()), iMaxSuscTime));
-//      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
-//        logLikelihood -= betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
-//            - min(j->getN(), iMaxSuscTime));
-//    }
+  //  // Adjust the integral part
+  //  size_t pos = 0;
+  //  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
+  //      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
+  //    {
+  //      double myBeta = beta(*j, **i);
+  //      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
+  //          pop_.getObsTime());
+  //      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+  //          j->getI(), j->getN()), iMaxSuscTime));
+  //      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
+  //        logLikelihood += betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
+  //            - min(j->getN(), iMaxSuscTime));
+  //      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+  //          newTime, j->getN()), iMaxSuscTime));
+  //      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
+  //        logLikelihood -= betastar(*j, **i) * (min(j->getR(), iMaxSuscTime)
+  //            - min(j->getN(), iMaxSuscTime));
+  //    }
+
+
+  // Now sort out a change of I1 if it has occurred
+  // I1 -> I*  or I1 -> S
+  if (j == I1 and newTime > I2->getI())
+    {
+      cerr << "I1 -> I* <<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+      // Delete pressure on I2 -- it is now I1
+      map<string, double>::iterator myProduct =
+          updatedLogLik.productCache.find(I2->getId());
+      if (myProduct != updatedLogLik.productCache.end())
+        {
+          logLikelihood -= myProduct->second;
+          updatedLogLik.productCache.erase(myProduct);
+        }
+
+      // Background and pairwise pressure added by the instantPressureOn function above
+    }
+
+  // I* -> I1 or S -> I1
+  else if (j != I1 and newTime < I1->getI())
+    {
+      cerr << "I* -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+      // Delete pressure on j -- it is now I1
+      map<string, double>::iterator myProduct =
+          updatedLogLik.productCache.find(j->getId());
+      if (myProduct != updatedLogLik.productCache.end())
+        {
+          logLikelihood -= log(myProduct->second);
+          updatedLogLik.productCache.erase(myProduct);
+        }
+
+      // Add pressure to the old I1
+      if (processInfectives_.count(I1) != 0)
+        {
+          double myPressure = txparams_(3);
+
+          if (find(j->getConnectionList().begin(),j->getConnectionList().end(),&(*I1))) {
+              if (I1->getI() <= j->getN())
+                myPressure += beta(*j, *I1);
+              else if (j->isNAt(I1->getI()))
+                myPressure += betastar(*j, *I1);
+          }
+          updatedLogLik.productCache[I1->getId()] = myPressure;
+          logLikelihood += log(myPressure);
+        }
+    }
 
   updatedLogLik.local = logLikelihood;
 
@@ -847,8 +850,9 @@ Mcmc::updateI(const size_t index)
   double newI = effectiveN - random_->extreme(a, b); // Independence sampler
 
 #ifndef NDEBUG
-  if (mpirank_ == 0) cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
-      << newI << endl;
+  if (mpirank_ == 0)
+    cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
+        << newI << endl;
 #endif
 
   Likelihood logLikCan;
@@ -879,10 +883,16 @@ Mcmc::updateI(const size_t index)
   Likelihood testLik;
   newUpdateIlogLikelihood(it, newI, testLik);
 
-  if (mpirank_ == 0) cerr.precision(15);
-  if (mpirank_ == 0) cerr << "Updated Likelihoods: " << logLikCan.global << "\t" << testLik.global << "\t";
-  if (mpirank_ == 0) if (fabs(logLikCan.global - testLik.global) > 10e-11) cerr << "!!!";
-  if (mpirank_ == 0) cerr << endl;
+  if (mpirank_ == 0)
+    cerr.precision(15);
+  if (mpirank_ == 0)
+    cerr << "Updated Likelihoods: " << logLikCan.global << "\t"
+        << testLik.global << "\t";
+  if (mpirank_ == 0)
+    if (fabs(logLikCan.global - testLik.global) > 10e-11)
+      cerr << "!!!";
+  if (mpirank_ == 0)
+    cerr << endl;
 
   double piCan = logLikCan.global;
   double piCur = logLikelihood_.global;
@@ -906,7 +916,8 @@ Mcmc::updateI(const size_t index)
   if (true) //log(random_->uniform()) < accept)
     {
 #ifndef NDEBUG
-      if (mpirank_ == 0) cerr << "ACCEPT" << endl;
+      if (mpirank_ == 0)
+        cerr << "ACCEPT" << endl;
 #endif
       // Update the infection
       pop_.moveInfectionTime(it, newI);
@@ -916,7 +927,8 @@ Mcmc::updateI(const size_t index)
   else
     {
 #ifndef NDEBUG
-      if (mpirank_ == 0) cerr << "REJECT" << endl;
+      if (mpirank_ == 0)
+        cerr << "REJECT" << endl;
 #endif
       return false;
     }
@@ -939,7 +951,8 @@ Mcmc::addI()
   double newI = min(pop_.getObsTime(), it->getN()) - inProp;
 
 #ifndef NDEBUG
-  if (mpirank_ == 0) cout << "Adding '" << it->getId() << "' at " << newI << endl;
+  if (mpirank_ == 0)
+    cout << "Adding '" << it->getId() << "' at " << newI << endl;
 #endif
 
   double logPiCur = logLikelihood_.global;
@@ -953,10 +966,16 @@ Mcmc::addI()
   Likelihood testLik;
   newUpdateIlogLikelihood(it, POSINF, testLik);
 
-  if (mpirank_ == 0) cerr.precision(15);
-  if (mpirank_ == 0) cerr << "Updated Likelihoods: " << logLikCan.global << "\t" << testLik.global << "\t";
-  if (mpirank_ == 0) if (fabs(logLikCan.global - testLik.global) > 10e-11) cerr << "!!!";
-  if (mpirank_ == 0) cerr << endl;
+  if (mpirank_ == 0)
+    cerr.precision(15);
+  if (mpirank_ == 0)
+    cerr << "Updated Likelihoods: " << logLikCan.global << "\t"
+        << testLik.global << "\t";
+  if (mpirank_ == 0)
+    if (fabs(logLikCan.global - testLik.global) > 10e-11)
+      cerr << "!!!";
+  if (mpirank_ == 0)
+    cerr << endl;
 
 #ifndef NDEBUG
   //  Likelihood tmp;
@@ -971,7 +990,8 @@ Mcmc::addI()
   //      cerr << "Log likelihood error in " << __FUNCTION__ << " for individual " << it->getId() << " (I=" << it->getI() << ", I*=" << newI << ", rank=" << rank << ")  Update=" << logLikCan.global << ", Full=" << tmp.global << endl;
   //  }
   if (logLikCan.global != logLikCan.global)
-    if (mpirank_ == 0) cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
+    if (mpirank_ == 0)
+      cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
 
   double logPiCan = logLikCan.global + log(1.0 - extremecdf(inProp, a, b));
@@ -1014,8 +1034,10 @@ Mcmc::deleteI()
   if (occultList_.empty())
     {
 #ifndef NDEBUG
-      if (mpirank_ == 0) cout << __FUNCTION__ << endl;
-      if (mpirank_ == 0) cout << "Occults empty. Not deleting" << endl;
+      if (mpirank_ == 0)
+        cout << __FUNCTION__ << endl;
+      if (mpirank_ == 0)
+        cout << "Occults empty. Not deleting" << endl;
 #endif
       return false;
     }
@@ -1029,7 +1051,8 @@ Mcmc::deleteI()
   double logPiCur = logLikelihood_.global + log(1 - extremecdf(inTime, a, b));
 
 #ifndef NDEBUG
-  if (mpirank_ == 0) cout << "Deleting '" << it->getId() << "'" << endl;
+  if (mpirank_ == 0)
+    cout << "Deleting '" << it->getId() << "'" << endl;
 #endif
 
   Likelihood logLikCan;
@@ -1037,10 +1060,16 @@ Mcmc::deleteI()
   Likelihood testLik;
   newUpdateIlogLikelihood(it, POSINF, testLik);
 
-  if (mpirank_ == 0) cerr.precision(15);
-  if (mpirank_ == 0) cerr << "Updated Likelihoods: " << logLikCan.global << "\t" << testLik.global << "\t";
-  if (mpirank_ == 0) if (fabs(logLikCan.global - testLik.global) > 10e-11) cerr << "!!!";
-  if (mpirank_ == 0) cerr << endl;
+  if (mpirank_ == 0)
+    cerr.precision(15);
+  if (mpirank_ == 0)
+    cerr << "Updated Likelihoods: " << logLikCan.global << "\t"
+        << testLik.global << "\t";
+  if (mpirank_ == 0)
+    if (fabs(logLikCan.global - testLik.global) > 10e-11)
+      cerr << "!!!";
+  if (mpirank_ == 0)
+    cerr << endl;
 
 #ifndef NDEBUG
   //  Likelihood tmp;
@@ -1057,7 +1086,8 @@ Mcmc::deleteI()
   //      cerr << "Log likelihood error in " << __FUNCTION__ << " for individual " << it->getId() << " (I=" << it->getI() << ", I*=" << POSINF << ", rank=" << rank << ")  Update=" << logLikCan.global << ", Full=" << tmp.global << endl;
   //  }
   if (logLikCan.global != logLikCan.global)
-    if (mpirank_ == 0) cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
+    if (mpirank_ == 0)
+      cout << "NAN in log likelihood (" << __FUNCTION__ << ")" << endl;
 #endif
 
   double logPiCan = logLikCan.global;
@@ -1070,7 +1100,8 @@ Mcmc::deleteI()
   if (log(random_->uniform()) < accept)
     {
 #ifndef NDEBUG
-      if (mpirank_ == 0) cout << "ACCEPT" << endl;
+      if (mpirank_ == 0)
+        cout << "ACCEPT" << endl;
 #endif
       pop_.moveInfectionTime(it, POSINF);
       logLikelihood_ = logLikCan;
@@ -1083,7 +1114,8 @@ Mcmc::deleteI()
   else
     {
 #ifndef NDEBUG
-      if (mpirank_ == 0) cout << "REJECT" << endl;
+      if (mpirank_ == 0)
+        cout << "REJECT" << endl;
 #endif
       return false;
     }
@@ -1134,9 +1166,9 @@ Mcmc::run(const size_t numIterations,
           //            }
 
 
-//          for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin(); it
-//              != updateStack_.end(); ++it)
-//            it->update();
+          //          for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin(); it
+          //              != updateStack_.end(); ++it)
+          //            it->update();
 
           for (size_t infec = 0; infec < numIUpdates_; ++infec)
             {
@@ -1158,7 +1190,8 @@ Mcmc::run(const size_t numIterations,
                 }
 
               dumpProdCache();
-              cerr << "I1 is " << pop_.I1().getId() << " at " << pop_.I1().getI() << endl;
+              cerr << "I1 is " << pop_.I1().getId() << " at "
+                  << pop_.I1().getI() << endl;
               Likelihood tmp;
               calcLogLikelihood(tmp);
               logLikelihood_ = tmp;
