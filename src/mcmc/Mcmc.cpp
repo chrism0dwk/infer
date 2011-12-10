@@ -324,8 +324,8 @@ double
 Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
     const double Ij)
 {
-  if (Ij <= pop_.infecBegin()->getI())
-    return 1.0; // Return 1 if j is I1
+  //if (Ij <= pop_.infecBegin()->getI())
+  //  return 1.0; // Return 1 if j is I1
 
   double sumPressure = 0.0;
   //Population<TestCovars>::Individual tmp("tmp",Ij,Ij,Ij,TestCovars());
@@ -785,15 +785,26 @@ Mcmc::newUpdateIlogLikelihood(
 
   // Now sort out a change of I1 if it has occurred
   // I1 -> I*  or I1 -> S
-  if (j == I1 and newTime > I2->getI())
+  if (j == I1)
     {
-      cerr << "I1 -> I* <<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
-      // Delete pressure on I2 -- it is now I1
-      map<string, double>::iterator myProduct =
-          updatedLogLik.productCache.find(I2->getId());
+      map<string,double>::iterator myProduct;
+
+      if (newTime < I2->getI())
+        {
+          cerr << "I1 -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+          myProduct = updatedLogLik.productCache.find(I1->getId());
+        }
+      else
+        {
+          cerr << "I1 -> I* <<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+          myProduct = updatedLogLik.productCache.find(I2->getId());
+        }
+
+      // Delete pressure on new I1
       if (myProduct != updatedLogLik.productCache.end())
         {
-          logLikelihood -= myProduct->second;
+          cerr << "Deleting product for new I1: " << myProduct->second << endl;
+          logLikelihood -= log(myProduct->second);
           updatedLogLik.productCache.erase(myProduct);
         }
 
@@ -818,7 +829,7 @@ Mcmc::newUpdateIlogLikelihood(
         {
           double myPressure = txparams_(3);
 
-          if (find(j->getConnectionList().begin(),j->getConnectionList().end(),&(*I1))) {
+          if (find(j->getConnectionList().begin(),j->getConnectionList().end(),&(*I1)) != j->getConnectionList().end()) {
               if (I1->getI() <= j->getN())
                 myPressure += beta(*j, *I1);
               else if (j->isNAt(I1->getI()))
