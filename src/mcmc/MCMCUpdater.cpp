@@ -32,6 +32,7 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/mpi/collectives.hpp>
 
+
 #define ADAPTIVESCALE 4.0
 
 namespace EpiRisk
@@ -376,9 +377,9 @@ namespace EpiRisk
         it != env_->pop_.infecEnd();
         it++)
       {
-        constants_[0] += pow(it->getCovariates().cattle,powers_[0].getValue());
-        constants_[1] += pow(it->getCovariates().pigs,powers_[1].getValue());
-        constants_[2] += pow(it->getCovariates().sheep,powers_[2].getValue());
+        constants_[0] += it->getCovariates().cattle;
+        constants_[1] += it->getCovariates().pigs;
+        constants_[2] += it->getCovariates().sheep;
       }
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
@@ -506,9 +507,9 @@ namespace EpiRisk
         it != env_->pop_.end();
         ++it)
       {
-        constants_[0] += pow(it->getCovariates().cattle,powers_[0].getValue());
-        constants_[1] += pow(it->getCovariates().pigs,powers_[1].getValue());
-        constants_[2] += pow(it->getCovariates().sheep,powers_[2].getValue());
+        constants_[0] += it->getCovariates().cattle;
+        constants_[1] += it->getCovariates().pigs;
+        constants_[2] += it->getCovariates().sheep;
       }
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
@@ -702,6 +703,288 @@ namespace EpiRisk
   {
     return empCovar_->getCovariance();
   }
+
+
+  InfectivityPowMRW::InfectivityPowMRW(const std::string& tag,
+      UpdateBlock& params, size_t burnin, Random& rng,
+      Likelihood& logLikelihood, Mcmc* const env) :
+    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), burnin_(
+        burnin)
+  {
+
+    // Initialize the standard covariance
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); ++i)
+      {
+        for (size_t j = 0; j < updateGroup_.size(); ++j)
+          {
+            if (i == j)
+              (*stdCov_)(i, j) = 0.01 / updateGroup_.size();
+            else
+              (*stdCov_)(i, j) = 0.0;
+          }
+      }
+
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_);
+
+    // Create species inf cache
+    cache_ = new ublas::matrix<double>(env->pop_.size(),params.size());
+
+  }
+  ;
+
+  InfectivityPowMRW::~InfectivityPowMRW()
+  {
+    delete empCovar_;
+    delete stdCov_;
+    delete cache_;
+  }
+
+  void
+  InfectivityPowMRW::setCovariance(
+      EmpCovar<LogTransform>::CovMatrix& covariance)
+  {
+    // Start the empirical covariance matrix
+    delete empCovar_;
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, covariance);
+  }
+  InfectivityPowMRW::Covariance
+  InfectivityPowMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
+  }
+
+  void
+  InfectivityPowMRW::update()
+  {
+    // Save old values
+    std::vector<double> oldParams(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); i++)
+      oldParams[i] = updateGroup_[i].getValue();
+
+    // Update empirical covariance
+    empCovar_->sample();
+
+    // Calculate current posterior
+    double logPiCur = logLikelihood_.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCur += log(updateGroup_[p].prior());
+
+    // Propose as in Haario, Sachs, Tamminen (2001)
+    Random::Variates logvars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+                / updateGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            logvars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      logvars = random_.mvgauss(*stdCov_);
+
+    // Log MRW proposal
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      updateGroup_[p].setValue(updateGroup_[p].getValue() * exp(logvars[p]));
+
+    // Update species infectivity covars
+    int counter = 0;
+    for(Population<TestCovars>::PopulationIterator it = env_->pop_.begin();
+        it != env_->pop_.end();
+        ++it,++counter)
+      {
+        const TestCovars& covars(it->getCovariates());
+        (*cache_)(counter,0) = covars.cattleinf;
+        (*cache_)(counter,1) = covars.pigsinf;
+        (*cache_)(counter,2) = covars.sheepinf;
+        const_cast<TestCovars&>(it->getCovariates()).cattleinf = pow(covars.cattle,updateGroup_[0].getValue());
+        const_cast<TestCovars&>(it->getCovariates()).pigsinf = pow(covars.pigs,updateGroup_[1].getValue());
+        const_cast<TestCovars&>(it->getCovariates()).sheepinf = pow(covars.sheep,updateGroup_[2].getValue());
+      }
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    double logPiCan = logLikCan.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCan += log(updateGroup_[p].prior());
+
+    // Proposal ratio
+    double qRatio = 0.0;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      qRatio += log(updateGroup_[p].getValue() / oldParams[p]);
+
+    // Accept or reject
+    double accept = logPiCan - logPiCur + qRatio;
+    if (log(random_.uniform()) < accept)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        for (size_t p = 0; p < updateGroup_.size(); ++p)
+          updateGroup_[p].setValue(oldParams[p]);
+        counter = 0;
+        for(Population<TestCovars>::PopulationIterator it = env_->pop_.begin();
+            it != env_->pop_.end();
+            it++, counter++)
+          {
+            const_cast<TestCovars&>(it->getCovariates()).cattleinf = (*cache_)(counter,0);
+            const_cast<TestCovars&>(it->getCovariates()).pigsinf = (*cache_)(counter,1);
+            const_cast<TestCovars&>(it->getCovariates()).sheepinf = (*cache_)(counter,2);
+          }
+      }
+
+    ++numUpdates_;
+  }
+
+
+
+  SusceptibilityPowMRW::SusceptibilityPowMRW(const std::string& tag,
+      UpdateBlock& params, size_t burnin, Random& rng,
+      Likelihood& logLikelihood, Mcmc* const env) :
+    McmcUpdate(tag, rng, logLikelihood, env), updateGroup_(params), burnin_(
+        burnin)
+  {
+
+    // Initialize the standard covariance
+    stdCov_ = new EmpCovar<LogTransform>::CovMatrix(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); ++i)
+      {
+        for (size_t j = 0; j < updateGroup_.size(); ++j)
+          {
+            if (i == j)
+              (*stdCov_)(i, j) = 0.01 / updateGroup_.size();
+            else
+              (*stdCov_)(i, j) = 0.0;
+          }
+      }
+
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, *stdCov_);
+
+    // Create species inf cache
+    cache_ = new ublas::matrix<double>(env->pop_.size(),params.size());
+
+  }
+  ;
+
+  SusceptibilityPowMRW::~SusceptibilityPowMRW()
+  {
+    delete empCovar_;
+    delete stdCov_;
+    delete cache_;
+  }
+
+  void
+  SusceptibilityPowMRW::setCovariance(
+      EmpCovar<LogTransform>::CovMatrix& covariance)
+  {
+    // Start the empirical covariance matrix
+    delete empCovar_;
+    empCovar_ = new EmpCovar<LogTransform> (updateGroup_, covariance);
+  }
+  SusceptibilityPowMRW::Covariance
+  SusceptibilityPowMRW::getCovariance() const
+  {
+    return empCovar_->getCovariance();
+  }
+
+  void
+  SusceptibilityPowMRW::update()
+  {
+    // Save old values
+    std::vector<double> oldParams(updateGroup_.size());
+    for (size_t i = 0; i < updateGroup_.size(); i++)
+      oldParams[i] = updateGroup_[i].getValue();
+
+    // Update empirical covariance
+    empCovar_->sample();
+
+    // Calculate current posterior
+    double logPiCur = logLikelihood_.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCur += log(updateGroup_[p].prior());
+
+    // Propose as in Haario, Sachs, Tamminen (2001)
+    Random::Variates logvars;
+    if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
+      {
+        try
+          {
+            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+                / updateGroup_.size());
+          }
+        catch (cholesky_error& e)
+          {
+            logvars = random_.mvgauss(*stdCov_);
+          }
+      }
+    else
+      logvars = random_.mvgauss(*stdCov_);
+
+    // Log MRW proposal
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      updateGroup_[p].setValue(updateGroup_[p].getValue() * exp(logvars[p]));
+
+    // Update species infectivity covars
+    int counter = 0;
+    for(Population<TestCovars>::PopulationIterator it = env_->pop_.begin();
+        it != env_->pop_.end();
+        ++it,++counter)
+      {
+        const TestCovars& covars(it->getCovariates());
+        (*cache_)(counter,0) = covars.cattlesusc;
+        (*cache_)(counter,1) = covars.pigssusc;
+        (*cache_)(counter,2) = covars.sheepsusc;
+        const_cast<TestCovars&>(it->getCovariates()).cattlesusc = pow(covars.cattle,updateGroup_[0].getValue());
+        const_cast<TestCovars&>(it->getCovariates()).pigssusc = pow(covars.pigs,updateGroup_[1].getValue());
+        const_cast<TestCovars&>(it->getCovariates()).sheepsusc = pow(covars.sheep,updateGroup_[2].getValue());
+      }
+
+    // Calculate candidate posterior
+    Likelihood logLikCan;
+    env_->calcLogLikelihood(logLikCan);
+
+    double logPiCan = logLikCan.global;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      logPiCan += log(updateGroup_[p].prior());
+
+    // Proposal ratio
+    double qRatio = 0.0;
+    for (size_t p = 0; p < updateGroup_.size(); ++p)
+      qRatio += log(updateGroup_[p].getValue() / oldParams[p]);
+
+    // Accept or reject
+    double accept = logPiCan - logPiCur + qRatio;
+    if (log(random_.uniform()) < accept)
+      {
+        logLikelihood_ = logLikCan;
+        acceptance_++;
+      }
+    else
+      {
+        for (size_t p = 0; p < updateGroup_.size(); ++p)
+          updateGroup_[p].setValue(oldParams[p]);
+        counter = 0;
+        for(Population<TestCovars>::PopulationIterator it = env_->pop_.begin();
+            it != env_->pop_.end();
+            it++, counter++)
+          {
+            const_cast<TestCovars&>(it->getCovariates()).cattlesusc = (*cache_)(counter,0);
+            const_cast<TestCovars&>(it->getCovariates()).pigssusc = (*cache_)(counter,1);
+            const_cast<TestCovars&>(it->getCovariates()).sheepsusc = (*cache_)(counter,2);
+          }
+      }
+
+    ++numUpdates_;
+  }
+
 
 
   SellkeSerializer::SellkeSerializer(const std::string filename, Random& rng, Likelihood& logLikelihood, Mcmc* const env)

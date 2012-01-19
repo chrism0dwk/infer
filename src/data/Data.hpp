@@ -41,6 +41,9 @@ struct TestCovars {
   long int sheep;
   long int goats;
   long int deer;
+  double cattlesusc,cattleinf;
+  double pigssusc,pigsinf;
+  double sheepsusc,sheepinf;
 };
 
 

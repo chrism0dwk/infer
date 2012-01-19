@@ -31,6 +31,7 @@
 #include <set>
 #include <vector>
 #include <map>
+#include <amdlibm.h>
 #include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
@@ -63,6 +64,8 @@ namespace EpiRisk
   class SpeciesMRW;
   class SusceptibilityMRW;
   class InfectivityMRW;
+  class SusceptibilityPowMRW;
+  class InfectivityPowMRW;
   class SellkeSerializer;
 
   struct DIC {
@@ -89,12 +92,15 @@ namespace EpiRisk
 
     friend class SusceptibilityMRW;
     friend class InfectivityMRW;
+    friend class SusceptibilityPowMRW;
+    friend class InfectivityPowMRW;
     friend class SellkeSerializer;
 
     Population<TestCovars>& pop_;
     Parameters& txparams_;
     Parameters& dxparams_;
     Likelihood logLikelihood_;
+    Likelihood testLik_;
     Random* random_;
 
     boost::ptr_list<McmcUpdate> updateStack_;
@@ -129,6 +135,8 @@ namespace EpiRisk
     virtual
     double
     infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
+    double
+    infecsuscep(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
     virtual
     double
     beta(const Population<TestCovars>::Individual& i, const Population<
@@ -221,6 +229,10 @@ namespace EpiRisk
     newInfectivityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
     SusceptibilityMRW*
     newSusceptibilityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    InfectivityPowMRW*
+    newInfectivityPowMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
+    SusceptibilityPowMRW*
+    newSusceptibilityPowMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SellkeSerializer*
     newSellkeSerializer(const string filename);
     void

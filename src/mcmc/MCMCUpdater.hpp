@@ -214,6 +214,50 @@ namespace EpiRisk
 
   };
 
+
+  class InfectivityPowMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    InfectivityPowMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& rng, Likelihood& logLikelihood, Mcmc* const env);
+    ~InfectivityPowMRW();
+    void
+    setCovariance(EmpCovar<LogTransform>::CovMatrix& covariance);
+    Covariance
+    getCovariance() const;
+    void
+    update();
+  private:
+    UpdateBlock& updateGroup_;
+    size_t burnin_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+    ublas::matrix<double>* cache_;
+  };
+
+
+  class SusceptibilityPowMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    SusceptibilityPowMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& rng, Likelihood& logLikelihood, Mcmc* const env);
+    ~SusceptibilityPowMRW();
+    void
+    setCovariance(EmpCovar<LogTransform>::CovMatrix& covariance);
+    Covariance
+    getCovariance() const;
+    void
+    update();
+  private:
+    UpdateBlock& updateGroup_;
+    size_t burnin_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+    ublas::matrix<double>* cache_;
+  };
+
   //! SellkeSerializer writes out integrated infectious pressure for each individual
   class SellkeSerializer : public McmcUpdate
   {

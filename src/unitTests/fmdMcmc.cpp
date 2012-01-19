@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_short.con");//uk_infec_25km.con");
+  myPopulation->loadConnectionGraph("/storage/stsiab/FMD2001/data/fmd2001_uk_infec_25km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -336,12 +336,12 @@ int main(int argc, char* argv[])
   txparams(4) = Parameter(1.0,GammaPrior(1,1),"xi_c");
   txparams(5) = Parameter(0.00205606,GammaPrior(1,1),"xi_p");
   txparams(6) = Parameter(0.613016,GammaPrior(1,1),"xi_s");
-  txparams(7) = Parameter(0.237344,BetaPrior(2,2),"psi_c");
-  txparams(8) = Parameter(0.665464,BetaPrior(2,2),"psi_p");
-  txparams(9) = Parameter(0.129998,BetaPrior(2,2),"psi_s");
-  txparams(10) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
-  txparams(11) = Parameter(0.000295018,GammaPrior(1,1),"zeta_p");
-  txparams(12) = Parameter(0.259683,GammaPrior(1,1),"zeta_s");
+  txparams(7) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
+  txparams(8) = Parameter(0.000295018,GammaPrior(1,1),"zeta_p");
+  txparams(9) = Parameter(0.259683,GammaPrior(1,1),"zeta_s");
+  txparams(10) = Parameter(0.237344,BetaPrior(2,2),"psi_c");
+  txparams(11) = Parameter(0.665464,BetaPrior(2,2),"psi_p");
+  txparams(12) = Parameter(0.129998,BetaPrior(2,2),"psi_s");
   txparams(13) = Parameter(0.402155,BetaPrior(2,2),"phi_c");
   txparams(14) = Parameter(0.749019,BetaPrior(2,2),"phi_p");
   txparams(15) = Parameter(0.365774,BetaPrior(2,2),"phi_s");
@@ -378,14 +378,14 @@ int main(int argc, char* argv[])
   txPsi.add(txparams[7]);
   txPsi.add(txparams[8]);
   txPsi.add(txparams[9]);
-  AdaptiveMultiLogMRW* updatePsi = myMcmc->newAdaptiveMultiLogMRW("txPsi",txPsi, 300);
+  InfectivityPowMRW* updatePsi = myMcmc->newInfectivityPowMRW("txPsi",txPsi, 300);
 
 
   UpdateBlock txPhi;
   txPhi.add(txparams[13]);
   txPhi.add(txparams[14]);
   txPhi.add(txparams[15]);
-  AdaptiveMultiLogMRW* updatePhi = myMcmc->newAdaptiveMultiLogMRW("txPhi",txPhi, 300);
+  SusceptibilityPowMRW* updatePhi = myMcmc->newSusceptibilityPowMRW("txPhi",txPhi, 300);
 
   UpdateBlock txInfec;
   txInfec.add(txparams[0]);

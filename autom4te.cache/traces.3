@@ -2080,6 +2080,88 @@ AC_MSG_RESULT([$am_cv_prog_tar_$1])])
 AC_SUBST([am__tar])
 AC_SUBST([am__untar])
 ])
+m4trace:m4/ax_prog_cxx_mpi.m4:77: -1- AC_DEFUN([AX_PROG_CXX_MPI], [
+AC_PREREQ(2.50)
+
+# Check for compiler
+# Needs to be split off into an extra macro to ensure right expansion
+# order.
+AC_REQUIRE([_AX_PROG_CXX_MPI],[_AX_PROG_CXX_MPI([$1])])
+
+AS_IF([test x"$_ax_prog_cxx_mpi_mpi_wanted" = xno],
+  [ _ax_prog_cxx_mpi_mpi_found=no ],
+  [
+    AC_LANG_PUSH([C++])
+
+    # test whether MPI::Init is available
+    # We do not use AC_SEARCH_LIBS here, as it caches its outcome and
+    # thus disallows corresponding calls in the other AX_PROG_*_MPI
+    # macros.
+    for lib in NONE mpi mpich; do
+      save_LIBS=$LIBS
+      if test x"$lib" = xNONE; then
+        AC_MSG_CHECKING([for function MPI::Init])
+      else
+        AC_MSG_CHECKING([for function MPI::Init in -l$lib])
+        LIBS="-l$lib $LIBS"
+      fi
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([
+namespace MPI {
+char Init();
+};
+using MPI::Init;],[MPI::Init;])],
+        [ _ax_prog_cxx_mpi_mpi_found=yes ],
+        [ _ax_prog_cxx_mpi_mpi_found=no ])
+      AC_MSG_RESULT($_ax_prog_cxx_mpi_mpi_found)
+      if test "x$_ax_prog_cxx_mpi_mpi_found" = "xyes"; then
+        break;
+      fi
+      LIBS=$save_LIBS
+    done
+
+    # Check for header
+    AS_IF([test x"$_ax_prog_cxx_mpi_mpi_found" = xyes], [
+      AC_MSG_CHECKING([for mpi.h])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <mpi.h>])],
+        [ AC_MSG_RESULT(yes)],
+        [ AC_MSG_RESULT(no)
+         _ax_prog_cxx_mpi_mpi_found=no
+      ])
+    ])
+    AC_LANG_POP([C++])
+])
+
+# Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
+AS_IF([test x"$_ax_prog_cxx_mpi_mpi_found" = xyes], [
+        ifelse([$2],,[AC_DEFINE(HAVE_MPI,1,[Define if you have the MPI library.])],[$2])
+        :
+],[
+        $3
+        :
+])
+
+])
+m4trace:m4/ax_prog_cxx_mpi.m4:161: -1- AC_DEFUN([_AX_PROG_CXX_MPI], [
+  AC_ARG_VAR(MPICXX,[MPI C++ compiler command])
+  ifelse([$1],,[_ax_prog_cxx_mpi_mpi_wanted=yes],[
+    AC_MSG_CHECKING([whether to compile using MPI])
+    if $1; then
+      _ax_prog_cxx_mpi_mpi_wanted=yes
+    else
+      _ax_prog_cxx_mpi_mpi_wanted=no
+    fi
+    AC_MSG_RESULT($_ax_prog_cxx_mpi_mpi_wanted)
+  ])
+  if test x"$_ax_prog_cxx_mpi_mpi_wanted" = xyes; then
+    if test -z "$CXX" && test -n "$MPICXX"; then
+      CXX="$MPICXX"
+    else
+      AC_CHECK_TOOLS([CXX], [mpic++ mpicxx mpiCC sxmpic++ hcp mpxlC_r mpxlC mpixlcxx_r mpixlcxx mpg++ mpc++ mpCC cmpic++ mpiFCC CCicpc pgCC pathCC sxc++ xlC_r xlC bgxlC_r bgxlC openCC sunCC crayCC g++ c++ gpp aCC CC cxx cc++ cl.exe FCC KCC RCC])
+    fi
+  fi
+  AC_PROG_CXX
+])
 m4trace:acinclude.m4:81: -1- AU_DEFUN([ACX_MPI], [m4_if($#, 0, [AX_MPI], [AX_MPI($@)])])
 m4trace:acinclude.m4:81: -1- AC_DEFUN([ACX_MPI], [AC_DIAGNOSE([obsolete], [The macro `ACX_MPI' is obsolete.
 You should run autoupdate.])dnl
@@ -2313,144 +2395,130 @@ AC_PROVIDE_IFELSE([AC_PROG_OBJC],
 m4trace:configure.ac:11: -2- _AM_MANGLE_OPTION([no-dependencies])
 m4trace:configure.ac:11: -1- _AM_IF_OPTION([silent-rules], [AC_REQUIRE([AM_SILENT_RULES])])
 m4trace:configure.ac:11: -2- _AM_MANGLE_OPTION([silent-rules])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXXFLAGS$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^ac_ct_CXX$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^EXEEXT$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^OBJEXT$])
-m4trace:configure.ac:14: -1- _AM_DEPENDENCIES([CXX])
-m4trace:configure.ac:14: -1- AM_SET_DEPDIR
-m4trace:configure.ac:14: -1- m4_pattern_allow([^DEPDIR$])
-m4trace:configure.ac:14: -1- AM_OUTPUT_DEPENDENCY_COMMANDS
-m4trace:configure.ac:14: -1- AM_MAKE_INCLUDE
-m4trace:configure.ac:14: -1- m4_pattern_allow([^am__include$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^am__quote$])
-m4trace:configure.ac:14: -1- AM_DEP_TRACK
-m4trace:configure.ac:14: -1- AM_CONDITIONAL([AMDEP], [test "x$enable_dependency_tracking" != xno])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^AMDEP_TRUE$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^AMDEP_FALSE$])
-m4trace:configure.ac:14: -1- _AM_SUBST_NOTMAKE([AMDEP_TRUE])
-m4trace:configure.ac:14: -1- _AM_SUBST_NOTMAKE([AMDEP_FALSE])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^AMDEPBACKSLASH$])
-m4trace:configure.ac:14: -1- _AM_SUBST_NOTMAKE([AMDEPBACKSLASH])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXXDEPMODE$])
-m4trace:configure.ac:14: -1- AM_CONDITIONAL([am__fastdepCXX], [
-  test "x$enable_dependency_tracking" != xno \
-  && test "$am_cv_CXX_dependencies_compiler_type" = gcc3])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
-m4trace:configure.ac:14: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
-m4trace:configure.ac:14: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXXCPP$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:14: -1- m4_pattern_allow([^CXXCPP$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^CXXFLAGS$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^ac_ct_CXX$])
-m4trace:configure.ac:15: -1- _AM_DEPENDENCIES([CXX])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^CXXDEPMODE$])
-m4trace:configure.ac:15: -1- AM_CONDITIONAL([am__fastdepCXX], [
-  test "x$enable_dependency_tracking" != xno \
-  && test "$am_cv_CXX_dependencies_compiler_type" = gcc3])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
-m4trace:configure.ac:15: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
-m4trace:configure.ac:15: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
-m4trace:configure.ac:15: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
-m4trace:configure.ac:18: -1- AM_PROG_LIBTOOL
-m4trace:configure.ac:18: -1- _m4_warn([obsolete], [The macro `AM_PROG_LIBTOOL' is obsolete.
+m4trace:configure.ac:12: -1- AM_PROG_LIBTOOL
+m4trace:configure.ac:12: -1- _m4_warn([obsolete], [The macro `AM_PROG_LIBTOOL' is obsolete.
 You should run autoupdate.], [/usr/share/aclocal/libtool.m4:103: AM_PROG_LIBTOOL is expanded from...
-configure.ac:18: the top level])
-m4trace:configure.ac:18: -1- LT_INIT
-m4trace:configure.ac:18: -1- m4_pattern_forbid([^_?LT_[A-Z_]+$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^(_LT_EOF|LT_DLGLOBAL|LT_DLLAZY_OR_NOW|LT_MULTI_MODULE)$])
-m4trace:configure.ac:18: -1- LTOPTIONS_VERSION
-m4trace:configure.ac:18: -1- LTSUGAR_VERSION
-m4trace:configure.ac:18: -1- LTVERSION_VERSION
-m4trace:configure.ac:18: -1- LTOBSOLETE_VERSION
-m4trace:configure.ac:18: -1- _LT_PROG_LTMAIN
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LIBTOOL$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^build$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^build_cpu$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^build_vendor$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^build_os$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^host$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^host_cpu$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^host_vendor$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^host_os$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CFLAGS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^ac_ct_CC$])
-m4trace:configure.ac:18: -1- _AM_DEPENDENCIES([CC])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CCDEPMODE$])
-m4trace:configure.ac:18: -1- AM_CONDITIONAL([am__fastdepCC], [
+configure.ac:12: the top level])
+m4trace:configure.ac:12: -1- LT_INIT
+m4trace:configure.ac:12: -1- m4_pattern_forbid([^_?LT_[A-Z_]+$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^(_LT_EOF|LT_DLGLOBAL|LT_DLLAZY_OR_NOW|LT_MULTI_MODULE)$])
+m4trace:configure.ac:12: -1- LTOPTIONS_VERSION
+m4trace:configure.ac:12: -1- LTSUGAR_VERSION
+m4trace:configure.ac:12: -1- LTVERSION_VERSION
+m4trace:configure.ac:12: -1- LTOBSOLETE_VERSION
+m4trace:configure.ac:12: -1- _LT_PROG_LTMAIN
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LIBTOOL$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^build$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^build_cpu$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^build_vendor$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^build_os$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^host$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^host_cpu$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^host_vendor$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^host_os$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CFLAGS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LIBS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^ac_ct_CC$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^EXEEXT$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^OBJEXT$])
+m4trace:configure.ac:12: -1- _AM_DEPENDENCIES([CC])
+m4trace:configure.ac:12: -1- AM_SET_DEPDIR
+m4trace:configure.ac:12: -1- m4_pattern_allow([^DEPDIR$])
+m4trace:configure.ac:12: -1- AM_OUTPUT_DEPENDENCY_COMMANDS
+m4trace:configure.ac:12: -1- AM_MAKE_INCLUDE
+m4trace:configure.ac:12: -1- m4_pattern_allow([^am__include$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^am__quote$])
+m4trace:configure.ac:12: -1- AM_DEP_TRACK
+m4trace:configure.ac:12: -1- AM_CONDITIONAL([AMDEP], [test "x$enable_dependency_tracking" != xno])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^AMDEP_TRUE$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^AMDEP_FALSE$])
+m4trace:configure.ac:12: -1- _AM_SUBST_NOTMAKE([AMDEP_TRUE])
+m4trace:configure.ac:12: -1- _AM_SUBST_NOTMAKE([AMDEP_FALSE])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^AMDEPBACKSLASH$])
+m4trace:configure.ac:12: -1- _AM_SUBST_NOTMAKE([AMDEPBACKSLASH])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CCDEPMODE$])
+m4trace:configure.ac:12: -1- AM_CONDITIONAL([am__fastdepCC], [
   test "x$enable_dependency_tracking" != xno \
   && test "$am_cv_CC_dependencies_compiler_type" = gcc3])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCC_TRUE$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCC_FALSE$])
-m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_TRUE])
-m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_FALSE])
-m4trace:configure.ac:18: -1- LT_PATH_LD
-m4trace:configure.ac:18: -1- m4_pattern_allow([^SED$])
-m4trace:configure.ac:18: -1- AC_PROG_EGREP
-m4trace:configure.ac:18: -1- m4_pattern_allow([^GREP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^EGREP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^FGREP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^GREP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LD$])
-m4trace:configure.ac:18: -1- LT_PATH_NM
-m4trace:configure.ac:18: -1- m4_pattern_allow([^DUMPBIN$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^ac_ct_DUMPBIN$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^DUMPBIN$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^NM$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LN_S$])
-m4trace:configure.ac:18: -1- LT_CMD_MAX_LEN
-m4trace:configure.ac:18: -1- m4_pattern_allow([^OBJDUMP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^OBJDUMP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^AR$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^STRIP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^RANLIB$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([LT_OBJDIR])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LT_OBJDIR$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^lt_ECHO$])
-m4trace:configure.ac:18: -1- _LT_CC_BASENAME([$compiler])
-m4trace:configure.ac:18: -1- _LT_PATH_TOOL_PREFIX([${ac_tool_prefix}file], [/usr/bin$PATH_SEPARATOR$PATH])
-m4trace:configure.ac:18: -1- _LT_PATH_TOOL_PREFIX([file], [/usr/bin$PATH_SEPARATOR$PATH])
-m4trace:configure.ac:18: -1- LT_SUPPORTED_TAG([CC])
-m4trace:configure.ac:18: -1- _LT_COMPILER_BOILERPLATE
-m4trace:configure.ac:18: -1- _LT_LINKER_BOILERPLATE
-m4trace:configure.ac:18: -1- _LT_COMPILER_OPTION([if $compiler supports -fno-rtti -fno-exceptions], [lt_cv_prog_compiler_rtti_exceptions], [-fno-rtti -fno-exceptions], [], [_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, )="$_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, ) -fno-rtti -fno-exceptions"])
-m4trace:configure.ac:18: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, ) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, )], [$_LT_TAGVAR(lt_prog_compiler_pic, )@&t@m4_if([],[],[ -DPIC],[m4_if([],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, ) in
+m4trace:configure.ac:12: -1- m4_pattern_allow([^am__fastdepCC_TRUE$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^am__fastdepCC_FALSE$])
+m4trace:configure.ac:12: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_TRUE])
+m4trace:configure.ac:12: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_FALSE])
+m4trace:configure.ac:12: -1- LT_PATH_LD
+m4trace:configure.ac:12: -1- m4_pattern_allow([^SED$])
+m4trace:configure.ac:12: -1- AC_PROG_EGREP
+m4trace:configure.ac:12: -1- m4_pattern_allow([^GREP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^EGREP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^FGREP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^GREP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LD$])
+m4trace:configure.ac:12: -1- LT_PATH_NM
+m4trace:configure.ac:12: -1- m4_pattern_allow([^DUMPBIN$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^ac_ct_DUMPBIN$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^DUMPBIN$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^NM$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LN_S$])
+m4trace:configure.ac:12: -1- LT_CMD_MAX_LEN
+m4trace:configure.ac:12: -1- m4_pattern_allow([^OBJDUMP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^OBJDUMP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^AR$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^STRIP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^RANLIB$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([LT_OBJDIR])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LT_OBJDIR$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^lt_ECHO$])
+m4trace:configure.ac:12: -1- _LT_CC_BASENAME([$compiler])
+m4trace:configure.ac:12: -1- _LT_PATH_TOOL_PREFIX([${ac_tool_prefix}file], [/usr/bin$PATH_SEPARATOR$PATH])
+m4trace:configure.ac:12: -1- _LT_PATH_TOOL_PREFIX([file], [/usr/bin$PATH_SEPARATOR$PATH])
+m4trace:configure.ac:12: -1- LT_SUPPORTED_TAG([CC])
+m4trace:configure.ac:12: -1- _LT_COMPILER_BOILERPLATE
+m4trace:configure.ac:12: -1- _LT_LINKER_BOILERPLATE
+m4trace:configure.ac:12: -1- _LT_COMPILER_OPTION([if $compiler supports -fno-rtti -fno-exceptions], [lt_cv_prog_compiler_rtti_exceptions], [-fno-rtti -fno-exceptions], [], [_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, )="$_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, ) -fno-rtti -fno-exceptions"])
+m4trace:configure.ac:12: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, ) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, )], [$_LT_TAGVAR(lt_prog_compiler_pic, )@&t@m4_if([],[],[ -DPIC],[m4_if([],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, ) in
      "" | " "*) ;;
      *) _LT_TAGVAR(lt_prog_compiler_pic, )=" $_LT_TAGVAR(lt_prog_compiler_pic, )" ;;
      esac], [_LT_TAGVAR(lt_prog_compiler_pic, )=
      _LT_TAGVAR(lt_prog_compiler_can_build_shared, )=no])
-m4trace:configure.ac:18: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, )=])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^DSYMUTIL$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^NMEDIT$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^LIPO$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^OTOOL$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^OTOOL64$])
-m4trace:configure.ac:18: -1- LT_SYS_DLOPEN_SELF
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CPP$])
+m4trace:configure.ac:12: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, )=])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^DSYMUTIL$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^NMEDIT$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^LIPO$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^OTOOL$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^OTOOL64$])
+m4trace:configure.ac:12: -1- LT_SYS_DLOPEN_SELF
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CPP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^CPP$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^STDC_HEADERS$])
+m4trace:configure.ac:12: -1- m4_pattern_allow([^HAVE_DLFCN_H$])
+m4trace:configure.ac:18: -1- AX_PROG_CXX_MPI([], [AX_MSG_RESULT([mpi found])], [AX_MSG_RESULT([not found]) AX_MSG_ERROR([MPI compiler not found])])
+m4trace:configure.ac:18: -1- _AX_PROG_CXX_MPI([])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^MPICXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^ac_ct_CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXFLAGS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^LIBS$])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^CPP$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^STDC_HEADERS$])
-m4trace:configure.ac:18: -1- m4_pattern_allow([^HAVE_DLFCN_H$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^ac_ct_CXX$])
+m4trace:configure.ac:18: -1- _AM_DEPENDENCIES([CXX])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXDEPMODE$])
+m4trace:configure.ac:18: -1- AM_CONDITIONAL([am__fastdepCXX], [
+  test "x$enable_dependency_tracking" != xno \
+  && test "$am_cv_CXX_dependencies_compiler_type" = gcc3])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
+m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
+m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
 m4trace:configure.ac:18: -1- LT_LANG([CXX])
 m4trace:configure.ac:18: -1- LT_SUPPORTED_TAG([CXX])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
@@ -2469,6 +2537,32 @@ m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
 m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
 m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
+m4trace:configure.ac:18: -1- LT_LANG([CXX])
+m4trace:configure.ac:18: -1- _m4_warn([syntax], [AC_REQUIRE: `AC_PROG_CXX' was expanded before it was required], [../../lib/autoconf/c.m4:636: AC_PROG_CXXCPP is expanded from...
+/usr/share/aclocal/libtool.m4:5337: _LT_PROG_CXX is expanded from...
+/usr/share/aclocal/libtool.m4:5360: _LT_LANG_CXX_CONFIG is expanded from...
+/usr/share/aclocal/libtool.m4:785: _LT_LANG is expanded from...
+/usr/share/aclocal/libtool.m4:768: LT_LANG is expanded from...
+m4/ax_prog_cxx_mpi.m4:161: _AX_PROG_CXX_MPI is expanded from...
+m4/ax_prog_cxx_mpi.m4:77: AX_PROG_CXX_MPI is expanded from...
+configure.ac:18: the top level])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXFLAGS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^LIBS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^ac_ct_CXX$])
+m4trace:configure.ac:18: -1- _AM_DEPENDENCIES([CXX])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXDEPMODE$])
+m4trace:configure.ac:18: -1- AM_CONDITIONAL([am__fastdepCXX], [
+  test "x$enable_dependency_tracking" != xno \
+  && test "$am_cv_CXX_dependencies_compiler_type" = gcc3])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
+m4trace:configure.ac:18: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
+m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
+m4trace:configure.ac:18: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
+m4trace:configure.ac:18: -1- LT_LANG([CXX])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXCPP$])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^CPPFLAGS$])
 m4trace:configure.ac:18: -1- m4_pattern_allow([^CXXCPP$])
@@ -2483,16 +2577,6 @@ m4trace:configure.ac:18: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAG
      esac], [_LT_TAGVAR(lt_prog_compiler_pic, CXX)=
      _LT_TAGVAR(lt_prog_compiler_can_build_shared, CXX)=no])
 m4trace:configure.ac:18: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works_CXX], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, CXX)=])
-m4trace:configure.ac:40: -1- AX_MPI
-m4trace:configure.ac:40: -1- m4_pattern_allow([^MPICXX$])
-m4trace:configure.ac:40: -1- m4_pattern_allow([^MPICXX$])
-m4trace:configure.ac:40: -1- m4_pattern_allow([^MPICXX$])
-m4trace:configure.ac:40: -1- _m4_warn([obsolete], [The macro `AC_TRY_COMPILE' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:2581: AC_TRY_COMPILE is expanded from...
-acinclude.m4:82: AX_MPI is expanded from...
-configure.ac:40: the top level])
-m4trace:configure.ac:40: -1- m4_pattern_allow([^MPILIBS$])
-m4trace:configure.ac:40: -1- m4_pattern_allow([^HAVE_MPI$])
 m4trace:configure.ac:45: -1- m4_pattern_allow([^OPENMP_CXXFLAGS$])
 m4trace:configure.ac:46: -1- m4_pattern_allow([^GSL_LIBS$])
 m4trace:configure.ac:48: -1- _m4_warn([obsolete], [AC_OUTPUT should be used without arguments.

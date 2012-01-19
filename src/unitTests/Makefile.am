@@ -5,19 +5,19 @@ bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead
 noinst_HEADERS = fmdModel.hpp
 
 fmdMcmc_SOURCES = fmdMcmc.cpp
-fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lboost_mpi -lboost_serialization
+fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lboost_mpi -lboost_serialization @GSL_LIBS@ @MATHLIB@
 
 fmdSim_SOURCES = fmdSim.cpp fmdModel.cpp
-fmdSim_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la -lboost_program_options
+fmdSim_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la -lboost_program_options @GSL_LIBS@ @MATHLIB@
 
 testLikelihood_SOURCES = testLikelihood.cpp
-testLikelihood_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lboost_mpi -lboost_serialization
+testLikelihood_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la -lboost_mpi -lboost_serialization @GSL_LIBS@ @MATHLIB@
 
 testPosteriorReader_SOURCES = testPosteriorReader.cpp
 testPosteriorReader_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la
 
 fmdOneStepAhead_SOURCES = fmdOneStepAhead.cpp fmdModel.cpp
-fmdOneStepAhead_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options
+fmdOneStepAhead_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la @GSL_LIBS@ -lboost_program_options @MATHLIB@
 
 fmdSellkeDiagnostic_SOURCES = fmdSellkeDiagnostic.cpp fmdModel.cpp
-fmdSellkeDiagnostic_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la -lgslcblas -lgsl -lboost_program_options
+fmdSellkeDiagnostic_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la @GSL_LIBS@ -lboost_program_options @MATHLIB@
