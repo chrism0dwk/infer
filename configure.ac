@@ -27,6 +27,7 @@ MATHLIB=$with_mathlib
 
 # Checks for Boost Base
 AX_BOOST_BASE([1.47.0], , [AC_MSG_ERROR([Boost library not found])])
+AC_CHECK_LIB([boost_mpi], [all_reduce])
 
 # Checks for header files.
 AC_CHECK_HEADER([gsl/gsl_version.h], ,
