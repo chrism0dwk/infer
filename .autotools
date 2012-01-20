@@ -64,7 +64,7 @@
 <option id="program-suffix" value=""/>
 <option id="program-transform-name" value=""/>
 <option id="enable-maintainer-mode" value="false"/>
-<option id="user" value="--with-mathlib=-lamdlibm --with-boost=/usr/local/packages/boost_1_48_0 --with-gsl=/usr/local/packages/gsl-1.15"/>
+<option id="user" value="--with-mathlib=&quot;-L${AMDLIBMLIB} -lamdlibm&quot; --with-boost=/usr/local/packages/boost_1_48_0 --with-gsl=/usr/local/packages/gsl-1.15"/>
 <option id="autogen" value="autogen.sh"/>
 <option id="autogenOpts" value=""/>
 </configuration>
