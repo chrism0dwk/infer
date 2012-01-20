@@ -29,7 +29,7 @@
 #include <iomanip>
 #include <gsl/gsl_cdf.h>
 #include <sys/time.h>
-#include <amdlibm.h>
+
 
 //#ifdef __LINUX__
 //#include <acml_mv.h>

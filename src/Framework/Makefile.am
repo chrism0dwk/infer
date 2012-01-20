@@ -1,3 +1,4 @@
+AM_CPPFLAGS = @BOOST_CPPFLAGS@ @GSL_CPPFLAGS@
 METASOURCES = AUTO
 noinst_LTLIBRARIES = libstlstrtok.la librandom.la
 noinst_HEADERS = stlStrTok.hpp Random.hpp Individual.hpp \

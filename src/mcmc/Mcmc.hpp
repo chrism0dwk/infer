@@ -31,7 +31,6 @@
 #include <set>
 #include <vector>
 #include <map>
-#include <amdlibm.h>
 #include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
