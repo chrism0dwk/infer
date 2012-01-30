@@ -268,8 +268,27 @@ namespace EpiRisk
             it != population_.end();
             it++)
           {
+            cerr << "Checking connection graph symmetry for '" << it->getId() << "', idx " << distance(population_.begin(),it) << endl;
+            for(typename Individual::ConnectionList::const_iterator ptr = it->getConnectionList().begin();
+                ptr != it->getConnectionList().end();
+                ptr++)
+              {
+                const Individual& j = **ptr;
+                typename Individual::ConnectionList::const_iterator found = find(j.getConnectionList().begin(), j.getConnectionList().end(), &(*it));
+                if (found == j.getConnectionList().end()) {
+                    //cerr << "WARNING: Symmetrifying pair (" << it->getId() << "," << j.getId() << ")" << endl;
+                    const_cast<typename Individual::ConnectionList&>(j.getConnectionList()).push_back(&(*it));
+                }
+              }
+          }
+
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          {
             const_cast<Individual&>(*it).sortConnections();
           }
+
       }
       //@}
 

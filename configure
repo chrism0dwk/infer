@@ -15579,14 +15579,14 @@ fi
 CPPFLAGS_SAVED=$CPPFLAGS
 CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
 LDFLAGS_SAVED=$LDFLAGS
-LDFLAGS="$LDFLAGS $BOOST_LDFLAGS"
+LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for MPI_Allreduce in -lboost_mpi" >&5
 $as_echo_n "checking for MPI_Allreduce in -lboost_mpi... " >&6; }
 if test "${ac_cv_lib_boost_mpi_MPI_Allreduce+set}" = set; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lboost_mpi  $LIBS"
+LIBS="-lboost_mpi -lboost_serialization $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 

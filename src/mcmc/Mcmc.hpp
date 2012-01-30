@@ -134,8 +134,6 @@ namespace EpiRisk
     virtual
     double
     infectivity(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
-    double
-    infecsuscep(const Population<TestCovars>::Individual& i, const Population<TestCovars>::Individual& j) const;
     virtual
     double
     beta(const Population<TestCovars>::Individual& i, const Population<

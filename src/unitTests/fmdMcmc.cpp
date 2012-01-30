@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
   dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
 
   Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
-  myMcmc->setNumIUpdates(200);
+  myMcmc->setNumIUpdates(20);
 
   std::vector<double> infAlpha(3);
   infAlpha[0] = 757.34;
@@ -375,9 +375,9 @@ int main(int argc, char* argv[])
 
 
   UpdateBlock txPsi;
-  txPsi.add(txparams[7]);
-  txPsi.add(txparams[8]);
-  txPsi.add(txparams[9]);
+  txPsi.add(txparams[10]);
+  txPsi.add(txparams[11]);
+  txPsi.add(txparams[12]);
   InfectivityPowMRW* updatePsi = myMcmc->newInfectivityPowMRW("txPsi",txPsi, 300);
 
 
@@ -395,8 +395,8 @@ int main(int argc, char* argv[])
 
   UpdateBlock txSuscep;
   txSuscep.add(txparams[0]);
-  txSuscep.add(txparams[11]);
-  txSuscep.add(txparams[12]);
+  txSuscep.add(txparams[8]);
+  txSuscep.add(txparams[9]);
   SusceptibilityMRW* updateSuscep = myMcmc->newSusceptibilityMRW("txSuscep",txSuscep, txPhi, 300);
 
 //  AdaptiveMultiMRW* updatePhiLin = myMcmc->newAdaptiveMultiMRW("txPhiLin",txPhi,1000);
@@ -426,8 +426,8 @@ int main(int argc, char* argv[])
   ofstream covFile(covFn.str().c_str());
   if(covFile.is_open()) {
       covFile << "txDistance:" << updateDistance->getCovariance() << "\n";
-      covFile << "txPsi:" << updatePsi->getCovariance() << "\n";
-      covFile << "txPhi:" << updatePhi->getCovariance() << "\n";
+      //covFile << "txPsi:" << updatePsi->getCovariance() << "\n";
+      //covFile << "txPhi:" << updatePhi->getCovariance() << "\n";
       covFile << "txInfec:" << updateInfec->getCovariance() << "\n";
       covFile << "txSuscep:" << updateSuscep->getCovariance() << "\n";
   }

@@ -33,7 +33,7 @@
 #include <boost/mpi/collectives.hpp>
 
 
-#define ADAPTIVESCALE 4.0
+#define ADAPTIVESCALE 1.0
 
 namespace EpiRisk
 {
@@ -377,9 +377,9 @@ namespace EpiRisk
         it != env_->pop_.infecEnd();
         it++)
       {
-        constants_[0] += it->getCovariates().cattle;
-        constants_[1] += it->getCovariates().pigs;
-        constants_[2] += it->getCovariates().sheep;
+        constants_[0] += it->getCovariates().cattleinf;
+        constants_[1] += it->getCovariates().pigsinf;
+        constants_[2] += it->getCovariates().sheepinf;
       }
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
@@ -507,9 +507,9 @@ namespace EpiRisk
         it != env_->pop_.end();
         ++it)
       {
-        constants_[0] += it->getCovariates().cattle;
-        constants_[1] += it->getCovariates().pigs;
-        constants_[2] += it->getCovariates().sheep;
+        constants_[0] += it->getCovariates().cattlesusc;
+        constants_[1] += it->getCovariates().pigssusc;
+        constants_[2] += it->getCovariates().sheepsusc;
       }
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
@@ -962,10 +962,13 @@ namespace EpiRisk
 
     // Accept or reject
     double accept = logPiCan - logPiCur + qRatio;
+
+    cerr << "SUSCEP POW ACCEPT/REJECT = " << accept << endl;
     if (log(random_.uniform()) < accept)
       {
         logLikelihood_ = logLikCan;
         acceptance_++;
+        cerr << "ACCEPT SUSCEP POW" << endl;
       }
     else
       {
@@ -980,6 +983,7 @@ namespace EpiRisk
             const_cast<TestCovars&>(it->getCovariates()).pigssusc = (*cache_)(counter,1);
             const_cast<TestCovars&>(it->getCovariates()).sheepsusc = (*cache_)(counter,2);
           }
+        cerr << "REJECT SUSCEP POW" << endl;
       }
 
     ++numUpdates_;
