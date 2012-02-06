@@ -61,20 +61,20 @@ namespace EpiRisk
     class Individual
     {
     private:
-    struct CmpConnections
-    {
-      bool operator()(const Individual* lhs, const Individual* rhs) const
-      {
-        return lhs->getI() < rhs->getI();
-      }
-    };
+//    struct CmpConnections
+//    {
+//      bool operator()(const Individual* lhs, const Individual* rhs) const
+//      {
+//        return lhs->getI() < rhs->getI();
+//      }
+//    };
 
     public:
 
     typedef Covars CovarsType;
     typedef Contact< Individual<Covars> > ContactType;
     typedef set<ContactType> ContactList;
-    typedef std::vector<const Individual*> ConnectionList;
+    typedef std::vector<size_t> ConnectionList;
 
 
     private:
@@ -281,7 +281,7 @@ namespace EpiRisk
       void
       sortConnections()
       {
-        sort(connections_.begin(),connections_.end(),CmpConnections());
+        sort(connections_.begin(),connections_.end());
       }
       // Miscellaneous methods
       bool

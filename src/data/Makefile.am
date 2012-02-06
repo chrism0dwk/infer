@@ -1,5 +1,5 @@
 INCLUDES = -I$(top_srcdir)/src/Framework
-AM_CPPFLAGS = @GSL_CPPFLAGS@
+AM_CPPFLAGS = @GSL_CPPFLAGS@ @BOOST_CPPFLAGS@
 METASOURCES = AUTO
 noinst_LTLIBRARIES = libdata.la libPosteriorReader.la
 noinst_HEADERS = Data.hpp PosteriorReader.hpp

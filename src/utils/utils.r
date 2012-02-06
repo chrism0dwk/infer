@@ -29,3 +29,32 @@ read.empcov <- function(filename)
 	
 	return (empCovariances)
 }
+
+
+
+
+mcconvergence <- function(posterior)
+  {
+    require(Matrix)
+    # Computes Markov chain convergence
+    sigma <- cov(posterior)
+    ndims <- dim(sigma)[1]
+    sigmainv <- solve(sigma)
+
+    # Normalise sigmainv
+    C=diag(diag(sigmainv)^(-0.5),nrow=ndims)%*%sigmainv%*%diag(diag(sigmainv)^(-0.5),nrow=ndims)
+
+    # Compute B = (I-L)^-1 %*% U
+    L=tril(C)
+    diag(L)<-rep(0,ndims)
+    U=triu(C)
+    diag(L)<-rep(0,ndims)
+    B = solve(diag(rep(1,ndims))-L)%*%U
+
+    # Get ratio of L2 norm to L1 norm
+    sigma.eigens=eigen(sigma)$values
+    adap = (sum(sigma.eigens^2)/length(sigma.eigens)) / (sum(sigma.eigens)^2/length(sigma.eigens))
+
+    # return
+    return(list(adap=adap,conveigs=eigen(B)$values))
+  }

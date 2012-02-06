@@ -259,25 +259,28 @@ namespace EpiRisk
             stlStrTok(toks,line,",");
             if(toks.size() != 2) break;
             if(toks[0] == toks[1]) continue; // Don't connect to self!
-            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).push_back(&(getById(toks[1])));
+
+            // Get index of toks[1] in population
+            size_t idx = distance(population_.begin(),asPop(idIndex_.find(toks[1])));
+            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).push_back(idx);
         }
 
         confile.close();
 
-        for(PopulationIterator it = population_.begin();
-            it != population_.end();
-            it++)
+        for(size_t i_idx = 0;
+            i_idx < population_.size();
+            i_idx++)
           {
-            cerr << "Checking connection graph symmetry for '" << it->getId() << "', idx " << distance(population_.begin(),it) << endl;
-            for(typename Individual::ConnectionList::const_iterator ptr = it->getConnectionList().begin();
-                ptr != it->getConnectionList().end();
+            cerr << "Checking connection graph symmetry for '" << population_[i_idx].getId() << "', idx " << i_idx << endl;
+            for(typename Individual::ConnectionList::const_iterator ptr = population_[i_idx].getConnectionList().begin();
+                ptr != population_[i_idx].getConnectionList().end();
                 ptr++)
               {
-                const Individual& j = **ptr;
-                typename Individual::ConnectionList::const_iterator found = find(j.getConnectionList().begin(), j.getConnectionList().end(), &(*it));
+                const Individual& j = population_[*ptr];
+                typename Individual::ConnectionList::const_iterator found = find(j.getConnectionList().begin(), j.getConnectionList().end(), i_idx);
                 if (found == j.getConnectionList().end()) {
                     //cerr << "WARNING: Symmetrifying pair (" << it->getId() << "," << j.getId() << ")" << endl;
-                    const_cast<typename Individual::ConnectionList&>(j.getConnectionList()).push_back(&(*it));
+                    const_cast<typename Individual::ConnectionList&>(j.getConnectionList()).push_back(i_idx);
                 }
               }
           }
@@ -322,7 +325,7 @@ namespace EpiRisk
       numSusceptible();
       /// Returns the current number of infectives (including occults)
       size_t
-      numInfected();
+      numInfected() const;
       /// Returns a const reference to I1
       const Individual&
       I1() const;
@@ -555,6 +558,11 @@ namespace EpiRisk
                   cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
                   record.data.N = record.data.R;
               }
+              if (record.data.R < record.data.I and record.data.I != POSINF)
+                {
+                  cerr << "WARNING: Individual " << record.id << " has I > R!  Setting I = R-7\n";
+                  record.data.I = record.data.R - 7;
+                }
 
               idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
             }
@@ -621,7 +629,7 @@ namespace EpiRisk
 
   template<typename Covars>
     size_t
-    Population<Covars>::numInfected()
+    Population<Covars>::numInfected() const
     {
       return distance(infIndex_.begin(),infIndex_.lower_bound(obsTime_));
     }
@@ -705,7 +713,7 @@ namespace EpiRisk
           jt != it->getConnectionList().end();
           ++jt)
         {
-          const_cast<Individual&>(**jt).sortConnections();
+          const_cast<Individual&>(population_[*jt]).sortConnections();
         }
       return rv;
 
@@ -732,7 +740,7 @@ namespace EpiRisk
     for(typename Individual::ConnectionList::const_iterator it = individual.getConnectionList().begin();
         it != individual.getConnectionList().end();
         it++)
-      const_cast<Individual&>(**it).sortConnections();
+      const_cast<Individual&>(population_[*it]).sortConnections();
 
     return rv;
   }

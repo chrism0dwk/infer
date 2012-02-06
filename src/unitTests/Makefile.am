@@ -5,7 +5,7 @@ bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead
 
 noinst_HEADERS = fmdModel.hpp
 
-fmdMcmc_SOURCES = fmdMcmc.cpp
+fmdMcmc_SOURCES = fmdMcmc.cpp MatLikelihood.cpp
 fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la @GSL_LIBS@ @BOOST_LDFLAGS@ @BOOST_MPI_LIB@ @BOOST_SERIALIZATION_LIB@ @MATHLIB@
 
 fmdSim_SOURCES = fmdSim.cpp fmdModel.cpp

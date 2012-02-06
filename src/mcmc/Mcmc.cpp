@@ -365,19 +365,20 @@ Mcmc::instantPressureOn(const Population<TestCovars>::InfectiveIterator& j,
   //  return 1.0; // Return 1 if j is I1
 
   double sumPressure = 0.0;
+  size_t j_idx = distance(pop_.asPop(pop_.infecBegin()),pop_.asPop(j));
   Population<TestCovars>::Individual::ConnectionList::const_iterator i =
       j->getConnectionList().begin();
-  while (i != j->getConnectionList().end() and (*i)->getI() < Ij)
+  while (i != j->getConnectionList().end() and pop_[*i].getI() < Ij)
     {
-      if (*i != &(*j))
+      if (*i != j_idx)
         { // Skip i==j
-          if ((*i)->getN() >= Ij)
+          if (pop_[*i].getN() >= Ij)
             {
-              sumPressure += beta(**i, *j);
+              sumPressure += beta(pop_[*i], *j);
             }
-          else if ((*i)->getR() >= Ij)
+          else if (pop_[*i].getR() >= Ij)
             {
-              sumPressure += betastar(**i, *j);
+              sumPressure += betastar(pop_[*i], *j);
             }
         }
       ++i;
@@ -401,20 +402,21 @@ Mcmc::integPressureOn(const Population<TestCovars>::PopulationIterator& j,
 
   // Get the latest time that j can possibly be susceptible
   double jMaxSuscepTime = min(min(Ij, pop_.getObsTime()), j->getN());
+  size_t j_idx = distance(pop_.asPop(pop_.infecBegin()),j);
   Population<TestCovars>::Individual::ConnectionList::const_iterator i =
       j->getConnectionList().begin();
 
-  while (i != j->getConnectionList().end() and (*i)->getI() < Ij)
+  while (i != j->getConnectionList().end() and pop_[*i].getI() < Ij)
     {
-      if (*i != &(*j))
+      if (*i != j_idx)
         {
           // Infective -> Susceptible pressure
-          integPressure += beta(**i, *j) * (min((*i)->getN(), jMaxSuscepTime)
-              - min((*i)->getI(), jMaxSuscepTime));
+          integPressure += beta(pop_[*i], *j) * (min(pop_[*i].getN(), jMaxSuscepTime)
+              - min(pop_[*i].getI(), jMaxSuscepTime));
 
           // Notified -> Susceptible pressure
-          integPressure += betastar(**i, *j) * (min((*i)->getR(),
-              jMaxSuscepTime) - min((*i)->getN(), jMaxSuscepTime));
+          integPressure += betastar(pop_[*i], *j) * (min(pop_[*i].getR(),
+              jMaxSuscepTime) - min(pop_[*i].getN(), jMaxSuscepTime));
         }
       ++i;
     }
@@ -579,215 +581,215 @@ Mcmc::getMeanOccI() const
   return sum / occultList_.size();
 }
 
-void
-Mcmc::newUpdateIlogLikelihood(
-    const Population<TestCovars>::InfectiveIterator& j, const double newTime,
-    Likelihood& updatedLogLik)
-{
-  timeval start, end;
-  gettimeofday(&start, NULL);
-
-  const Population<TestCovars>::InfectiveIterator& I1(pop_.infecBegin());
-  const Population<TestCovars>::InfectiveIterator& I2(++pop_.infecBegin());
-
-  // Calculates an updated likelihood for an infection time move
-  double logLikelihood = 0.0; //logLikelihood_.local;
-  updatedLogLik.productCache = logLikelihood_.productCache;
-
-  // Adjust pressure on the movee
-  if (processInfectives_.count(j) != 0)
-    { // Node which has the movee does the calculation -- not optimal!
-
-      // Adjust product first
-      double myPressure = 0.0;
-
-      map<string, double>::const_iterator myProduct =
-          logLikelihood_.productCache.find(j->getId());
-      if (myProduct != logLikelihood_.productCache.end())
-        {
-          myPressure = myProduct->second;
-          logLikelihood -= log(myPressure);
-        }
-
-      if (newTime < pop_.getObsTime())
-        {
-          myPressure = instantPressureOn(j, newTime);
-          updatedLogLik.productCache[j->getId()] = myPressure; // Automatically adds j to the productCache if it didn't exist before (ie Adding)
-          logLikelihood += log(myPressure);
-        }
-      else
-        {
-          updatedLogLik.productCache.erase(j->getId());
-        }
-
-      // Now adjust integral
-      double press;
-      press = integPressureOn(pop_.asPop(j), j->getI());
-      logLikelihood += press;
-      press = integPressureOn(pop_.asPop(j), newTime);
-      logLikelihood -= press;
-    }
-
-  // Adjust product part -- iterate over connection list and update pressure on
-  //                        local process's infectives.
-  Population<TestCovars>::Individual::ConnectionList::const_iterator i;
-  for (i = j->getConnectionList().begin(); i != j->getConnectionList().end(); i++)
-    {
-      if (processInfectives_.count(pop_.asI(**i)) != 0)
-        {
-
-          // Skip if i == I1 -- no pressure change
-          if (*i == &(pop_.I1()))
-            continue;
-
-          // Product First
-          // Fetch cached pressure
-          double myPressure = 0.0;
-          map<string, double>::const_iterator myProduct =
-              logLikelihood_.productCache.find((*i)->getId());
-          if (myProduct != logLikelihood_.productCache.end())
-            {
-              myPressure = myProduct->second;
-              logLikelihood -= log(myPressure);
-            }
-
-          // Adjust pressure - subtract old pressure
-          if (j->isIAt((*i)->getI()))
-            myPressure -= beta(*j, **i) * susceptibility(*j, **i);
-          else if (j->isNAt((*i)->getI()) and j->getI() < pop_.getObsTime()
-              and newTime > pop_.getObsTime())
-            myPressure -= betastar(*j, **i) * susceptibility(*j, **i);
-
-          // Adjust pressure - add new pressure
-          if (newTime < (*i)->getI() && (*i)->getI() <= j->getN())
-            myPressure += beta(*j, **i) * susceptibility(*j, **i);
-          else if (j->isNAt((*i)->getI()) and j->getI() > pop_.getObsTime()
-              and newTime < pop_.getObsTime())
-            myPressure += betastar(*j, **i) * susceptibility(*j, **i);
-
-          updatedLogLik.productCache[(*i)->getId()] = myPressure;
-          logLikelihood += log(myPressure);
-          if (logLikelihood == NEGINF)
-            cerr << "Log Likelihood neg inf for individual " << (*i)->getId()
-                << " with pressure " << myPressure << endl;
-        }
-    }
-
-  // Adjust the integral part
-  size_t pos = 0;
-  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
-      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
-    {
-      double myBeta = beta(*j, **i) * susceptibility(*j, **i);
-      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
-          pop_.getObsTime());
-      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-          j->getI(), j->getN()), iMaxSuscTime));
-
-      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
-        logLikelihood += betastar(*j, **i) * susceptibility(*j, **i) * (min(
-            j->getR(), iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
-
-      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
-          newTime, j->getN()), iMaxSuscTime));
-
-      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
-        logLikelihood -= betastar(*j, **i) * susceptibility(*j, **i) * (min(
-            j->getR(), iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
-    }
-
-  // Background integrated pressure, and bits to sort out a change of I1
-  if (j == I1)
-    {
-      map<string, double>::iterator myProduct;
-
-      if (newTime < I2->getI())
-        {
-#ifndef NDEBUG
-          cerr << "I1 -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
-#endif
-          myProduct = updatedLogLik.productCache.find(I1->getId());
-        }
-      else
-        {
-#ifndef NDEBUG
-          cerr << "I1 -> I* <<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
-#endif
-          myProduct = updatedLogLik.productCache.find(I2->getId());
-        }
-
-      // Delete pressure on new I1
-      if (myProduct != updatedLogLik.productCache.end())
-        {
-          logLikelihood -= log(myProduct->second);
-          updatedLogLik.productCache.erase(myProduct);
-        }
-
-      // Update background integrated pressure
-      if (processInfectives_.count(j) != 0)
-        {
-          logLikelihood -= txparams_(3) * (newTime - min(newTime, I2->getI())); // Add bgPressure to I1 if I1 -> I*
-          double bgPress = txparams_(3) * (pop_.I1().getI() - min(newTime,
-              I2->getI()));
-          logLikelihood -= bgPress * (pop_.size() - 1); // Add bgPressure to all others
-          cerr << "Adjust background integral from I1 move: +" << bgPress
-              * (pop_.size() - 1);
-        }
-
-    }
-
-  // I* -> I1 or S -> I1
-  else if (j != I1 and newTime < I1->getI())
-    {
-#ifndef NDEBUG
-      cerr << "I* -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
-#endif
-      // Delete pressure on j -- it is now I1
-      map<string, double>::iterator myProduct =
-          updatedLogLik.productCache.find(j->getId());
-      if (myProduct != updatedLogLik.productCache.end())
-        {
-          logLikelihood -= log(myProduct->second);
-          updatedLogLik.productCache.erase(myProduct);
-        }
-
-      // Add pressure to the old I1
-      if (processInfectives_.count(I1) != 0)
-        {
-          double myPressure = txparams_(3);
-
-          if (find(j->getConnectionList().begin(),
-              j->getConnectionList().end(), &(*I1))
-              != j->getConnectionList().end())
-            {
-              if (I1->getI() <= j->getN())
-                myPressure += beta(*j, *I1) * susceptibility(*j, *I1);
-              else if (j->isNAt(I1->getI()))
-                myPressure += betastar(*j, *I1) * susceptibility(*j, *I1);
-            }
-          updatedLogLik.productCache[I1->getId()] = myPressure;
-          logLikelihood += log(myPressure);
-
-          // Update background integrated pressure
-          logLikelihood += txparams_(3) * (j->getI() - pop_.I1().getI()); // Subtract old background pressure from the new I1
-          logLikelihood -= txparams_(3) * (pop_.I1().getI() - newTime)
-              * (pop_.size() - 1.0); // Add pressure integral to all others
-        }
-
-    }
-
-  else
-    // Update background pressure integral
-    if (processInfectives_.count(I1) != 0) logLikelihood -= txparams_(3) * (newTime - j->getI());
-
-  updatedLogLik.local = logLikelihood + logLikelihood_.local;
-
-  all_reduce(comm_, updatedLogLik.local, updatedLogLik.global, plus<double> ());
-
-  gettimeofday(&end, NULL);
-  numUpdate_++;
-  timeUpdate_ = onlineMean(timeinseconds(start, end), timeUpdate_, numUpdate_);
-}
+//void
+//Mcmc::newUpdateIlogLikelihood(
+//    const Population<TestCovars>::InfectiveIterator& j, const double newTime,
+//    Likelihood& updatedLogLik)
+//{
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
+//
+//  const Population<TestCovars>::InfectiveIterator& I1(pop_.infecBegin());
+//  const Population<TestCovars>::InfectiveIterator& I2(++pop_.infecBegin());
+//
+//  // Calculates an updated likelihood for an infection time move
+//  double logLikelihood = 0.0; //logLikelihood_.local;
+//  updatedLogLik.productCache = logLikelihood_.productCache;
+//
+//  // Adjust pressure on the movee
+//  if (processInfectives_.count(j) != 0)
+//    { // Node which has the movee does the calculation -- not optimal!
+//
+//      // Adjust product first
+//      double myPressure = 0.0;
+//
+//      map<string, double>::const_iterator myProduct =
+//          logLikelihood_.productCache.find(j->getId());
+//      if (myProduct != logLikelihood_.productCache.end())
+//        {
+//          myPressure = myProduct->second;
+//          logLikelihood -= log(myPressure);
+//        }
+//
+//      if (newTime < pop_.getObsTime())
+//        {
+//          myPressure = instantPressureOn(j, newTime);
+//          updatedLogLik.productCache[j->getId()] = myPressure; // Automatically adds j to the productCache if it didn't exist before (ie Adding)
+//          logLikelihood += log(myPressure);
+//        }
+//      else
+//        {
+//          updatedLogLik.productCache.erase(j->getId());
+//        }
+//
+//      // Now adjust integral
+//      double press;
+//      press = integPressureOn(pop_.asPop(j), j->getI());
+//      logLikelihood += press;
+//      press = integPressureOn(pop_.asPop(j), newTime);
+//      logLikelihood -= press;
+//    }
+//
+//  // Adjust product part -- iterate over connection list and update pressure on
+//  //                        local process's infectives.
+//  Population<TestCovars>::Individual::ConnectionList::const_iterator i;
+//  for (i = j->getConnectionList().begin(); i != j->getConnectionList().end(); i++)
+//    {
+//      if (processInfectives_.count(pop_.asI(pop_[*i])) != 0)
+//        {
+//
+//          // Skip if i == I1 -- no pressure change
+//          if (*i == &(pop_.I1()))
+//            continue;
+//
+//          // Product First
+//          // Fetch cached pressure
+//          double myPressure = 0.0;
+//          map<string, double>::const_iterator myProduct =
+//              logLikelihood_.productCache.find((*i)->getId());
+//          if (myProduct != logLikelihood_.productCache.end())
+//            {
+//              myPressure = myProduct->second;
+//              logLikelihood -= log(myPressure);
+//            }
+//
+//          // Adjust pressure - subtract old pressure
+//          if (j->isIAt((*i)->getI()))
+//            myPressure -= beta(*j, **i) * susceptibility(*j, **i);
+//          else if (j->isNAt((*i)->getI()) and j->getI() < pop_.getObsTime()
+//              and newTime > pop_.getObsTime())
+//            myPressure -= betastar(*j, **i) * susceptibility(*j, **i);
+//
+//          // Adjust pressure - add new pressure
+//          if (newTime < (*i)->getI() && (*i)->getI() <= j->getN())
+//            myPressure += beta(*j, **i) * susceptibility(*j, **i);
+//          else if (j->isNAt((*i)->getI()) and j->getI() > pop_.getObsTime()
+//              and newTime < pop_.getObsTime())
+//            myPressure += betastar(*j, **i) * susceptibility(*j, **i);
+//
+//          updatedLogLik.productCache[(*i)->getId()] = myPressure;
+//          logLikelihood += log(myPressure);
+//          if (logLikelihood == NEGINF)
+//            cerr << "Log Likelihood neg inf for individual " << (*i)->getId()
+//                << " with pressure " << myPressure << endl;
+//        }
+//    }
+//
+//  // Adjust the integral part
+//  size_t pos = 0;
+//  for (i = j->getConnectionList().begin() + mpirank_, pos = mpirank_; pos
+//      < j->getConnectionList().size(); i += mpiprocs_, pos += mpiprocs_)
+//    {
+//      double myBeta = beta(*j, **i) * susceptibility(*j, **i);
+//      double iMaxSuscTime = min(min((*i)->getI(), (*i)->getN()),
+//          pop_.getObsTime());
+//      logLikelihood += myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+//          j->getI(), j->getN()), iMaxSuscTime));
+//
+//      if (j->getI() < pop_.getObsTime() and newTime > pop_.getObsTime()) // Remove betastar if j is not infectious anymore
+//        logLikelihood += betastar(*j, **i) * susceptibility(*j, **i) * (min(
+//            j->getR(), iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
+//
+//      logLikelihood -= myBeta * (min(j->getN(), iMaxSuscTime) - min(min(
+//          newTime, j->getN()), iMaxSuscTime));
+//
+//      if (j->getI() > pop_.getObsTime() and newTime < pop_.getObsTime()) // Add betastar is j is now infectious
+//        logLikelihood -= betastar(*j, **i) * susceptibility(*j, **i) * (min(
+//            j->getR(), iMaxSuscTime) - min(j->getN(), iMaxSuscTime));
+//    }
+//
+//  // Background integrated pressure, and bits to sort out a change of I1
+//  if (j == I1)
+//    {
+//      map<string, double>::iterator myProduct;
+//
+//      if (newTime < I2->getI())
+//        {
+//#ifndef NDEBUG
+//          cerr << "I1 -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+//#endif
+//          myProduct = updatedLogLik.productCache.find(I1->getId());
+//        }
+//      else
+//        {
+//#ifndef NDEBUG
+//          cerr << "I1 -> I* <<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+//#endif
+//          myProduct = updatedLogLik.productCache.find(I2->getId());
+//        }
+//
+//      // Delete pressure on new I1
+//      if (myProduct != updatedLogLik.productCache.end())
+//        {
+//          logLikelihood -= log(myProduct->second);
+//          updatedLogLik.productCache.erase(myProduct);
+//        }
+//
+//      // Update background integrated pressure
+//      if (processInfectives_.count(j) != 0)
+//        {
+//          logLikelihood -= txparams_(3) * (newTime - min(newTime, I2->getI())); // Add bgPressure to I1 if I1 -> I*
+//          double bgPress = txparams_(3) * (pop_.I1().getI() - min(newTime,
+//              I2->getI()));
+//          logLikelihood -= bgPress * (pop_.size() - 1); // Add bgPressure to all others
+//          cerr << "Adjust background integral from I1 move: +" << bgPress
+//              * (pop_.size() - 1);
+//        }
+//
+//    }
+//
+//  // I* -> I1 or S -> I1
+//  else if (j != I1 and newTime < I1->getI())
+//    {
+//#ifndef NDEBUG
+//      cerr << "I* -> I1 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+//#endif
+//      // Delete pressure on j -- it is now I1
+//      map<string, double>::iterator myProduct =
+//          updatedLogLik.productCache.find(j->getId());
+//      if (myProduct != updatedLogLik.productCache.end())
+//        {
+//          logLikelihood -= log(myProduct->second);
+//          updatedLogLik.productCache.erase(myProduct);
+//        }
+//
+//      // Add pressure to the old I1
+//      if (processInfectives_.count(I1) != 0)
+//        {
+//          double myPressure = txparams_(3);
+//
+//          if (find(j->getConnectionList().begin(),
+//              j->getConnectionList().end(), &(*I1))
+//              != j->getConnectionList().end())
+//            {
+//              if (I1->getI() <= j->getN())
+//                myPressure += beta(*j, *I1) * susceptibility(*j, *I1);
+//              else if (j->isNAt(I1->getI()))
+//                myPressure += betastar(*j, *I1) * susceptibility(*j, *I1);
+//            }
+//          updatedLogLik.productCache[I1->getId()] = myPressure;
+//          logLikelihood += log(myPressure);
+//
+//          // Update background integrated pressure
+//          logLikelihood += txparams_(3) * (j->getI() - pop_.I1().getI()); // Subtract old background pressure from the new I1
+//          logLikelihood -= txparams_(3) * (pop_.I1().getI() - newTime)
+//              * (pop_.size() - 1.0); // Add pressure integral to all others
+//        }
+//
+//    }
+//
+//  else
+//    // Update background pressure integral
+//    if (processInfectives_.count(I1) != 0) logLikelihood -= txparams_(3) * (newTime - j->getI());
+//
+//  updatedLogLik.local = logLikelihood + logLikelihood_.local;
+//
+//  all_reduce(comm_, updatedLogLik.local, updatedLogLik.global, plus<double> ());
+//
+//  gettimeofday(&end, NULL);
+//  numUpdate_++;
+//  timeUpdate_ = onlineMean(timeinseconds(start, end), timeUpdate_, numUpdate_);
+//}
 
 bool
 Mcmc::updateI(const size_t index)
@@ -807,7 +809,7 @@ Mcmc::updateI(const size_t index)
 #endif
 
   Likelihood logLikCan;
-  newUpdateIlogLikelihood(it, newI, logLikCan);
+  //newUpdateIlogLikelihood(it, newI, logLikCan);
 
 #ifndef NDEBUG
   Likelihood tmp;
@@ -898,7 +900,7 @@ Mcmc::addI()
     processInfectives_.insert(it);
 
   Likelihood logLikCan;
-  newUpdateIlogLikelihood(it, newI, logLikCan);
+  //newUpdateIlogLikelihood(it, newI, logLikCan);
 
 #ifndef NDEBUG
   //  Likelihood tmp;
@@ -978,7 +980,7 @@ Mcmc::deleteI()
 #endif
 
   Likelihood logLikCan;
-  newUpdateIlogLikelihood(it, POSINF, logLikCan);
+  //newUpdateIlogLikelihood(it, POSINF, logLikCan);
 
 #ifndef NDEBUG
   //  Likelihood tmp;

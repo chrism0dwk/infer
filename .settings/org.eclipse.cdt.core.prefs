@@ -1,4 +1,4 @@
-#Wed Jan 25 16:12:41 GMT 2012
+#Wed Feb 01 17:26:10 GMT 2012
 eclipse.preferences.version=1
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/operation=replace
@@ -16,7 +16,7 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/value=
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -DBOOST_MPI_HOMOGENEOUS -O3
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -DBOOST_MPI_HOMOGENEOUS -msse4.1 -Ofast -ftree-vectorizer-verbose\=2
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/value=
@@ -24,12 +24,12 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/appendContributed=true
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CPPFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CPPFLAGS/value=-I/usr/local/packages/gsl-1.15/include -I/usr/local/packages/acml-4.3.0/gfortran64/include -I/usr/local/packages/boost_1_47_0/include -I/usr/local/packages/openmpi-1.4.2/include
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CPPFLAGS/value=
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CXXFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CXXFLAGS/operation=append
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CXXFLAGS/value=-O0 -g
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/value=-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/acml-4.3.0/gfortran64/lib -L/usr/local/packages/boost_1_47_0/lib
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/value=
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/append=true
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/appendContributed=true
