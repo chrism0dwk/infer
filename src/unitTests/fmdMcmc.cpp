@@ -28,8 +28,6 @@
 #include <cstdlib>
 #include <fstream>
 #include <gsl/gsl_randist.h>
-#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -49,6 +47,7 @@ namespace po = boost::program_options;
 #include "MatLikelihood.hpp"
 
 #define CONNECTIONCUTOFF 25.0
+#define REPS 50
 
 using namespace EpiRisk;
 
@@ -329,9 +328,6 @@ main(int argc, char* argv[])
 {
   // Tests out class Mcmc
 
-  mpi::environment env(argc, argv);
-  mpi::communicator comm;
-
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
@@ -358,7 +354,7 @@ main(int argc, char* argv[])
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
   myPopulation->loadConnectionGraph(
-      "/storage/stsiab/FMD2001/data/fmd2001_short.con");//_uk_infec_25km.con");
+      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_uk_infec_25km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -427,16 +423,27 @@ main(int argc, char* argv[])
   MatLikelihood matLikelihood(*myPopulation, txparams);
   cerr << "Done" << endl;
 
-  cerr << "Calculating likelihood" << endl;
+  cerr << "======== CPU likelihood ========" << endl;
   timeval start, end;
   gettimeofday(&start, NULL);
   float integral = 0.0f;
-  for(size_t i = 0; i<50; ++i)
+  for(size_t i = 0; i<REPS; ++i)
     integral = matLikelihood.calculate();
   gettimeofday(&end, NULL);
-  cerr << "Done in " << timeinseconds(start,end) / 50.0 << endl;
+  cerr << "Done in " << timeinseconds(start,end) / (double)REPS << endl;
+  cerr.precision(20);
+  cerr << "Likelihood = " << integral << endl << endl;
+
+  cerr << "======== GPU likelihood ========" << endl;
+  gettimeofday(&start, NULL);
+  integral = 0.0f;
+  for(size_t i = 0; i<REPS; ++i)
+    integral = matLikelihood.calculateGPU();
+  gettimeofday(&end, NULL);
+  cerr << "Done in " << timeinseconds(start,end) / (double)REPS << endl;
   cerr.precision(20);
   cerr << "Likelihood = " << integral << endl;
+
 
   cout << "Press <enter> to exit....";
   char m = getchar();

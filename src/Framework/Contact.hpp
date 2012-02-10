@@ -48,15 +48,15 @@ namespace EpiRisk {
     operator=(const Contact<T>& c)
     {
       source_ = c.getSource();
-      const_cast<int&> (type_) = c.type;
-      const_cast<eventTime_t&> (time_) = c.time;
+      const_cast<int&> (type_) = c.type_;
+      const_cast<eventTime_t&> (time_) = c.time_;
       return *this;
     };
 
     bool
     operator<(const Contact<T>& rhs) const
     {
-      return time < rhs.time;
+      return time_ < rhs.time_;
     };
 
     bool

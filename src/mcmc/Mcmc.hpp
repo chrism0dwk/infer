@@ -31,7 +31,6 @@
 #include <set>
 #include <vector>
 #include <map>
-#include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
@@ -53,7 +52,6 @@ namespace EpiRisk
 {
   using namespace std;
   using namespace EpiRisk;
-  namespace mpi = boost::mpi;
 
   // FWD DECLS
   class McmcUpdate;
@@ -103,7 +101,7 @@ namespace EpiRisk
     Random* random_;
 
     boost::ptr_list<McmcUpdate> updateStack_;
-    mpi::communicator comm_;
+
     int mpirank_, mpiprocs_;
     bool mpiInitHere_;
     bool accept_;

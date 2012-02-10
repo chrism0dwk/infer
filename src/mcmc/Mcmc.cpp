@@ -20,8 +20,6 @@
 
 #include <cmath>
 #include <boost/numeric/ublas/io.hpp>
-#include <boost/mpi/datatype.hpp>
-#include <boost/mpi/collectives.hpp>
 #include <ctime>
 #include <algorithm>
 #include <functional>
@@ -112,8 +110,8 @@ Mcmc::Mcmc(Population<TestCovars>& population, Parameters& transParams,
   int largc = 1;
   char** largv;
 
-  mpirank_ = comm_.rank();
-  mpiprocs_ = comm_.size();
+  mpirank_ = 0;
+  mpiprocs_ = 1;
 
   // Random number generation
   random_ = new Random(randomSeed);
@@ -465,7 +463,7 @@ Mcmc::calcLogLikelihood(Likelihood& logLikelihood)
       logLikelihood.local -= tmp; // Require minus the integral
     }
 
-  all_reduce(comm_, logLikelihood.local, logLikelihood.global, plus<double> ());
+  logLikelihood.global = logLikelihood.local;
   gettimeofday(&end, NULL);
   numCalc_++;
   timeCalc_ = onlineMean(timeinseconds(start, end), timeCalc_, numCalc_);
@@ -564,7 +562,7 @@ Mcmc::getMeanI2N() const
         sumI2Nlocal += (*it)->getN() - (*it)->getI();
     }
   double sumI2Nglobal = 0.0;
-  all_reduce(comm_, sumI2Nlocal, sumI2Nglobal, plus<double> ());
+  sumI2Nglobal = sumI2Nlocal;
 
   return sumI2Nglobal / (pop_.numInfected() - occultList_.size());
 }
@@ -896,7 +894,7 @@ Mcmc::addI()
   double logPiCur = logLikelihood_.global;
 
   //Add to processInfectives for a random processor
-  if (mpirank_ == random_->integer(comm_.size()))
+  if (mpirank_ == random_->integer(mpiprocs_))
     processInfectives_.insert(it);
 
   Likelihood logLikCan;
@@ -1188,7 +1186,7 @@ Mcmc::dumpProdCache()
 {
   for (size_t proc = 0; proc < mpiprocs_; ++proc)
     {
-      MPI::COMM_WORLD.Barrier();
+      //MPI::COMM_WORLD.Barrier();
       if (mpirank_ == proc)
         {
           cerr << "======================RANK " << proc
@@ -1197,18 +1195,18 @@ Mcmc::dumpProdCache()
               logLikelihood_.productCache.begin();
           cerr << "ID \t \t Cache \t \t TmpCache \t \t Difference\n" << endl;
           ;
-          MPI::COMM_WORLD.Barrier();
+          //MPI::COMM_WORLD.Barrier();
           while (it != logLikelihood_.productCache.end())
             {
               cerr << it->first << ":\t" << it->second << "\t" << endl;
-              MPI::COMM_WORLD.Barrier();
+              //MPI::COMM_WORLD.Barrier();
               ++it;
             }
           cerr
               << "==============================================================\n"
               << "Length = " << logLikelihood_.productCache.size() << endl;
         }
-      MPI::COMM_WORLD.Barrier();
+      //MPI::COMM_WORLD.Barrier();
     }
 }
 
@@ -1217,7 +1215,7 @@ Mcmc::loadBalance()
 {
   std::vector<double> times;
   multimap<double, size_t> processors; // ordered by ascending speed
-  mpi::all_gather(comm_, integPressTime_, times);
+  //mpi::all_gather(comm_, integPressTime_, times);
 
   if (mpirank_ == 0)
     {
@@ -1284,8 +1282,8 @@ Mcmc::checkProcPopConsistency()
       != pop_.infecEnd(); it++)
     {
       std::vector<string> ids;
-      all_gather(comm_, it->getId(), ids);
-      for (int i = 1; i < comm_.size(); i++)
+      //all_gather(comm_, it->getId(), ids);
+      for (int i = 1; i < mpiprocs_; i++)
         {
           if (ids[0] != ids.at(i))
             {

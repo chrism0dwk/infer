@@ -26,11 +26,9 @@
 
 #include "MCMCUpdater.hpp"
 #include <algorithm>
-#include <boost/mpi.hpp>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
-#include <boost/mpi/datatype.hpp>
-#include <boost/mpi/collectives.hpp>
+
 
 
 #define ADAPTIVESCALE 1.0
@@ -995,7 +993,7 @@ namespace EpiRisk
     : McmcUpdate(filename, rng, logLikelihood, env)
   {
 
-    if(env_->comm_.rank() == 0) {
+    if(env_->mpirank_ == 0) {
         outfile_.open(filename.c_str(),ios::out);
         if(!outfile_.is_open()) {
             string msg = "Cannot open SellkeSerializer output file '";
@@ -1013,9 +1011,10 @@ namespace EpiRisk
   SellkeSerializer::update()
   {
     std::vector< map<string, double> > pressures;
-    boost::mpi::gather(env_->comm_,logLikelihood_.integPressure, pressures, 0);
+    //logLikelihood_.integPressure=pressures;
+    //boost::mpi::gather(env_->comm_,logLikelihood_.integPressure, pressures, 0);
 
-    if(env_->comm_.rank() == 0) {
+    if(env_->mpirank_ == 0) {
         bool isFirst = true;
         for(std::vector< map<string, double> >::const_iterator jt = pressures.begin();
             jt != pressures.end();

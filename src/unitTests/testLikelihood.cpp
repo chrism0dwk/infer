@@ -33,8 +33,6 @@
 
 #include <iostream>
 #include <gsl/gsl_randist.h>
-#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
 #include <sstream>
 
 #include <boost/property_tree/ptree.hpp>
@@ -250,8 +248,7 @@ int main(int argc, char* argv[])
 {
   // Tests out class Mcmc
 
-  mpi::environment env(argc,argv);
-  mpi::communicator comm;
+
 
   if (argc != 5) {
       cerr << "Usage: testSpatPointPop <pop file> <epi file> <covar matrix> <num iterations>" << endl;

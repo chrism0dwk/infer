@@ -522,7 +522,7 @@ namespace EpiRisk
       ;
 
       void
-      updateInfecByContact() const
+      updateInfecByContact()
       {
         // Sets bool Individual::infecByContact to true
         // if I coincides with an infectious contact

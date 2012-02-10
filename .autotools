@@ -10,7 +10,7 @@
 <option id="version" value="false"/>
 <option id="host" value=""/>
 <option id="build" value=""/>
-<option id="target" value=""/>
+<option id="target" value="x86_64"/>
 <option id="prefix" value=""/>
 <option id="exec-prefix" value=""/>
 <option id="libdir" value=""/>
@@ -30,7 +30,7 @@
 <option id="program-suffix" value=""/>
 <option id="program-transform-name" value=""/>
 <option id="enable-maintainer-mode" value="false"/>
-<option id="user" value=" --with-boost=/usr/local/packages/boost_1_48_0 --with-gsl=/usr/local/packages/gsl-1.15"/>
+<option id="user" value="--with-boost=/usr/local --with-gsl=/usr/local"/>
 <option id="autogen" value="autogen.sh"/>
 <option id="autogenOpts" value=""/>
 </configuration>
@@ -64,7 +64,7 @@
 <option id="program-suffix" value=""/>
 <option id="program-transform-name" value=""/>
 <option id="enable-maintainer-mode" value="false"/>
-<option id="user" value="--with-boost=/usr/local/packages/boost_1_48_0 --with-gsl=/usr/local/packages/gsl-1.15"/>
+<option id="user" value="--with-boost=/usr/local --with-gsl=/usr/local"/>
 <option id="autogen" value="autogen.sh"/>
 <option id="autogenOpts" value=""/>
 </configuration>

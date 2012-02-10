@@ -1,12 +1,16 @@
 INCLUDES = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/mcmc -I$(top_srcdir)/src/sim -I$(top_srcdir)/src/diags
 AM_CPPFLAGS = @BOOST_CPPFLAGS@ @GSL_CPPFLAGS@
 METASOURCES = AUTO
+
+.cu.o:
+	nvcc -m64 --compiler-options "$(CXXFLAGS)" $(INCLUDES) $(CPPFLAGS) -c -o $@ $<
+
 bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead fmdSellkeDiagnostic
 
 noinst_HEADERS = fmdModel.hpp
 
-fmdMcmc_SOURCES = fmdMcmc.cpp MatLikelihood.cpp
-fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la @GSL_LIBS@ @BOOST_LDFLAGS@ @BOOST_MPI_LIB@ @BOOST_SERIALIZATION_LIB@ @MATHLIB@
+fmdMcmc_SOURCES = fmdMcmc.cpp MatLikelihood.cu
+fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la @GSL_LIBS@ @BOOST_LDFLAGS@ @CUDA_LDFLAGS@ @BOOST_SERIALIZATION_LIB@ @MATHLIB@
 
 fmdSim_SOURCES = fmdSim.cpp fmdModel.cpp
 fmdSim_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la @BOOST_LDFLAGS@ -lboost_program_options @GSL_LIBS@ @MATHLIB@

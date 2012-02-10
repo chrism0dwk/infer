@@ -266,12 +266,11 @@ namespace EpiRisk
         }
 
         confile.close();
-
+        cerr << "Checking connection graph symmetry..." << flush;
         for(size_t i_idx = 0;
             i_idx < population_.size();
             i_idx++)
           {
-            cerr << "Checking connection graph symmetry for '" << population_[i_idx].getId() << "', idx " << i_idx << endl;
             for(typename Individual::ConnectionList::const_iterator ptr = population_[i_idx].getConnectionList().begin();
                 ptr != population_[i_idx].getConnectionList().end();
                 ptr++)
@@ -284,7 +283,7 @@ namespace EpiRisk
                 }
               }
           }
-
+        cerr << "Done" << endl;
         for(PopulationIterator it = population_.begin();
             it != population_.end();
             it++)

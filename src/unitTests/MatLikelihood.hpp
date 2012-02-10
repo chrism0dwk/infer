@@ -33,6 +33,10 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 
+#include <cuda_runtime.h>
+#include <cusparse_v2.h>
+#include <cublas_v2.h>
+
 #include "Parameter.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
@@ -51,6 +55,8 @@ public:
   ~MatLikelihood();
   double
   calculate();
+  double
+  calculateGPU();
 
 private:
 
@@ -61,22 +67,50 @@ private:
   ublas::vector<fp_t> jcoord_; // Array of j (column) coordinates
   size_t infectivesSz_;
   size_t subPopSz_;
-  matrix<fp_t> animals_; // n*m matrix of m species on n farms
-  matrix<fp_t> animalsInfPow_; // Powers of m species on n farms for infectivity
-  matrix<fp_t> animalsSuscPow_; // For susceptibility
-  matrix<fp_t> infecTimes_; // n*3 matrix of I,N,R times for each n infected farm
+  matrix<fp_t,column_major> animals_; // n*m matrix of m species on n farms
+  matrix<fp_t,column_major> animalsInfPow_; // Powers of m species on n farms for infectivity
+  matrix<fp_t,column_major> animalsSuscPow_; // For susceptibility
+  matrix<fp_t,column_major> infecTimes_; // n*3 matrix of I,N,R times for each n infected farm
   fp_t I1_;
   ublas::vector<fp_t>::size_type I1idx_;
   ublas::vector<fp_t> infectivity_; // Infectivities
   ublas::vector<fp_t> susceptibility_; // Susceptibilities
   ublas::vector<fp_t> product_; // Product cache
   typedef compressed_matrix<fp_t> spm_t;
-  compressed_matrix<fp_t> D_; // Spatial kernel matrix
+  spm_t D_; // Spatial kernel matrix
   compressed_matrix<fp_t,column_major> E_; // Exposed at time of infection (product)
   spm_t T_; // Exposure time
   spm_t DT_; // Spatial kernel * exposure time
+  ublas::unbounded_array<int> DRowPtr_;
+  ublas::unbounded_array<int> DColInd_;
+  ublas::unbounded_array<int> ERowPtr_;
+  ublas::unbounded_array<int> EColPtr_;
+
   typedef EpiRisk::Population<TestCovars>::Individual Individual;
   typedef std::vector<size_t> SubPopulation;
+
+  // GPU data structures
+  float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
+  float* devInfecTimes_;
+  float* devSusceptibility_;
+  float* devInfectivity_;
+  float* devDVal_; int* devDRowPtr_; int* devDColInd_; //CRS
+  float* devTVal_;  //CRS
+  float* devDTVal_; // CRS
+  float* devEVal_; int* devEColPtr_; int* devERowInd_; //CCS
+  float* devModelParams_;
+  float* devTmp_;
+
+  // GPU BLAS handles
+  cublasStatus_t blasStat_;
+  cublasHandle_t cudaBLAS_;
+  cusparseStatus_t sparseStat_;
+  cusparseHandle_t cudaSparse_;
+  cusparseMatDescr_t crsDescr_;
+
+  // Constants
+  const float zero_;
+  const float unity_;
 
 };
 
