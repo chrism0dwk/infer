@@ -40,6 +40,7 @@
 #include "Parameter.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
+#include "GpuLikelihood.hpp"
 
 using namespace boost::numeric;
 using namespace boost::numeric::ublas;
@@ -56,7 +57,8 @@ public:
   double
   calculate();
   double
-  calculateGPU();
+  gpuCalculate();
+
 
 private:
 
@@ -89,28 +91,11 @@ private:
   typedef EpiRisk::Population<TestCovars>::Individual Individual;
   typedef std::vector<size_t> SubPopulation;
 
-  // GPU data structures
-  float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
-  float* devInfecTimes_;
-  float* devSusceptibility_;
-  float* devInfectivity_;
-  float* devDVal_; int* devDRowPtr_; int* devDColInd_; //CRS
-  float* devTVal_;  //CRS
-  float* devDTVal_; // CRS
-  float* devEVal_; int* devEColPtr_; int* devERowInd_; //CCS
-  float* devModelParams_;
-  float* devTmp_;
-
-  // GPU BLAS handles
-  cublasStatus_t blasStat_;
-  cublasHandle_t cudaBLAS_;
-  cusparseStatus_t sparseStat_;
-  cusparseHandle_t cudaSparse_;
-  cusparseMatDescr_t crsDescr_;
-
   // Constants
   const float zero_;
   const float unity_;
+
+  GpuLikelihood* gpu_;
 
 };
 

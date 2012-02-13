@@ -47,7 +47,7 @@ namespace po = boost::program_options;
 #include "MatLikelihood.hpp"
 
 #define CONNECTIONCUTOFF 25.0
-#define REPS 50
+#define REPS 1
 
 using namespace EpiRisk;
 
@@ -353,8 +353,8 @@ main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph(
-      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_uk_infec_25km.con");
+  myPopulation->loadConnectionGraph("/Users/stsiab/Documents/InFER/FMD2001/data/toy.con");
+     // "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_uk_infec_25km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -438,7 +438,7 @@ main(int argc, char* argv[])
   gettimeofday(&start, NULL);
   integral = 0.0f;
   for(size_t i = 0; i<REPS; ++i)
-    integral = matLikelihood.calculateGPU();
+    integral = matLikelihood.gpuCalculate();
   gettimeofday(&end, NULL);
   cerr << "Done in " << timeinseconds(start,end) / (double)REPS << endl;
   cerr.precision(20);

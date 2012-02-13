@@ -1,3 +1,22 @@
+/*************************************************************************
+ *  ./src/unitTests/MatLikelihood.cpp
+ *  Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
+ *
+ *  This file is part of InFER.
+ *
+ *  InFER is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  InFER is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with InFER.  If not, see <http://www.gnu.org/licenses/>.
+ *************************************************************************/
 /*
  * MatLikelihood.cpp
  *
@@ -9,26 +28,12 @@
 #include <iterator>
 #include <map>
 #include <boost/numeric/ublas/operation.hpp>
-#include <boost/numeric/ublas/vector.hpp>
 #include <sys/time.h>
 
 
 
 #include "MatLikelihood.hpp"
 
-__global__ void distanceKernel(float* input, float delta, size_t N, float* output)
-{
-  int idx = threadIdx.x + blockDim.x * blockIdx.x;
-  if(idx < N)
-    output[idx] = delta / (delta*delta + input[idx]);
-}
-
-__global__ void pointwiseMult(float* A, float* B, float* C, size_t N)
-{
-  int idx = threadIdx.x + blockDim.x * blockIdx.x;
-  if(idx < N)
-    C[idx] = A[idx] * B[idx];
-}
 
 
 void
@@ -203,123 +208,47 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   size_t csrRowPtrSize = D_.index1_data().size();
   size_t txparamsSize = txparams_.size();
   cerr << "Allocating GPU memory" << endl;
-  int rv = 0;
-  rv |= cudaMalloc(&devAnimalsInfPow_,animInfSize*sizeof(float));
-  rv |= cudaMalloc(&devAnimalsSuscPow_,(animSuscSize*sizeof(float)));
-  rv |= cudaMalloc(&devInfecTimes_,infecTimesSize*sizeof(float));
-  rv |= cudaMalloc(&devSusceptibility_,subPopSz_*sizeof(float));
-  rv |= cudaMalloc(&devInfectivity_,infectivesSz_*sizeof(float));
 
-  rv |= cudaMalloc(&devDVal_,nnz*sizeof(double));
-  rv |= cudaMalloc(&devDRowPtr_,csrRowPtrSize*sizeof(int));
-  rv |= cudaMalloc(&devDColInd_,nnz*sizeof(int));
-
-  rv |= cudaMalloc(&devTVal_,nnz*sizeof(float));
-
-  rv |= cudaMalloc(&devDTVal_,nnz*sizeof(float));
-
-  rv |= cudaMalloc(&devEVal_,E_.nnz()*sizeof(float));
-  rv |= cudaMalloc(&devEColPtr_,E_.size1()*sizeof(int));
-  rv |= cudaMalloc(&devERowInd_,E_.nnz()*sizeof(int));
-
-  rv |= cudaMalloc(&devModelParams_,txparamsSize*sizeof(float));
-  rv |= cudaMalloc(&devTmp_,infectivesSz_*sizeof(float));
-
-  if(rv != cudaSuccess) {
-      cerr << "CUDA ERROR " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error allocating GPU device memory");
-  }
-
-  // Copy data structures to device
-  cerr << "Copying host memory to device memory" << endl;
-  rv = 0;
-  rv |= cudaMemcpy(devAnimalsInfPow_, animalsInfPow_.data().begin(), animInfSize * sizeof(float), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devAnimalsSuscPow_, animalsSuscPow_.data().begin(), (animSuscSize * sizeof(float)), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devInfecTimes_, infecTimes_.data().begin(),infecTimesSize * sizeof(float), cudaMemcpyHostToDevice);
-  if(rv != cudaSuccess) {
-      cerr << "Error copying covariates to GPU device: " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error copying data to GPU device");
-  }
-  
   // Sparse matrices -- convert indices from size_t to int -- limitation of CUSPARSE!
   DRowPtr_.resize(D_.index1_data().size());
   for(size_t i=0; i<D_.index1_data().size(); ++i) DRowPtr_[i] = D_.index1_data()[i];
   DColInd_.resize(D_.index2_data().size());
   for(size_t i=0; i<D_.index2_data().size(); ++i) DColInd_[i] = D_.index2_data()[i];
   
-  // Copy sparse matrices to GPU -- a lot of this can be implemented on the GPU itself!
-  rv = 0;
-  rv |= cudaMemcpy(devDVal_, D_.value_data().begin(),nnz * sizeof(float), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devDRowPtr_, DRowPtr_.begin(),csrRowPtrSize * sizeof(int), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devDColInd_, DColInd_.begin(),nnz * sizeof(int), cudaMemcpyHostToDevice);
-  if(rv != cudaSuccess) {
-      cerr << "Error copying D_ to GPU device: " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error copying data to GPU device");
-  }
-
-  rv |= cudaMemcpy(devTVal_, T_.value_data().begin(),nnz * sizeof(float), cudaMemcpyHostToDevice);
-  if(rv != cudaSuccess) {
-      cerr << "Error copying T_ to GPU device: " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error copying data to GPU device");
-  }
-
-  rv |= cudaMemcpy(devDTVal_, DT_.value_data().begin(),nnz * sizeof(float), cudaMemcpyHostToDevice);
-  if(rv != cudaSuccess) {
-      cerr << "Error copying DT_ to GPU device: " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error copying data to GPU device");
-  }
-
-  rv |= cudaMemcpy(devEVal_, E_.value_data().begin(),(size_t)(E_.nnz() * sizeof(float)), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devEColPtr_, E_.index1_data().begin(),(size_t)(E_.size1() * sizeof(int)), cudaMemcpyHostToDevice);
-  rv |= cudaMemcpy(devERowInd_, E_.index2_data().begin(),(size_t)(E_.nnz() * sizeof(int)), cudaMemcpyHostToDevice);
-
-  for(size_t i=0; i<txparams_.size();++i) {
-      float val = txparams_(i);
-      rv |= cudaMemcpy(devModelParams_+i,&val,sizeof(float),cudaMemcpyHostToDevice);
-  }
-
-  if(rv != cudaSuccess) {
-      cerr << "Error copying parameters to GPU device: " << cudaGetErrorString((cudaError_t)rv) << endl;
-      throw runtime_error("Error copying data to GPU device");
-  }
   
-  
-  // BLAS handles
-  blasStat_ = cublasCreate(&cudaBLAS_);
-  if(blasStat_ != CUBLAS_STATUS_SUCCESS) throw runtime_error("CUBLAS init failed");
+  // Set up GPU environment
+  gpu_ = new GpuLikelihood(subPopSz_,infectivesSz_,3,D_.nnz());
+  gpu_->SetEvents(infecTimes_.data().begin());
+  gpu_->SetSpecies(animals_.data().begin());
+  cerr << "Animals data:" << endl;
+  for(size_t i=0; i<infectivesSz_; ++i) cerr << animals_.data().begin()[i] << " ";
+  cerr << endl;
+  gpu_->SetDistance(D_.value_data().begin(),DRowPtr_.begin(),DColInd_.begin());
 
-  sparseStat_ = cusparseCreate(&cudaSparse_);
-  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS) throw runtime_error("CUSPARSE init failed");
+  // Parameters(needs glue code!)
+  GpuParams gpuParams;
+  gpuParams.epsilon = txparams_(3);
+  gpuParams.gamma1 = txparams_(0);
+  gpuParams.gamma2 = txparams_(1);
+  gpuParams. delta = txparams_(2);
+
+  for(size_t p = 0; p<3; ++p)
+    {
+      gpuParams.xi[p] = txparams_(4+p);
+      gpuParams.psi[p] = txparams_(10+p);
+      gpuParams.zeta[p] = txparams_(7+p);
+      gpuParams.phi[p] = txparams_(13+p);
+    }
+
+  gpu_->SetParameters(gpuParams);
   
-  sparseStat_ = cusparseCreateMatDescr(&crsDescr_);
-  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS) throw runtime_error("CUSPARSE matrix descriptor init failed");
-  
-  cusparseSetMatType(crsDescr_,CUSPARSE_MATRIX_TYPE_GENERAL);
-  cusparseSetMatIndexBase(crsDescr_,CUSPARSE_INDEX_BASE_ZERO);
+  //gpu_->Calculate();
+
 
 }
 
 MatLikelihood::~MatLikelihood()
 {
-  int rv = 0;
-  rv |= cudaFree(devAnimalsInfPow_);
-  rv |= cudaFree(devAnimalsSuscPow_);
-  rv |= cudaFree(devInfecTimes_);
-  rv |= cudaFree(devSusceptibility_);
-  rv |= cudaFree(devInfectivity_);
-  rv |= cudaFree(devDVal_);
-  rv |= cudaFree(devDRowPtr_);
-  rv |= cudaFree(devDColInd_);
-  rv |= cudaFree(devTVal_);
-  rv |= cudaFree(devDTVal_);
-  rv |= cudaFree(devEVal_);
-  rv |= cudaFree(devEColPtr_);
-  rv |= cudaFree(devERowInd_);
-
-  if(rv != cudaSuccess) throw runtime_error("Error freeing GPU device memory");
-
-  cublasDestroy(cudaBLAS_);
-  cusparseDestroy(cudaSparse_);
 
 }
 
@@ -404,76 +333,12 @@ MatLikelihood::calculate()
   return /*lp */- integral;
 }
 
-
 double
-MatLikelihood::calculateGPU()
+MatLikelihood::gpuCalculate()
 {
-  // GPU version of likelihood calculation
-
-  // Susceptibility
-  blasStat_ = cublasSgemv(cudaBLAS_,CUBLAS_OP_N,
-              subPopSz_,3,
-              &unity_,
-              devAnimalsSuscPow_, subPopSz_,
-              (devModelParams_+7), 1,
-              &zero_,
-              devSusceptibility_, 1);
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      cerr << "Error in susceptibility: " << blasStat_ << endl;
-    }
-
-  
-  // Infectivity
-  blasStat_ = cublasSgemv(cudaBLAS_,CUBLAS_OP_N,
-              infectivesSz_,3,
-              &unity_,
-              devAnimalsInfPow_, infectivesSz_,
-              (devModelParams_+4), 1,
-              &zero_,
-              devInfectivity_, 1);
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      cerr << "Error in infectivity: " << blasStat_ << endl;
-    }
-  
-  // Apply distance kernel to D_, place result in DT_.
-  size_t threadsPerBlock = 512;
-  size_t blocksPerGrid = (D_.nnz() + threadsPerBlock - 1) / threadsPerBlock;
-  float delta = txparams_(2);
-  size_t nnz = D_.nnz();
-  distanceKernel<<<blocksPerGrid,threadsPerBlock>>>(devDVal_,delta,nnz,devDTVal_);
-  pointwiseMult<<<blocksPerGrid,threadsPerBlock>>>(devDTVal_,devTVal_,devDTVal_,nnz);
-  
-
-  // DT * Susceptibility
-  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_NON_TRANSPOSE,
-      infectivesSz_,subPopSz_,nnz,&unity_,
-      crsDescr_, devDTVal_,
-      devDRowPtr_, devDColInd_,
-      devSusceptibility_,&zero_,
-      devTmp_);
-  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    {
-      cerr << "Error in cusparseScsrmv() " << sparseStat_ << endl;
-    }
-  
-
-  // infectivity * devTmp
-  float result;
-  blasStat_ = cublasSdot(cudaBLAS_, infectivesSz_,
-                           devInfectivity_, 1,
-                           devTmp_, 1,
-                           &result);  // May have an issue with 1-based indexing here!
-  if(blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      cerr << "Error in cublasSdot() " << blasStat_ << endl;
-    }
-  cerr << "Waiting for kernels to finish" << endl;
-  cudaDeviceSynchronize();
-  
-  // Gamma1
-  result *= txparams_(0);
-  
-  return -result;
+  gpu_->CalcInfectivity();
+  //gpu_->UpdateDistance();
+  return gpu_->LogLikelihood();
 }
+
+
