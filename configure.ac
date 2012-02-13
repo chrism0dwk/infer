@@ -67,5 +67,6 @@ AC_SUBST([GSL_LIBS])
 AC_SUBST([MATHLIB])
 AC_SUBST([BOOST_MPI_LIB])
 AC_SUBST([CUDA_LDFLAGS])
+AC_SUBST([NVCXXFLAGS])
 
 AC_OUTPUT(Makefile src/Makefile src/Framework/Makefile src/data/Makefile src/diags/Makefile src/mcmc/Makefile src/sim/Makefile src/unitTests/Makefile)
