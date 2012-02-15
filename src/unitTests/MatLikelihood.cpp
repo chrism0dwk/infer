@@ -44,7 +44,7 @@ addreduction(ublas::vector<float>& rb, size_t level=1)
 
   for(size_t i=reductionLevel/2; i<rb.size(); i += reductionLevel)
     {
-      rb[i-reductionLevel/2] += rb[i];
+      rb[i-reductionLevel/2] += fabs(rb[i]);
     }
 
   addreduction(rb,level+1);
@@ -83,6 +83,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
     {
       tmp.insert(population[i].getConnectionList().begin(),
           population[i].getConnectionList().end());
+      tmp.insert(i);
     }
 
   // Order subpopulation by infection time
@@ -100,7 +101,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   product_.resize(infectivesSz_);
   icoord_.resize(infectivesSz_);
   jcoord_.resize(subPopSz_);
-  infecTimes_.resize(infectivesSz_,3);
+  eventTimes_.resize(subPopSz_,3);
 
   E_.resize(infectivesSz_,infectivesSz_,false);
   D_.resize(infectivesSz_, subPopSz_,false);
@@ -129,22 +130,29 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   // Set up infectives
   cerr << "Setting up infectives" << endl;
 
-  for(size_t i = 0; i < infectivesSz_; ++i)
+  for(size_t i = 0; i < subPopSz_; ++i)
     {
 
-          icoord_(i) = jcoord_(i);
-          infecTimes_(i, 0) = population_[jcoord_[i]].getI();
-          infecTimes_(i, 1) = population_[jcoord_[i]].getN();
-          infecTimes_(i, 2) = population_[jcoord_[i]].getR();
 
-          for(size_t k = 0; k < 3; ++k)
+
+          eventTimes_(i, 0) = population_[jcoord_[i]].getI();
+          eventTimes_(i, 1) = population_[jcoord_[i]].getN();
+          eventTimes_(i, 2) = population_[jcoord_[i]].getR();
+
+          if(i < infectivesSz_)
             {
-              animalsInfPow_(i,k) = powf(animals_(i,k),txparams_(k+10));
+              icoord_(i) = jcoord_(i);
+              for(size_t k = 0; k < 3; ++k)
+                {
+                  animalsInfPow_(i,k) = powf(animals_(i,k),txparams_(k+10));
+                }
             }
     }
 
+  infecTimes_ = new matrix_range< matrix<fp_t,column_major> >(eventTimes_,range(0,infectivesSz_), range(0,3));
+
   // Cache I1
-  matrix_column< matrix<float,column_major> > col(infecTimes_,0);
+  matrix_column< matrix_range< matrix<float,column_major> > > col(*infecTimes_,0);
   I1_ = col(0); I1idx_ = 0;
   for(size_t i = 1; i < col.size(); ++i)
     if (col(i) < I1_) {
@@ -170,15 +178,15 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
 
               // Product mask
               if(j < infectivesSz_ and i != j) {
-                  if (infecTimes_(i,0) < infecTimes_(j,0) and infecTimes_(j,0) <= infecTimes_(i,1)) E_(i,j) = 1.0f;
-                  else if (infecTimes_(i,1) < infecTimes_(j,0) and infecTimes_(j,0) <= infecTimes_(i,2)) E_(i,j) = txparams_(1);
+                  if (infecTimes_->operator()(i,0) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,1)) E_(i,j) = 1.0f;
+                  else if (infecTimes_->operator()(i,1) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,2)) E_(i,j) = txparams_(1);
               }
 
               // Integral of infection time
               float jMaxSuscepTime = 0.0;
               if(j < infectivesSz_)
                 {
-                  if(infecTimes_(i,0) < infecTimes_(j,0)) jMaxSuscepTime = infecTimes_(j,0);
+                  if(infecTimes_->operator()(i,0) < infecTimes_->operator()(j,0)) jMaxSuscepTime = infecTimes_->operator()(j,0);
                 }
               else
                 {
@@ -186,8 +194,8 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
                 }
               D_(i, j) = sqDist;
               float exposureTime;
-              exposureTime = min(infecTimes_(i,1),jMaxSuscepTime) - min(infecTimes_(i,0),jMaxSuscepTime);
-              exposureTime += txparams_(1)*(min(infecTimes_(i,2),jMaxSuscepTime)-min(infecTimes_(i,1),jMaxSuscepTime));
+              exposureTime = min(infecTimes_->operator()(i,1),jMaxSuscepTime) - min(infecTimes_->operator()(i,0),jMaxSuscepTime);
+              exposureTime += txparams_(1)*(min(infecTimes_->operator()(i,2),jMaxSuscepTime)-min(infecTimes_->operator()(i,1),jMaxSuscepTime));
               if (exposureTime < 0.0) cerr << "T_(" << population_[icoord_[i]].getId() << "," << population_[*con].getId() << ") = " << exposureTime << endl;
               T_(i, j) = exposureTime;
             }
@@ -217,39 +225,38 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   
   
   // Set up GPU environment
-  gpu_ = new GpuLikelihood(subPopSz_,infectivesSz_,3,D_.nnz());
-  gpu_->SetEvents(infecTimes_.data().begin());
+  gpu_ = new GpuLikelihood(subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
+  gpu_->SetEvents(eventTimes_.data().begin());
   gpu_->SetSpecies(animals_.data().begin());
-  cerr << "Animals data:" << endl;
-  for(size_t i=0; i<infectivesSz_; ++i) cerr << animals_.data().begin()[i] << " ";
-  cerr << endl;
   gpu_->SetDistance(D_.value_data().begin(),DRowPtr_.begin(),DColInd_.begin());
 
   // Parameters(needs glue code!)
-  GpuParams gpuParams;
-  gpuParams.epsilon = txparams_(3);
-  gpuParams.gamma1 = txparams_(0);
-  gpuParams.gamma2 = txparams_(1);
-  gpuParams. delta = txparams_(2);
+  float epsilon = txparams_(3);
+  float gamma1 = txparams_(0);
+  float gamma2 = txparams_(1);
+  float delta = txparams_(2);
+
+  float xi[3]; float psi[3]; float zeta[3]; float phi[3];
 
   for(size_t p = 0; p<3; ++p)
     {
-      gpuParams.xi[p] = txparams_(4+p);
-      gpuParams.psi[p] = txparams_(10+p);
-      gpuParams.zeta[p] = txparams_(7+p);
-      gpuParams.phi[p] = txparams_(13+p);
+      xi[p] = txparams_(4+p);
+      psi[p] = txparams_(10+p);
+      zeta[p] = txparams_(7+p);
+      phi[p] = txparams_(13+p);
     }
 
-  gpu_->SetParameters(gpuParams);
+  gpu_->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
+  gpu_->Calculate();
   
-  //gpu_->Calculate();
 
 
 }
 
 MatLikelihood::~MatLikelihood()
 {
-
+  delete gpu_;
+  delete infecTimes_;
 }
 
 double
@@ -272,11 +279,16 @@ MatLikelihood::calculate()
   // Susceptibility
   axpy_prod(animalsSuscPow_, suscepParams, susceptibility_, true);
 
+  ublas::vector<float> v(susceptibility_);
+  addreduction(v);
+  cerr << "Sum susceptibility = " << v(0) << endl;
 
   // Infectivity
   axpy_prod(animalsInfPow_, infecParams, infectivity_, true);
+  v = infectivity_;
+  addreduction(v);
+  cerr << "Sum infectivity = " << v(0) << endl;
 
-  
   // Calculate product
   float lp = 0.0;
   compressed_matrix<float,column_major> QE(E_);
@@ -317,6 +329,12 @@ MatLikelihood::calculate()
         }
     }
  
+  v = T_.value_data();
+  addreduction(v);
+  cerr << "Sum host T_ = " << v(0) << endl;
+
+  //cerr << T_ << endl;
+
   // Calculate the integral
   axpy_prod(DT_,susceptibility_,tmp);
 
@@ -336,8 +354,7 @@ MatLikelihood::calculate()
 double
 MatLikelihood::gpuCalculate()
 {
-  gpu_->CalcInfectivity();
-  //gpu_->UpdateDistance();
+  gpu_->UpdateDistance();
   return gpu_->LogLikelihood();
 }
 

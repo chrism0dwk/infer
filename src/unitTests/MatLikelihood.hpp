@@ -72,7 +72,8 @@ private:
   matrix<fp_t,column_major> animals_; // n*m matrix of m species on n farms
   matrix<fp_t,column_major> animalsInfPow_; // Powers of m species on n farms for infectivity
   matrix<fp_t,column_major> animalsSuscPow_; // For susceptibility
-  matrix<fp_t,column_major> infecTimes_; // n*3 matrix of I,N,R times for each n infected farm
+  matrix<fp_t,column_major> eventTimes_; // n*3 matrix of I,N,R times for each n infected farm
+  matrix_range< matrix<fp_t,column_major> >* infecTimes_;
   fp_t I1_;
   ublas::vector<fp_t>::size_type I1idx_;
   ublas::vector<fp_t> infectivity_; // Infectivities

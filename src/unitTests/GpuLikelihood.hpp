@@ -32,28 +32,17 @@
 #include <cublas_v2.h>
 
 // CUDA defines
-#define THREADSPERBLOCK 512
+#define THREADSPERBLOCK 128
 
 // Model defines
 #define NUMEVENTS 3
 #define NUMSPECIES 3
 
-struct GpuParams
-{
-  float epsilon;
-  float gamma1;
-  float gamma2;
-  float xi[NUMSPECIES];
-  float psi[NUMSPECIES];
-  float zeta[NUMSPECIES];
-  float phi[NUMSPECIES];
-  float delta;
-};
 
 class GpuLikelihood
 {
 public:
-  GpuLikelihood(const size_t popSize, const size_t numInfecs, const size_t nSpecies, const size_t distanceNNZ);
+  GpuLikelihood(const size_t popSize, const size_t numInfecs, const size_t nSpecies, const float obsTime, const size_t distanceNNZ);
   virtual
   ~GpuLikelihood();
   void
@@ -62,8 +51,6 @@ public:
   SetSpecies(const float* data);
   void
   SetDistance(const float* data, const int* rowptr, const int* colind);
-  void
-  SetParameters(GpuParams params);
   void
   SetParameters(float* epsilon, float* gamma1, float* gamma2, float* xi, float* psi, float* zeta, float* phi, float* delta);
   void
@@ -83,11 +70,11 @@ public:
 
 private:
   // Host vars
-  size_t popSize_;
+  const size_t popSize_;
   size_t numInfecs_;
-  size_t numSpecies_;
+  const size_t numSpecies_;
   float logLikelihood_;
-  GpuParams gpuParams_;
+  const float obsTime_;
 
   // GPU data structures
   float* devAnimals_;
@@ -102,14 +89,14 @@ private:
   float* devTmp_;
 
   // Parameters
-  float* epsilon_;
-  float* gamma1_;
-  float* gamma2_;
-  float* xi_;
-  float* psi_;
-  float* zeta_;
-  float* phi_;
-  float* delta_;
+  float epsilon_;
+  float gamma1_;
+  float gamma2_;
+  float* devXi_;
+  float* devPsi_;
+  float* devZeta_;
+  float* devPhi_;
+  float delta_;
 
   // GPU BLAS handles
   cublasStatus_t blasStat_;

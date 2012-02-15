@@ -1,4 +1,4 @@
-#Mon Feb 13 16:19:56 GMT 2012
+#Tue Feb 14 16:52:29 GMT 2012
 eclipse.preferences.version=1
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410.989196113/CPPFLAGS/operation=replace
@@ -22,10 +22,16 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CPPFLAGS/value=-I/usr/local/cuda/include
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/operation=replace
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -DBOOST_MPI_HOMOGENEOUS -msse4.1 -O3
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/CXXFLAGS/value=-DNDEBUG -msse4.1 -O3
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/DYLD_LIBRARY_PATH/delimiter=\:
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/DYLD_LIBRARY_PATH/operation=replace
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/DYLD_LIBRARY_PATH/value=/usr/local/cuda/lib
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/LDFLAGS/value=-L/usr/local/cuda/lib
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/NVCXXFLAGS/delimiter=\:
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/NVCXXFLAGS/operation=replace
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/NVCXXFLAGS/value=-m64 -v --ptxas-options\=-v -g -G
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PATH/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PATH/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279.1706072410/PATH/value=/usr/bin\:/bin\:/usr/sbin\:/sbin\:/usr/local/bin\:/usr/X11/bin\:/opt/local/bin\:/usr/local/git/bin\:/usr/local/cuda/bin
@@ -38,11 +44,14 @@ environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.buil
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CXXFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/CXXFLAGS/value=-m64 -O0 -g -G
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/DYLD_LIBRARY_PATH/delimiter=\:
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/DYLD_LIBRARY_PATH/operation=append
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/DYLD_LIBRARY_PATH/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/DYLD_LIBRARY_PATH/value=/usr/local/cuda/lib
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/delimiter=\:
-environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/operation=append
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/LDFLAGS/value=-L/usr/local/cuda/lib
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/NVCXXFLAGS/delimiter=\:
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/NVCXXFLAGS/operation=append
+environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/NVCXXFLAGS/value=-m64 -v --ptxas-options\=-v
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/PATH/delimiter=\:
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/PATH/operation=replace
 environment/project/org.eclipse.linuxtools.cdt.autotools.core.configuration.build.1270651279/PATH/value=/usr/bin\:/bin\:/usr/sbin\:/sbin\:/usr/local/bin\:/usr/X11/bin\:/opt/local/bin\:/usr/local/git/bin\:/usr/local/cuda/bin

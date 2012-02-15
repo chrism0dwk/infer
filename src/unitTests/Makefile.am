@@ -3,11 +3,7 @@ AM_CPPFLAGS = @BOOST_CPPFLAGS@ @GSL_CPPFLAGS@
 METASOURCES = AUTO
 
 .cu.o:
-<<<<<<< HEAD
-	nvcc -g -G -m64 --ptxas-options=-v --compiler-options "$(CXXFLAGS)" $(INCLUDES) $(CPPFLAGS) -c -o $@ $<
-=======
 	nvcc @NVCXXFLAGS@ --compiler-options "$(CXXFLAGS)" $(INCLUDES) $(CPPFLAGS) -c -o $@ $<
->>>>>>> 950685638a28e90a1c092232db0ea66bfc816eba
 
 bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead fmdSellkeDiagnostic
 
