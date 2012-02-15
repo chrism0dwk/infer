@@ -225,7 +225,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   
   
   // Set up GPU environment
-  gpu_ = new GpuLikelihood(subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
+  gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
   gpu_->SetEvents(eventTimes_.data().begin());
   gpu_->SetSpecies(animals_.data().begin());
   gpu_->SetDistance(D_.value_data().begin(),DRowPtr_.begin(),DColInd_.begin());
@@ -329,24 +329,22 @@ MatLikelihood::calculate()
         }
     }
  
-  v = T_.value_data();
-  addreduction(v);
-  cerr << "Sum host T_ = " << v(0) << endl;
-
-  //cerr << T_ << endl;
-
   // Calculate the integral
   axpy_prod(DT_,susceptibility_,tmp);
 
   float integral = txparams_(0) * inner_prod(infectivity_,tmp);
 
   // Calculate background pressure
-  //matrix_column< matrix<float,column_major> > col(infecTimes_,0);
-  //float bg = sum(col) - I1_*infectivesSz_;
-  //bg += (obsTime_ - I1_)*(population_.size() - infectivesSz_);
-  //bg *= txparams_(3);
+  matrix_column< matrix_range< matrix<float,column_major> > > col(*infecTimes_,0);
+  v = col;
+  addreduction(v);
+  float bg = v(0) - I1_*infectivesSz_;
+  bg += (obsTime_ - I1_)*(population_.size() - infectivesSz_);
+  bg *= txparams_(3);
 
-  //integral += bg;
+  cerr << "Host sum I = " << v(0) << endl;
+  cerr << "Host I1 = " << I1_ << endl;
+  integral += bg;
 
   return /*lp */- integral;
 }

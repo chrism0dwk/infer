@@ -42,7 +42,7 @@
 class GpuLikelihood
 {
 public:
-  GpuLikelihood(const size_t popSize, const size_t numInfecs, const size_t nSpecies, const float obsTime, const size_t distanceNNZ);
+  GpuLikelihood(const size_t realPopSize, const size_t popSize, const size_t numInfecs, const size_t nSpecies, const float obsTime, const size_t distanceNNZ);
   virtual
   ~GpuLikelihood();
   void
@@ -62,6 +62,8 @@ public:
   void
   CalcDistance();
   void
+  CalcBgIntegral();
+  void
   UpdateDistance();
   void
   Calculate();
@@ -70,11 +72,14 @@ public:
 
 private:
   // Host vars
+  const size_t realPopSize_;
   const size_t popSize_;
   size_t numInfecs_;
   const size_t numSpecies_;
   float logLikelihood_;
   const float obsTime_;
+  float I1Time_;
+  float bgIntegral_;
 
   // GPU data structures
   float* devAnimals_;

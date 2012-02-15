@@ -354,7 +354,7 @@ main(int argc, char* argv[])
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
   myPopulation->loadConnectionGraph(//"/Users/stsiab/Documents/InFER/FMD2001/data/toy.con");
-      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_uk_infec_25km.con");
+      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_short.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
