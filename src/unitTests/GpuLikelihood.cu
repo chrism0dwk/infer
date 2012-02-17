@@ -183,18 +183,12 @@ template<unsigned int blockSize, typename Op>
 
     if (tid < 32)
       {
-        if (blockSize >= 64)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 32]);
-        if (blockSize >= 32)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 16]);
-        if (blockSize >= 16)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 8]);
-        if (blockSize >= 8)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 4]);
-        if (blockSize >= 4)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 2]);
-        if (blockSize >= 2)
-          threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 1]);
+        if (blockSize >= 64) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 32]); __syncthreads();}
+        if (blockSize >= 32) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 16]); __syncthreads();}
+        if (blockSize >= 16) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  8]); __syncthreads();}
+        if (blockSize >=  8) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  4]); __syncthreads();}
+        if (blockSize >=  4) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  2]); __syncthreads();}
+        if (blockSize >=  2) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  1]); __syncthreads();}
       }
 
     if (tid == 0)
