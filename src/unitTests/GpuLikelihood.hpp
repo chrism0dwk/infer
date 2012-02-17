@@ -28,8 +28,9 @@
 #define GPULIKELIHOOD_HPP_
 
 #include <cuda_runtime.h>
-#include <cusparse_v2.h>
 #include <cublas_v2.h>
+#include <cusparse.h>
+
 
 // CUDA defines
 #define THREADSPERBLOCK 128
@@ -83,8 +84,11 @@ private:
 
   // GPU data structures
   float* devAnimals_;
+  size_t animalsPitch_;
   float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
+  size_t animalsInfPowPitch_, animalsSuscPowPitch_;
   float* devEventTimes_;
+  size_t eventTimesPitch_;
   float* devSusceptibility_;
   float* devInfectivity_;
   float* devDVal_; int* devDRowPtr_; int* devDColInd_; size_t dnnz_; //CRS
