@@ -33,9 +33,6 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 
-#include <cuda_runtime.h>
-#include <cusparse_v2.h>
-#include <cublas_v2.h>
 
 #include "Parameter.hpp"
 #include "SpatPointPop.hpp"

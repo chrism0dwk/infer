@@ -354,7 +354,7 @@ main(int argc, char* argv[])
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
   myPopulation->loadConnectionGraph(//"/Users/stsiab/Documents/InFER/FMD2001/data/toy.con");
-      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_short.con");
+      "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_uk_infec_25km.con");
   myPopulation->setObsTime(atof(argv[4]));
 
   delete popDataImporter;
@@ -445,8 +445,8 @@ main(int argc, char* argv[])
   cerr << "Likelihood = " << integral << endl;
 
 
-  cout << "Press <enter> to exit....";
-  char m = getchar();
+//  cout << "Press <enter> to exit....";
+//  char m = getchar();
 
 
   //Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);

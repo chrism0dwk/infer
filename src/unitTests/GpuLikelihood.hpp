@@ -33,7 +33,7 @@
 
 
 // CUDA defines
-#define THREADSPERBLOCK 128
+#define THREADSPERBLOCK 256
 
 // Model defines
 #define NUMEVENTS 3

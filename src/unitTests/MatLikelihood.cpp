@@ -225,6 +225,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   
   
   // Set up GPU environment
+  cerr << "Initialising GPU" << endl;
   gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
   gpu_->SetEvents(eventTimes_.data().begin());
   gpu_->SetSpecies(animals_.data().begin());
@@ -247,6 +248,8 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
     }
 
   gpu_->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
+
+  cerr << "Calculating likelihood" << endl;
   gpu_->Calculate();
   
 
@@ -289,33 +292,33 @@ MatLikelihood::calculate()
   addreduction(v);
   cerr << "Sum infectivity = " << v(0) << endl;
 
-  // Calculate product
-  float lp = 0.0;
-  compressed_matrix<float,column_major> QE(E_);
-  for(size_t j = 0; j != QE.size1(); j++) // Iterate over COLUMNS j
-    {
-      size_t begin = QE.index1_data()[j];
-      size_t end = QE.index1_data()[j+1];
-      for(size_t i = begin; i < end; ++i) // Non-zero ROWS i
-        {
-          QE.value_data()[i] *= txparams_(2) / (deltasq + D_(QE.index2_data()[i],j));
-        }
-    }
-  axpy_prod(infectivity_,QE,tmp);
-
-  tmp *= txparams_(0);  // Gamma1
-
-  for(size_t i = 0; i < I1idx_; ++i)
-    {
-      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
-      product_(i) = subprod; lp += logf(subprod);
-    }
-  product_(I1idx_) = 1.0; // Loop unrolled to skip I1
-  for(size_t i = I1idx_+1; i < tmp.size(); ++i)
-    {
-      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
-      product_(i) = subprod; lp += logf(subprod);
-    }
+//  // Calculate product
+//  float lp = 0.0;
+//  compressed_matrix<float,column_major> QE(E_);
+//  for(size_t j = 0; j != QE.size1(); j++) // Iterate over COLUMNS j
+//    {
+//      size_t begin = QE.index1_data()[j];
+//      size_t end = QE.index1_data()[j+1];
+//      for(size_t i = begin; i < end; ++i) // Non-zero ROWS i
+//        {
+//          QE.value_data()[i] *= txparams_(2) / (deltasq + D_(QE.index2_data()[i],j));
+//        }
+//    }
+//  axpy_prod(infectivity_,QE,tmp);
+//
+//  tmp *= txparams_(0);  // Gamma1
+//
+//  for(size_t i = 0; i < I1idx_; ++i)
+//    {
+//      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
+//      product_(i) = subprod; lp += logf(subprod);
+//    }
+//  product_(I1idx_) = 1.0; // Loop unrolled to skip I1
+//  for(size_t i = I1idx_+1; i < tmp.size(); ++i)
+//    {
+//      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
+//      product_(i) = subprod; lp += logf(subprod);
+//    }
 
   // Apply distance kernel to D_ and calculate DT
   for(size_t i = 0; i < D_.size1(); ++i)
