@@ -108,7 +108,7 @@ private:
   float* devTVal_;  //CRS
   float* devDTVal_; // CRS
   float* devEVal_; int* devERowPtr_; int* devEColInd_; size_t ennz_; //CRS
-  float* devEDVal_; // CRS
+  float* devEDVal_; int* devEDRowPtr_; int* devEDColInd_;// CRS
   float* devTmp_;
 
   // Parameters
