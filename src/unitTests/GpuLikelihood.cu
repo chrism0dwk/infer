@@ -195,26 +195,27 @@ __global__ void
 calcE(const int infecSize, const int nnz, const int* ERowPtr, const int* EColInd,
     float* EVal, const float* eventTimes, const int eventTimesPitch, const float gamma2)
 {
-  // Each thread calculates a row i of the sparse matrix -- not efficient!
+  // Each thread calculates a row j of the sparse matrix -- not efficient!
 
-  int i = threadIdx.x + blockDim.x * blockIdx.x;
+  int j = threadIdx.x + blockDim.x * blockIdx.x;
 
-  if (i < infecSize)
+  if (j < infecSize)
     {
-      int begin = ERowPtr[i];
-      int end = ERowPtr[i + 1];
+      int begin = ERowPtr[j];
+      int end = ERowPtr[j + 1];
 
-      float Ii = eventTimes[i]; // First column  -- argument for row-major here, I would have thought.
-      float Ni = eventTimes[eventTimesPitch + i]; // Second column
-      float Ri = eventTimes[eventTimesPitch * 2 + i]; // Third column
+      float Ij = eventTimes[j];
 
-      for (int j = begin; j < end; ++j)
-        {
-          float Ij = eventTimes[EColInd[j]];
+      for (int ii = begin; ii < end; ++ii)      // Accessing all this data will *not* coalesce.
+        {                                       // -- probably good to use texture cache here!
+          int i = EColInd[ii];
+          float Ii = eventTimes[i];
+          float Ni = eventTimes[eventTimesPitch + i];
+          float Ri = eventTimes[eventTimesPitch * 2 + i];
 
-          if(Ii < Ij and Ij <= Ni) EVal[j] = 1.0f;
-          else if(Ni < Ij and Ij <= Ri ) EVal[j] = gamma2;
-          else EVal[j] = 0.0f;
+          if(Ii < Ij and Ij <= Ni) EVal[ii] = 1.0f;
+          else if(Ni < Ij and Ij <= Ri ) EVal[ii] = gamma2;
+          else EVal[ii] = 0.0f;
         }
     }
 }
@@ -381,8 +382,6 @@ GpuLikelihood::~GpuLikelihood()
     cudaFree(devERowPtr_);
     cudaFree(devEColInd_);
     cudaFree(devEDVal_);
-    cudaFree(devEDRowPtr_);
-    cudaFree(devEDColInd_);
   }
 
   if (devXi_)
@@ -468,13 +467,10 @@ GpuLikelihood::SetDistance(const float* data, const int* rowptr,
   checkCudaError(cudaMalloc(&devEColInd_,tmpColInd.size() * sizeof(int)));
   checkCudaError(cudaMalloc(&devEVal_,tmpVals.size() * sizeof(float)));
   checkCudaError(cudaMalloc(&devEDVal_,tmpVals.size() * sizeof(float)));
-  checkCudaError(cudaMalloc(&devEDRowPtr_,eRowPtr.size()*sizeof(int)));
-  checkCudaError(cudaMalloc(&devEDColInd_,tmpVals.size()*sizeof(int)));
   ennz_ = tmpVals.size();
 
   checkCudaError(cudaMemcpy(devERowPtr_,eRowPtr.data(),eRowPtr.size() * sizeof(int),cudaMemcpyHostToDevice));
   checkCudaError(cudaMemcpy(devEColInd_,tmpColInd.data(),tmpColInd.size() * sizeof(int),cudaMemcpyHostToDevice));
-
 }
 
 void
@@ -519,15 +515,12 @@ GpuLikelihood::CalcEvents()
   calcT<<<blocksPerGrid,THREADSPERBLOCK>>>(numInfecs_, dnnz_, devDRowPtr_, devDColInd_, devTVal_, devEventTimes_, eventTimesPitch_, gamma2_, obsTime_);
 
   cudaThreadSynchronize();
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess)
-    throw GpuRuntimeError("Error calculating events", err);
+  checkCudaError(cudaGetLastError());
 
   // Calculate the E_ matrix
   blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
   calcE<<<blocksPerGrid,THREADSPERBLOCK>>>(numInfecs_, ennz_, devERowPtr_, devEColInd_, devEVal_, devEventTimes_, eventTimesPitch_, gamma2_);
-
-  // Calculate I1Time_, I1Idx_, and sumI
+  checkCudaError(cudaGetLastError());
 
   cudaThreadSynchronize();
 
@@ -541,13 +534,7 @@ GpuLikelihood::CalcInfectivityPow()
   int dimBlock(THREADSPERBLOCK);
   int dimGrid((numInfecs_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
   calcSpecPow<<<dimGrid, dimBlock>>>(numInfecs_,numSpecies_,devAnimalsInfPow_, animalsInfPowPitch_,devAnimals_,animalsPitch_,devPsi_);
-
-  //cudaThreadSynchronize();
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess)
-    {
-      throw GpuRuntimeError("Launch of infectivity power kernel failed", err);
-    }
+  checkCudaError(cudaGetLastError());
 }
 
 
@@ -574,14 +561,7 @@ GpuLikelihood::CalcSusceptibilityPow()
   int dimBlock(THREADSPERBLOCK);
   int dimGrid((popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
   calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,animalsSuscPowPitch_, devAnimals_,animalsPitch_,devPhi_);
-
-  //cudaThreadSynchronize();
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess)
-    {
-      throw GpuRuntimeError("Launch of susceptibility power kernel failed",
-          err);
-    }
+  checkCudaError(cudaGetLastError());
 }
 
 inline
@@ -614,20 +594,20 @@ GpuLikelihood::CalcDistance()
 
 
   // Apply distance kernel to E_, place result in a temporary
-  float* val;
-  checkCudaError(cudaMalloc(&val,ennz_*sizeof(float)));
+//  float* val;
+//  checkCudaError(cudaMalloc(&val,ennz_*sizeof(float)));
   blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
-  calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, val, numInfecs_, delta_);
+  calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, devEDVal_, numInfecs_, delta_);
   checkCudaError(cudaGetLastError());
 
-  // Transpose into ED_ to enable faster calculation
-  sparseStat_ = cusparseScsr2csc(cudaSparse_,numInfecs_,numInfecs_,val,devERowPtr_,devEColInd_, devEDVal_,devEDColInd_,devEDRowPtr_,1,CUSPARSE_INDEX_BASE_ZERO);
-  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    {
-      std::cerr << "ED matrix transpose failed" << std::endl;
-    }
-
-  cudaFree(val);
+//  // Transpose into ED_ to enable faster calculation
+//  sparseStat_ = cusparseScsr2csc(cudaSparse_,numInfecs_,numInfecs_,val,devERowPtr_,devEColInd_, devEDVal_,devEDColInd_,devEDRowPtr_,1,CUSPARSE_INDEX_BASE_ZERO);
+//  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
+//    {
+//      std::cerr << "ED matrix transpose failed" << std::endl;
+//    }
+//
+//  cudaFree(val);
 
 }
 
@@ -693,9 +673,9 @@ GpuLikelihood::CalcIntegral()
 void
 GpuLikelihood::FullCalculate()
 {
-
-  CalcEvents();
   CalcInfectivityPow();
+  CalcEvents();
+
   CalcInfectivity();
   CalcSusceptibilityPow();
   CalcSusceptibility();
