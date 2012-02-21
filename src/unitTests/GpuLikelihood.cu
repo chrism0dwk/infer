@@ -381,6 +381,8 @@ GpuLikelihood::~GpuLikelihood()
     cudaFree(devERowPtr_);
     cudaFree(devEColInd_);
     cudaFree(devEDVal_);
+    cudaFree(devEDRowPtr_);
+    cudaFree(devEDColInd_);
   }
 
   if (devXi_)
@@ -466,6 +468,8 @@ GpuLikelihood::SetDistance(const float* data, const int* rowptr,
   checkCudaError(cudaMalloc(&devEColInd_,tmpColInd.size() * sizeof(int)));
   checkCudaError(cudaMalloc(&devEVal_,tmpVals.size() * sizeof(float)));
   checkCudaError(cudaMalloc(&devEDVal_,tmpVals.size() * sizeof(float)));
+  checkCudaError(cudaMalloc(&devEDRowPtr_,eRowPtr.size()*sizeof(int)));
+  checkCudaError(cudaMalloc(&devEDColInd_,tmpVals.size()*sizeof(int)));
   ennz_ = tmpVals.size();
 
   checkCudaError(cudaMemcpy(devERowPtr_,eRowPtr.data(),eRowPtr.size() * sizeof(int),cudaMemcpyHostToDevice));
@@ -609,10 +613,21 @@ GpuLikelihood::CalcDistance()
   checkCudaError(err);
 
 
-  // Apply distance kernel to E_, place result in ED_
+  // Apply distance kernel to E_, place result in a temporary
+  float* val;
+  checkCudaError(cudaMalloc(&val,ennz_*sizeof(float)));
   blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
-  calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, devEDVal_, numInfecs_, delta_);
+  calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, val, numInfecs_, delta_);
   checkCudaError(cudaGetLastError());
+
+  // Transpose into ED_ to enable faster calculation
+  sparseStat_ = cusparseScsr2csc(cudaSparse_,numInfecs_,numInfecs_,val,devERowPtr_,devEColInd_, devEDVal_,devEDColInd_,devEDRowPtr_,1,CUSPARSE_INDEX_BASE_ZERO);
+  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
+    {
+      std::cerr << "ED matrix transpose failed" << std::endl;
+    }
+
+  cudaFree(val);
 
 }
 
@@ -634,7 +649,7 @@ void
 GpuLikelihood::CalcProduct()
 {
   // Calculate Product
-  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_TRANSPOSE, numInfecs_, numInfecs_, UNITY, crsDescr_, devEDVal_, devERowPtr_, devEColInd_, devInfectivity_, ZERO, devTmp_);
+  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_NON_TRANSPOSE, numInfecs_, numInfecs_, UNITY, crsDescr_, devEDVal_, devERowPtr_, devEColInd_, devInfectivity_, ZERO, devTmp_);
   if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
     {
       std::cerr << "ED*S failed: " << sparseStat_ << "\n";
