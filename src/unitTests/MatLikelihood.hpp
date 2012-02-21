@@ -78,7 +78,7 @@ private:
   ublas::vector<fp_t> product_; // Product cache
   typedef compressed_matrix<fp_t> spm_t;
   spm_t D_; // Spatial kernel matrix
-  compressed_matrix<fp_t,column_major> E_; // Exposed at time of infection (product)
+  compressed_matrix<fp_t,row_major> E_; // Exposed at time of infection (product)
   spm_t T_; // Exposure time
   spm_t DT_; // Spatial kernel * exposure time
   ublas::unbounded_array<int> DRowPtr_;

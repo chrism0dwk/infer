@@ -7,6 +7,9 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <utility>
 #include <cmath>
 #include <math_functions.h>
 
@@ -42,6 +45,23 @@ public:
 private:
   std::string msg_;
 };
+
+
+#define checkCudaError(err)  __checkCudaError(err, __FILE__, __LINE__)
+
+void
+__checkCudaError(const cudaError_t err, const char* file, const int line)
+{
+  if(err != cudaSuccess) {
+    std::stringstream s;
+    s << file << "(" << line
+      << ") : Cuda Runtime error ";
+    throw GpuRuntimeError(s.str(),err);
+  }
+}
+
+
+
 
 // CUDA kernels
 
@@ -79,6 +99,18 @@ struct Plus
     }
   };
 
+template<typename T>
+struct Log
+{
+  __host__ __device__
+  T
+  operator()(const T& val) const
+  {
+    return logf(val);
+  }
+};
+
+
 __global__ void
 calcDT(const float* D, const float* T, const int N, float* DT, const float delta)
 {
@@ -87,8 +119,46 @@ calcDT(const float* D, const float* T, const int N, float* DT, const float delta
     DT[idx] = delta / (delta * delta + D[idx]) * T[idx];
 }
 
+
 __global__ void
-calcT(const int infecSize, const int nnz, const int popSize, int* TRowPtr, int* TColInd,
+calcED(const float* eVal, const int* eRowPtr, const int* eColInd, const float* dVal,
+    const int* dRowPtr, const int* dColInd, float* edVal, const int numInfecs, const float delta)
+{
+  int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  int wid = tid / 32; // Warp id
+  int lane = tid & (32 - 1); // Id within a warp
+
+  int row = wid;
+  if (row < numInfecs)
+    {
+      int d_begin = dRowPtr[row]; //int d_end = dRowPtr[row+1];
+      int e_begin = eRowPtr[row]; int e_end = eRowPtr[row+1];
+      int rowLen = e_end - e_begin;
+
+      for(int col = lane; col < rowLen; col += 32) // Loop over row in e
+        {
+          float d = dVal[d_begin+col];
+          float e = eVal[e_begin+col];
+          edVal[e_begin+col] = delta / (delta*delta + d) * e;
+
+        }
+    }
+}
+
+
+__global__ void
+calcProdSusceptibility(const float* input, const float* infectivity, float* product, const int size, const int I1, const float epsilon, const float gamma1)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  if(tid == I1) product[tid] = 1.0;
+  else if(tid < size)
+    {
+      product[tid] = infectivity[tid] * input[tid] * gamma1 + epsilon;
+    }
+}
+
+__global__ void
+calcT(const int infecSize, const int nnz, int* TRowPtr, int* TColInd,
     float* TVal, float* eventTimes, const int eventTimesPitch, const float gamma2, const float obsTime)
 {
   // Each thread calculates a row i of the sparse matrix -- probably not efficient!
@@ -119,6 +189,38 @@ calcT(const int infecSize, const int nnz, const int popSize, int* TRowPtr, int* 
     }
 }
 
+
+
+__global__ void
+calcE(const int infecSize, const int nnz, const int* ERowPtr, const int* EColInd,
+    float* EVal, const float* eventTimes, const int eventTimesPitch, const float gamma2)
+{
+  // Each thread calculates a row i of the sparse matrix -- not efficient!
+
+  int i = threadIdx.x + blockDim.x * blockIdx.x;
+
+  if (i < infecSize)
+    {
+      int begin = ERowPtr[i];
+      int end = ERowPtr[i + 1];
+
+      float Ii = eventTimes[i]; // First column  -- argument for row-major here, I would have thought.
+      float Ni = eventTimes[eventTimesPitch + i]; // Second column
+      float Ri = eventTimes[eventTimesPitch * 2 + i]; // Third column
+
+      for (int j = begin; j < end; ++j)
+        {
+          float Ij = eventTimes[EColInd[j]];
+
+          if(Ii < Ij and Ij <= Ni) EVal[j] = 1.0f;
+          else if(Ni < Ij and Ij <= Ri ) EVal[j] = gamma2;
+          else EVal[j] = 0.0f;
+        }
+    }
+}
+
+
+
 __global__ void
 calcSpecPow(const int size, const int nSpecies, float* specpow, const int specpowPitch,
     const float* animals, const int animalsPitch, const float* powers)
@@ -135,66 +237,6 @@ calcSpecPow(const int size, const int nSpecies, float* specpow, const int specpo
     }
 }
 
-template<unsigned int blockSize, typename Op>
-  __global__ void
-  reduction(const float* buffer, float* rb, int size)
-  {
-    extern __shared__ float threadBuff[];
-
-    Op op; // Operation functor to use
-
-    unsigned int tid = threadIdx.x;
-    unsigned int i = blockIdx.x * (blockSize * 2) + tid;
-    unsigned int gridSize = blockSize * 2 * gridDim.x;
-    threadBuff[tid] = op.initval(); // Initialize with default init value
-
-    while (i < size)
-      {
-        threadBuff[tid] = buffer[i];
-        if (i + blockSize < size) threadBuff[tid] = op(threadBuff[tid], buffer[i + blockSize]);
-        i += gridSize;
-      }
-    __syncthreads();
-
-    if (blockSize >= 512)
-      {
-        if (tid < 256)
-          {
-            threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 256]);
-          }
-        __syncthreads();
-      }
-    if (blockSize >= 256)
-      {
-        if (tid < 128)
-          {
-            threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 128]);
-          }
-        __syncthreads();
-      }
-    if (blockSize >= 128)
-      {
-        if (tid < 64)
-          {
-            threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 64]);
-          }
-        __syncthreads();
-      }
-
-    if (tid < 32)
-      {
-        if (blockSize >= 64) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 32]); __syncthreads();}
-        if (blockSize >= 32) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid + 16]); __syncthreads();}
-        if (blockSize >= 16) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  8]); __syncthreads();}
-        if (blockSize >=  8) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  4]); __syncthreads();}
-        if (blockSize >=  4) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  2]); __syncthreads();}
-        if (blockSize >=  2) { threadBuff[tid] = op(threadBuff[tid], threadBuff[tid +  1]); __syncthreads();}
-      }
-
-    if (tid == 0)
-      rb[blockIdx.x] = threadBuff[0];
-  }
-
 
 __global__ void
 sequence(float* buff, int size)
@@ -203,48 +245,16 @@ sequence(float* buff, int size)
   if(idx < size) buff[idx] = (float)idx;
 }
 
-template<class Op>
-  __host__ float
-  gpuReduction(const float* deviceBuffer, const int size)
-  {
-    int numBlocks = (size + THREADSPERBLOCK - 1) / THREADSPERBLOCK / 2;
-    float* buff = new float[numBlocks];
-    float* devRB;
-
-    cudaError_t rv = cudaMalloc(&devRB, numBlocks * sizeof(float));
-    if (rv != cudaSuccess)
-      throw GpuRuntimeError("Cannot allocate memory for reduction buffer", rv);
-
-    reduction<THREADSPERBLOCK, Op><<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(deviceBuffer, devRB, size);
-
-    rv = cudaMemcpy(buff, devRB, numBlocks * sizeof(float),
-        cudaMemcpyDeviceToHost);
-    if (rv != cudaSuccess)
-      throw GpuRuntimeError("Could not retrieve reduction buffer from device",
-          rv);
-
-    cudaFree(devRB);
-
-    // Final reduction on host
-    float result = buff[0];
-    Op op;
-    for (size_t i = 1; i < numBlocks; ++i)
-      result = op(buff[i],result);
-
-    delete[] buff;
-
-    return result;
-  }
 
 GpuLikelihood::GpuLikelihood(const size_t realPopSize, const size_t popSize,
     const size_t numInfecs, const size_t nSpecies, const float obsTime,
     const size_t distanceNNZ) :
     realPopSize_(realPopSize), popSize_(popSize), numInfecs_(numInfecs), numSpecies_(
-        nSpecies), obsTime_(obsTime), I1Time_(0.0), bgIntegral_(0.0), devAnimals_(
+        nSpecies), obsTime_(obsTime), I1Time_(0.0), I1Idx_(0), sumI_(0),bgIntegral_(0.0), devAnimals_(
         NULL), animalsPitch_(0), devAnimalsInfPow_(NULL), devAnimalsSuscPow_(NULL), devEventTimes_(
         NULL), devSusceptibility_(NULL), devInfectivity_(NULL), devDVal_(NULL), devDRowPtr_(
         NULL), devDColInd_(NULL), dnnz_(distanceNNZ), devTVal_(NULL), devDTVal_(
-        NULL), devEVal_(NULL), devEColPtr_(NULL), devERowInd_(NULL), devTmp_(
+        NULL), devEVal_(NULL), devERowPtr_(NULL), devEColInd_(NULL), devTmp_(
         NULL), epsilon_(0.0f), gamma1_(0.0f), gamma2_(0.0f), devXi_(NULL), devPsi_(
         NULL), devZeta_(NULL), devPhi_(NULL), delta_(0.0f)
 {
@@ -303,8 +313,11 @@ GpuLikelihood::GpuLikelihood(const size_t realPopSize, const size_t popSize,
     throw GpuRuntimeError("Cannot allocate temporary structures",
         (cudaError_t) rv);
 
+  // Allocate product vector
+  rv = cudaMalloc(&devProduct_, numInfecs_ * sizeof(float));
+
   // Allocate temporary vector
-  rv = cudaMalloc(&devTmp_, numInfecs_ * sizeof(float));
+  rv = cudaMalloc(&devTmp_, popSize_ * sizeof(float));
   if (rv != cudaSuccess)
     throw GpuRuntimeError("Cannot allocate temporary structures",
         (cudaError_t) rv);
@@ -361,6 +374,14 @@ GpuLikelihood::~GpuLikelihood()
     cudaFree(devInfectivity_);
   if (devTmp_ != NULL)
     cudaFree(devTmp_);
+  if(devProduct_ != NULL)
+    cudaFree(devProduct_);
+  if(devEVal_ != NULL) {
+    cudaFree(devEVal_);
+    cudaFree(devERowPtr_);
+    cudaFree(devEColInd_);
+    cudaFree(devEDVal_);
+  }
 
   if (devXi_)
     cudaFree(devXi_);
@@ -382,6 +403,12 @@ GpuLikelihood::SetEvents(const float* data)
   cudaError_t rv = cudaMemcpy2D(devEventTimes_, eventTimesPitch_*sizeof(float), data, popSize_*sizeof(float), popSize_*sizeof(float), NUMEVENTS, cudaMemcpyHostToDevice);
   if (rv != cudaSuccess)
     throw GpuRuntimeError("Copying event times to device failed", rv);
+
+  thrust::device_ptr<float> v(devEventTimes_); // REQUIRES COL MAJOR!!
+  thrust::device_ptr<float> myMin = thrust::min_element(v,v+numInfecs_);
+  I1Idx_ = myMin - v;
+  I1Time_ = *myMin;
+  sumI_ = thrust::reduce(v,v+numInfecs_,0.0f,thrust::plus<float>());
 }
 
 void
@@ -409,6 +436,41 @@ GpuLikelihood::SetDistance(const float* data, const int* rowptr,
   if (rv != cudaSuccess)
     throw GpuRuntimeError("Copy of distance matrix to device failed",
         (cudaError_t) rv);
+
+  std::cerr << "Creating E matrix" << std::endl;
+  // Create E_ matrix -- this is an nxn sparse range of the nxm distance matrix
+  std::vector< int > eRowPtr;
+  std::vector< int > tmpColInd;
+  std::vector< float > tmpVals;
+  int eNNZ = 0;
+  for(size_t i=0; i<numInfecs_; ++i)
+    {
+      eRowPtr.push_back(eNNZ);
+      int begin = rowptr[i];
+      int end = rowptr[i+1];
+      for(size_t jj = begin; jj<end; ++jj)
+        {
+          if(colind[jj] < numInfecs_)
+            {
+              tmpColInd.push_back(colind[jj]);
+              tmpVals.push_back(data[begin+jj]);
+              eNNZ++;
+            }
+        }
+    }
+  eRowPtr.push_back(eNNZ);
+  std::cerr << "Done\nCopying to device memory" << std::endl;
+
+  // Transfer to device
+  checkCudaError(cudaMalloc(&devERowPtr_,eRowPtr.size() * sizeof(int)));
+  checkCudaError(cudaMalloc(&devEColInd_,tmpColInd.size() * sizeof(int)));
+  checkCudaError(cudaMalloc(&devEVal_,tmpVals.size() * sizeof(float)));
+  checkCudaError(cudaMalloc(&devEDVal_,tmpVals.size() * sizeof(float)));
+  ennz_ = tmpVals.size();
+
+  checkCudaError(cudaMemcpy(devERowPtr_,eRowPtr.data(),eRowPtr.size() * sizeof(int),cudaMemcpyHostToDevice));
+  checkCudaError(cudaMemcpy(devEColInd_,tmpColInd.data(),tmpColInd.size() * sizeof(int),cudaMemcpyHostToDevice));
+
 }
 
 void
@@ -450,55 +512,45 @@ GpuLikelihood::CalcEvents()
   std::cerr << "Calculating Events with block size "
       << THREADSPERBLOCK << " and blocks per grid " << blocksPerGrid
       << std::endl;
-  calcT<<<blocksPerGrid,THREADSPERBLOCK>>>(numInfecs_, dnnz_, popSize_, devDRowPtr_, devDColInd_, devTVal_, devEventTimes_, eventTimesPitch_, gamma2_, obsTime_);
+  calcT<<<blocksPerGrid,THREADSPERBLOCK>>>(numInfecs_, dnnz_, devDRowPtr_, devDColInd_, devTVal_, devEventTimes_, eventTimesPitch_, gamma2_, obsTime_);
 
   cudaThreadSynchronize();
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
     throw GpuRuntimeError("Error calculating events", err);
 
-//  float* vals = new float[dnnz_];
-//  int* rowptr = new int[popSize_];
-//  int* colind = new int[dnnz_];
-//
-//  cudaMemcpy(vals, devTVal_, dnnz_ * sizeof(float), cudaMemcpyDeviceToHost);
-//  cudaMemcpy(rowptr, devDRowPtr_, popSize_ * sizeof(int),
-//      cudaMemcpyDeviceToHost);
-//  cudaMemcpy(colind, devDColInd_, dnnz_ * sizeof(int), cudaMemcpyDeviceToHost);
-//
-//  std::cerr << "T_: ";
-//  for (size_t i = 0; i < dnnz_; ++i)
-//    std::cerr << vals[i] << " ";
-//  std::cerr << std::endl;
-//  std::cerr << "TColInd: ";
-//  for (size_t i = 0; i < dnnz_; ++i)
-//    std::cerr << colind[i] << " ";
-//  std::cerr << std::endl;
-//  std::cerr << "TRowPtr: ";
-//  for (size_t i = 0; i < popSize_; ++i)
-//    std::cerr << rowptr[i] << " ";
-//  std::cerr << std::endl;
-//
-//  delete[] vals;
+  // Calculate the E_ matrix
+  blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
+  calcE<<<blocksPerGrid,THREADSPERBLOCK>>>(numInfecs_, ennz_, devERowPtr_, devEColInd_, devEVal_, devEventTimes_, eventTimesPitch_, gamma2_);
+
+  // Calculate I1Time_, I1Idx_, and sumI
+
+  cudaThreadSynchronize();
 
 }
 
+
+inline
 void
-GpuLikelihood::CalcInfectivity()
+GpuLikelihood::CalcInfectivityPow()
 {
-  // Calculates infectivity powers and sums over infectivity
-  cudaGetLastError(); // Reset error status
-  // First do devAnimalsInfPow_
   int dimBlock(THREADSPERBLOCK);
   int dimGrid((numInfecs_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
   calcSpecPow<<<dimGrid, dimBlock>>>(numInfecs_,numSpecies_,devAnimalsInfPow_, animalsInfPowPitch_,devAnimals_,animalsPitch_,devPsi_);
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
     {
       throw GpuRuntimeError("Launch of infectivity power kernel failed", err);
     }
+}
+
+
+inline
+void
+GpuLikelihood::CalcInfectivity()
+{
 
   // Now calculate infectivity
   blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, numInfecs_, numSpecies_,
@@ -509,40 +561,38 @@ GpuLikelihood::CalcInfectivity()
       std::cerr << "Error in infectivity: " << blasStat_ << std::endl;
     }
 
-  float res;
-  cublasSasum(cudaBLAS_, numInfecs_, devInfectivity_, 1, &res);
-  std::cerr << "Sum devInfectivity_ (GPU) = " << res << std::endl;
 }
 
+inline
 void
-GpuLikelihood::CalcSusceptibility()
+GpuLikelihood::CalcSusceptibilityPow()
 {
-  // Calculates susceptibility powers and sums over suscept.
-  cudaGetLastError();
   int dimBlock(THREADSPERBLOCK);
   int dimGrid((popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
   calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,animalsSuscPowPitch_, devAnimals_,animalsPitch_,devPhi_);
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
     {
       throw GpuRuntimeError("Launch of susceptibility power kernel failed",
           err);
     }
+}
 
+inline
+void
+GpuLikelihood::CalcSusceptibility()
+{
+  // Calculates susceptibility powers and sums over suscept.
   blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, popSize_, numSpecies_, &UNITY,
       devAnimalsSuscPow_, animalsSuscPowPitch_, devZeta_, 1, &ZERO, devSusceptibility_, 1);
   if (blasStat_ != CUBLAS_STATUS_SUCCESS)
     {
       std::cerr << "Error in susceptibility: " << blasStat_ << std::endl;
     }
-
-  float res;
-  cublasSasum(cudaBLAS_, popSize_, devSusceptibility_, 1, &res);
-  std::cerr << "Sum devSusceptibility_ (GPU) = " << res << std::endl;
-
 }
+
 
 inline
 void
@@ -554,14 +604,15 @@ GpuLikelihood::CalcDistance()
   size_t blocksPerGrid = (dnnz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
   calcDT<<<blocksPerGrid,THREADSPERBLOCK>>>(devDVal_,devTVal_,dnnz_,devDTVal_, delta_);
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
   cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess)
-    throw GpuRuntimeError("Distance calculation failed", err);
+  checkCudaError(err);
 
-  float res;
-  cublasSasum(cudaBLAS_, dnnz_, devTVal_, 1, &res);
-  std::cerr << "Sum devTVal_ (GPU) = " << res << std::endl;
+
+  // Apply distance kernel to E_, place result in ED_
+  blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
+  calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, devEDVal_, numInfecs_, delta_);
+  checkCudaError(cudaGetLastError());
 
 }
 
@@ -570,98 +621,92 @@ GpuLikelihood::CalcBgIntegral()
 {
   // Get I1Time
 
-  float I1 = gpuReduction<Min<float> >(devEventTimes_, numInfecs_);
-  float sumI = gpuReduction<Plus<float> >(devEventTimes_, numInfecs_);
-
-  bgIntegral_ = sumI - I1 * numInfecs_;
-  bgIntegral_ += (obsTime_ - I1) * (realPopSize_ - numInfecs_);
+  bgIntegral_ = sumI_ - I1Time_ * numInfecs_;
+  bgIntegral_ += (obsTime_ - I1Time_) * (realPopSize_ - numInfecs_);
   bgIntegral_ *= epsilon_;
 
-  std::cerr << "Cuda sumI = " << sumI << std::endl;
-  std::cerr << "Cuda I1 = " << I1 << std::endl;
+  //std::cerr << "Cuda sumI = " << sumI_ << std::endl;
+  //std::cerr << "Cuda I1 = " << I1Time_ << std::endl;
+}
+
+
+void
+GpuLikelihood::CalcProduct()
+{
+  // Calculate Product
+  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_TRANSPOSE, numInfecs_, numInfecs_, UNITY, crsDescr_, devEDVal_, devERowPtr_, devEColInd_, devInfectivity_, ZERO, devTmp_);
+  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
+    {
+      std::cerr << "ED*S failed: " << sparseStat_ << "\n";
+    }
+
+  int blocksPerGrid = (numInfecs_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
+  calcProdSusceptibility<<<blocksPerGrid, THREADSPERBLOCK>>>(devTmp_, devSusceptibility_, devProduct_, numInfecs_, I1Idx_, epsilon_, gamma1_);
+  checkCudaError(cudaGetLastError());
+
+  thrust::device_ptr<float> rb(devProduct_);
+  lp_ = thrust::transform_reduce(rb, rb+numInfecs_, Log<float>(), 0.0f, thrust::plus<float>());
+}
+
+void
+GpuLikelihood::CalcIntegral()
+{
+  integral_ = 0.0f;
+  // DT * Susceptibility
+  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_NON_TRANSPOSE,
+      numInfecs_, popSize_, UNITY, crsDescr_, devDTVal_, devDRowPtr_,
+      devDColInd_, devSusceptibility_, ZERO, devTmp_);
+  if (sparseStat_ != CUSPARSE_STATUS_SUCCESS)
+    {
+      std::cerr << "Error in cusparseScsrmv() " << sparseStat_ << std::endl;
+    }
+
+  cudaDeviceSynchronize();
+  // infectivity * devTmp
+  blasStat_ = cublasSdot(cudaBLAS_, numInfecs_, devInfectivity_, 1, devTmp_, 1,
+      &integral_); // May have an issue with 1-based indexing here!
+  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
+    {
+      std::cerr << "Error in cublasSdot() " << blasStat_ << std::endl;
+    }
+  cudaDeviceSynchronize();
+
+  integral_ *= gamma1_;
+}
+
+
+void
+GpuLikelihood::FullCalculate()
+{
+
+  CalcEvents();
+  CalcInfectivityPow();
+  CalcInfectivity();
+  CalcSusceptibilityPow();
+  CalcSusceptibility();
+  CalcDistance();
+
+  CalcProduct();
+
+  CalcIntegral();
+  CalcBgIntegral();
+
+  logLikelihood_ = lp_ - (integral_ + bgIntegral_);
 }
 
 void
 GpuLikelihood::Calculate()
 {
-
-  CalcEvents();
   CalcInfectivity();
   CalcSusceptibility();
   CalcDistance();
+
+  CalcProduct();
+  CalcIntegral();
   CalcBgIntegral();
 
-  // DT * Susceptibility
-  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_NON_TRANSPOSE,
-      numInfecs_, popSize_, UNITY, crsDescr_, devDTVal_, devDRowPtr_,
-      devDColInd_, devSusceptibility_, ZERO, devTmp_);
-  if (sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in cusparseScsrmv() " << sparseStat_ << std::endl;
-    }
-  cudaDeviceSynchronize();
+  logLikelihood_ = lp_ - (integral_ + bgIntegral_);
 
-  // infectivity * devTmp
-  blasStat_ = cublasSdot(cudaBLAS_, numInfecs_, devInfectivity_, 1, devTmp_, 1,
-      &logLikelihood_); // May have an issue with 1-based indexing here!
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in cublasSdot() " << blasStat_ << std::endl;
-    }
-  cudaDeviceSynchronize();
-
-  logLikelihood_ *= gamma1_;
-  logLikelihood_ += bgIntegral_;
-  logLikelihood_ *= -1;
-}
-
-void
-GpuLikelihood::UpdateDistance()
-{
-
-  // Now calculate infectivity
-  blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, numInfecs_, numSpecies_,
-      &UNITY, devAnimalsInfPow_, animalsInfPowPitch_, devXi_, 1, &ZERO, devInfectivity_,
-      1);
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in infectivity: " << blasStat_ << std::endl;
-    }
-
-  // Calculate Susceptibility
-  blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, popSize_, numSpecies_, &UNITY,
-      devAnimalsSuscPow_, animalsSuscPowPitch_, devZeta_, 1, &ZERO, devSusceptibility_, 1);
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in susceptibility: " << blasStat_ << std::endl;
-    }
-
-  CalcDistance();
-
-  // DT * Susceptibility
-  sparseStat_ = cusparseScsrmv(cudaSparse_, CUSPARSE_OPERATION_NON_TRANSPOSE,
-      numInfecs_, popSize_, UNITY, crsDescr_, devDTVal_, devDRowPtr_,
-      devDColInd_, devSusceptibility_, ZERO, devTmp_);
-  if (sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in cusparseScsrmv() " << sparseStat_ << std::endl;
-    }
-
-  // infectivity * devTmp
-  blasStat_ = cublasSdot(cudaBLAS_, numInfecs_, devInfectivity_, 1, devTmp_, 1,
-      &logLikelihood_); // May have an issue with 1-based indexing here!
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    {
-      std::cerr << "Error in cublasSdot() " << blasStat_ << std::endl;
-    }
-  cudaDeviceSynchronize();
-
-  // Background integral
-  CalcBgIntegral();
-
-  logLikelihood_ *= gamma1_;
-  logLikelihood_ += bgIntegral_;
-  logLikelihood_ *= -1;
 }
 
 float

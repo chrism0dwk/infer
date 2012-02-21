@@ -44,13 +44,14 @@ addreduction(ublas::vector<float>& rb, size_t level=1)
 
   for(size_t i=reductionLevel/2; i<rb.size(); i += reductionLevel)
     {
-      rb[i-reductionLevel/2] += fabs(rb[i]);
+      rb[i-reductionLevel/2] += rb[i];
     }
 
   addreduction(rb,level+1);
 
   return;
 }
+
 
 
 class CmpIndivIdxOnInfection
@@ -180,6 +181,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
               if(j < infectivesSz_ and i != j) {
                   if (infecTimes_->operator()(i,0) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,1)) E_(i,j) = 1.0f;
                   else if (infecTimes_->operator()(i,1) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,2)) E_(i,j) = txparams_(1);
+                  else E_(i,j) = 0.0;
               }
 
               // Integral of infection time
@@ -206,6 +208,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   cerr << "Initialised T_ with nnz=" << T_.nnz() << endl;
   cerr << "Initialised E_ with nnz=" << E_.nnz() << endl;
 
+
   // Initialize GPU datasets
   
   // Data sizes
@@ -227,9 +230,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   // Set up GPU environment
   cerr << "Initialising GPU" << endl;
   gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
-  gpu_->SetEvents(eventTimes_.data().begin());
-  gpu_->SetSpecies(animals_.data().begin());
-  gpu_->SetDistance(D_.value_data().begin(),DRowPtr_.begin(),DColInd_.begin());
+
 
   // Parameters(needs glue code!)
   float epsilon = txparams_(3);
@@ -247,10 +248,13 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
       phi[p] = txparams_(13+p);
     }
 
-  gpu_->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
 
+  gpu_->SetEvents(eventTimes_.data().begin());
+  gpu_->SetSpecies(animals_.data().begin());
+  gpu_->SetDistance(D_.value_data().begin(),DRowPtr_.begin(),DColInd_.begin());
+  gpu_->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
   cerr << "Calculating likelihood" << endl;
-  gpu_->Calculate();
+  gpu_->FullCalculate();
   
 
 
@@ -282,45 +286,45 @@ MatLikelihood::calculate()
   // Susceptibility
   axpy_prod(animalsSuscPow_, suscepParams, susceptibility_, true);
 
-  ublas::vector<float> v(susceptibility_);
-  addreduction(v);
-  cerr << "Sum susceptibility = " << v(0) << endl;
-
   // Infectivity
   axpy_prod(animalsInfPow_, infecParams, infectivity_, true);
-  v = infectivity_;
-  addreduction(v);
-  cerr << "Sum infectivity = " << v(0) << endl;
 
-//  // Calculate product
-//  float lp = 0.0;
-//  compressed_matrix<float,column_major> QE(E_);
-//  for(size_t j = 0; j != QE.size1(); j++) // Iterate over COLUMNS j
-//    {
-//      size_t begin = QE.index1_data()[j];
-//      size_t end = QE.index1_data()[j+1];
-//      for(size_t i = begin; i < end; ++i) // Non-zero ROWS i
-//        {
-//          QE.value_data()[i] *= txparams_(2) / (deltasq + D_(QE.index2_data()[i],j));
-//        }
-//    }
-//  axpy_prod(infectivity_,QE,tmp);
-//
-//  tmp *= txparams_(0);  // Gamma1
-//
-//  for(size_t i = 0; i < I1idx_; ++i)
-//    {
-//      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
-//      product_(i) = subprod; lp += logf(subprod);
-//    }
-//  product_(I1idx_) = 1.0; // Loop unrolled to skip I1
-//  for(size_t i = I1idx_+1; i < tmp.size(); ++i)
-//    {
-//      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
-//      product_(i) = subprod; lp += logf(subprod);
-//    }
+  // Calculate product
 
-  // Apply distance kernel to D_ and calculate DT
+  float lp = 0.0;
+  compressed_matrix<float,row_major> QE(E_);
+  for(size_t j = 0; j != QE.size1(); j++) // Iterate over rows j
+    {
+      size_t begin = QE.index1_data()[j];
+      size_t end = QE.index1_data()[j+1];
+      for(size_t i = begin; i < end; ++i) // Non-zero COLS i
+        {
+          QE.value_data()[i] *= txparams_(2) / (deltasq + D_(j,QE.index2_data()[i]));
+        }
+    }
+  axpy_prod(infectivity_,QE,tmp);
+
+  tmp *= txparams_(0);  // Gamma1
+
+  for(size_t i = 0; i < I1idx_; ++i)
+    {
+      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
+      tmp(i) = subprod;
+    }
+  tmp(I1idx_) = 1.0; // Loop unrolled to skip I1
+  for(size_t i = I1idx_+1; i < tmp.size(); ++i)
+    {
+      float subprod = susceptibility_(i)*tmp(i) + txparams_(3);
+      tmp(i) = subprod;
+    }
+
+  product_ = tmp;
+  for(size_t i=0; i<tmp.size(); ++i) tmp[i] = logf(tmp[i]);
+  addreduction(tmp);
+  lp = tmp(0);
+
+
+//  // Apply distance kernel to D_ and calculate DT
   for(size_t i = 0; i < D_.size1(); ++i)
     {
       size_t begin = D_.index1_data()[i];
@@ -331,7 +335,7 @@ MatLikelihood::calculate()
           DT_.value_data()[j] = txparams_(2) / (deltasq + D_.value_data()[j]) * T_.value_data()[j];
         }
     }
- 
+
   // Calculate the integral
   axpy_prod(DT_,susceptibility_,tmp);
 
@@ -339,23 +343,21 @@ MatLikelihood::calculate()
 
   // Calculate background pressure
   matrix_column< matrix_range< matrix<float,column_major> > > col(*infecTimes_,0);
-  v = col;
+  ublas::vector<float> v = col;
   addreduction(v);
   float bg = v(0) - I1_*infectivesSz_;
   bg += (obsTime_ - I1_)*(population_.size() - infectivesSz_);
   bg *= txparams_(3);
 
-  cerr << "Host sum I = " << v(0) << endl;
-  cerr << "Host I1 = " << I1_ << endl;
   integral += bg;
 
-  return /*lp */- integral;
+  return lp - integral;
 }
 
 double
 MatLikelihood::gpuCalculate()
 {
-  gpu_->UpdateDistance();
+  gpu_->Calculate();
   return gpu_->LogLikelihood();
 }
 

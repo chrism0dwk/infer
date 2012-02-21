@@ -30,6 +30,8 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cusparse.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 
 
 // CUDA defines
@@ -57,7 +59,11 @@ public:
   void
   CalcEvents();
   void
+  CalcSusceptibilityPow();
+  void
   CalcSusceptibility();
+  void
+  CalcInfectivityPow();
   void
   CalcInfectivity();
   void
@@ -66,6 +72,12 @@ public:
   CalcBgIntegral();
   void
   UpdateDistance();
+  void
+  CalcProduct();
+  void
+  CalcIntegral();
+  void
+  FullCalculate();
   void
   Calculate();
   float
@@ -79,8 +91,8 @@ private:
   const size_t numSpecies_;
   float logLikelihood_;
   const float obsTime_;
-  float I1Time_;
-  float bgIntegral_;
+  float I1Time_; int I1Idx_; float sumI_;
+  float bgIntegral_; float lp_; float integral_;
 
   // GPU data structures
   float* devAnimals_;
@@ -91,10 +103,12 @@ private:
   size_t eventTimesPitch_;
   float* devSusceptibility_;
   float* devInfectivity_;
+  float* devProduct_;
   float* devDVal_; int* devDRowPtr_; int* devDColInd_; size_t dnnz_; //CRS
   float* devTVal_;  //CRS
   float* devDTVal_; // CRS
-  float* devEVal_; int* devEColPtr_; int* devERowInd_; //CCS
+  float* devEVal_; int* devERowPtr_; int* devEColInd_; size_t ennz_; //CRS
+  float* devEDVal_; // CRS
   float* devTmp_;
 
   // Parameters
