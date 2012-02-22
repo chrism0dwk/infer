@@ -24,13 +24,15 @@ class GpuRuntimeError : public std::exception
 public:
   GpuRuntimeError(const std::string usrMsg, cudaError_t cudaErr)
   {
-    msg_ = "GPU Runtime Error: ";
-    msg_ += usrMsg;
-    msg_ += " (";
-    msg_ += cudaErr;
-    msg_ += ",";
-    msg_ += cudaGetErrorString(cudaErr);
-    msg_ += ")";
+    std::stringstream s;
+    s << "GPU Runtime Error: "
+      << usrMsg
+      << " ("
+      << cudaErr
+      << ","
+      << cudaGetErrorString(cudaErr)
+      << ")";
+    msg_ = s.str();
   }
   ~GpuRuntimeError() throw ()
   {
@@ -391,7 +393,7 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
   }
   catch (std::exception& e)
   {
-      this->~GpuLikelihood();
+      //this->~GpuLikelihood();
       throw e;
   }
 
