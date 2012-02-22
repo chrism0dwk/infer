@@ -384,17 +384,8 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
   checkCudaError(cudaMemcpy(devPhi_, other.devPhi_, numSpecies_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
   // BLAS handles
-  blasStat_ = cublasCreate(&cudaBLAS_);
-  if (blasStat_ != CUBLAS_STATUS_SUCCESS)
-    throw std::runtime_error("CUBLAS init failed");
-
-  sparseStat_ = cusparseCreate(&cudaSparse_);
-  if (sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    throw std::runtime_error("CUSPARSE init failed");
-
-  sparseStat_ = cusparseCreateMatDescr(&crsDescr_);
-  if (sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-    throw std::runtime_error("CUSPARSE matrix descriptor init failed");
+  cudaBLAS_ = other.cudaBLAS_;
+  cudaSparse_ = other.cudaSparse_;
   cusparseSetMatType(crsDescr_, CUSPARSE_MATRIX_TYPE_GENERAL);
   cusparseSetMatIndexBase(crsDescr_, CUSPARSE_INDEX_BASE_ZERO);
   }
@@ -420,6 +411,10 @@ GpuLikelihood::~GpuLikelihood()
       cudaFree(devDColInd_);
       cudaFree(devERowPtr_);
       cudaFree(devEColInd_);
+
+      cublasDestroy(cudaBLAS_);
+      cusparseDestroy(cudaSparse_);
+
       delete covariateCopies_;
     }
 
@@ -443,9 +438,11 @@ GpuLikelihood::~GpuLikelihood()
   if(devZeta_) cudaFree(devZeta_);
   if(devPhi_) cudaFree(devPhi_);
 
-  cublasDestroy(cudaBLAS_);
-  cusparseDestroy(cudaSparse_);
+
 }
+
+
+
 
 void
 GpuLikelihood::SetEvents(const float* data)
