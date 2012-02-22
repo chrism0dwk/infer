@@ -256,6 +256,11 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   cerr << "Calculating likelihood" << endl;
   gpu_->FullCalculate();
   
+  gpu1_ = new GpuLikelihood(*gpu_);
+  GpuLikelihood* gpu2 = new GpuLikelihood(*gpu_);
+  delete gpu1_;
+  gpu1_ = gpu2;
+
 
 
 }
@@ -263,6 +268,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
 MatLikelihood::~MatLikelihood()
 {
   delete gpu_;
+  delete gpu1_;
   delete infecTimes_;
 }
 
@@ -358,6 +364,9 @@ double
 MatLikelihood::gpuCalculate()
 {
   gpu_->Calculate();
+  gpu1_->Calculate();
+  cerr << "First gpu class likelihood: " << gpu_->LogLikelihood() << "\n";
+  cerr << "Second gpu class likelihood: " << gpu1_->LogLikelihood() << "\n";
   return gpu_->LogLikelihood();
 }
 

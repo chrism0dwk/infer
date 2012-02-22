@@ -94,6 +94,7 @@ private:
   const float unity_;
 
   GpuLikelihood* gpu_;
+  GpuLikelihood* gpu1_;
 
 };
 
