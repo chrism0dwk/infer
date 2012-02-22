@@ -24,15 +24,13 @@ class GpuRuntimeError : public std::exception
 public:
   GpuRuntimeError(const std::string usrMsg, cudaError_t cudaErr)
   {
-    std::stringstream s;
-    s << "GPU Runtime Error: "
-      << usrMsg
-      << " ("
-      << cudaErr
-      << ","
-      << cudaGetErrorString(cudaErr)
-      << ")";
-    msg_ = s.str();
+    msg_ = "GPU Runtime Error: ";
+    msg_ += usrMsg;
+    msg_ += " (";
+    msg_ += cudaErr;
+    msg_ += ",";
+    msg_ += cudaGetErrorString(cudaErr);
+    msg_ += ")";
   }
   ~GpuRuntimeError() throw ()
   {
@@ -335,16 +333,16 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
       other.epsilon_), gamma1_(other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_)
 {
 
-  try {
   // Allocate Animals_
+  checkCudaError(cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_,
+      numInfecs_ * sizeof(float), numSpecies_));
+  animalsInfPowPitch_ /= sizeof(float);
+  checkCudaError(cudaMemcpy2D(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),numInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+
   checkCudaError(cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_,
       popSize_ * sizeof(float), numSpecies_));
   animalsSuscPowPitch_ /= sizeof(float);
   checkCudaError(cudaMemcpy2D(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
-  checkCudaError(cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_,
-      numInfecs_ * sizeof(float), numSpecies_));
-  animalsInfPowPitch_ /= sizeof(float);
-  checkCudaError(cudaMemcpy2D(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
 
   // Allocate and copy event times - popSize_ * NUMEVENTS matrix
   checkCudaError(cudaMallocPitch(&devEventTimes_, &eventTimesPitch_,
@@ -388,14 +386,7 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
   // BLAS handles
   cudaBLAS_ = other.cudaBLAS_;
   cudaSparse_ = other.cudaSparse_;
-  cusparseSetMatType(crsDescr_, CUSPARSE_MATRIX_TYPE_GENERAL);
-  cusparseSetMatIndexBase(crsDescr_, CUSPARSE_INDEX_BASE_ZERO);
-  }
-  catch (std::exception& e)
-  {
-      //this->~GpuLikelihood();
-      throw e;
-  }
+  crsDescr_ = other.crsDescr_;
 
   ++*covariateCopies_; // Increment copies of covariate data
 
