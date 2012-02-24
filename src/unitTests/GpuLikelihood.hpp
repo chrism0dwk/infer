@@ -27,8 +27,6 @@
 #ifndef GPULIKELIHOOD_HPP_
 #define GPULIKELIHOOD_HPP_
 
-#include <tr1/memory>
-
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cusparse.h>
@@ -43,8 +41,6 @@
 #define NUMEVENTS 3
 #define NUMSPECIES 3
 
-using std::tr1::shared_ptr;
-
 class GpuLikelihood
 {
 public:
@@ -52,6 +48,7 @@ public:
   GpuLikelihood(const GpuLikelihood& other);
   virtual
   ~GpuLikelihood();
+  const
   GpuLikelihood&
   operator=(const GpuLikelihood& other);
   void
@@ -110,8 +107,8 @@ private:
   size_t animalsPitch_;
   float* devDVal_; int* devDRowPtr_; int* devDColInd_; size_t dnnz_; //CRS
 
-  float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
   size_t animalsInfPowPitch_, animalsSuscPowPitch_;
+  float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
   float* devEventTimes_;
   size_t eventTimesPitch_;
   float* devSusceptibility_;
@@ -121,7 +118,7 @@ private:
   float* devTVal_;  //CRS
   float* devDTVal_; // CRS
   float* devEVal_; int* devERowPtr_; int* devEColInd_; size_t ennz_; //CRS
-  float* devEDVal_; int* devEDRowPtr_; int* devEDColInd_;// CRS
+  float* devEDVal_;// CRS
   float* devTmp_;
 
   // Parameters

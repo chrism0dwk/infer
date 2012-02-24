@@ -12,12 +12,24 @@
 #include <utility>
 #include <cmath>
 #include <math_functions.h>
+#include <sys/time.h>
 
 #include "GpuLikelihood.hpp"
 
 // Constants
 const float UNITY = 1.0;
 const float ZERO = 0.0;
+
+
+inline
+double
+timeinseconds(const timeval a, const timeval b)
+{
+  timeval result;
+  timersub(&b, &a, &result);
+  return result.tv_sec + result.tv_usec / 1000000.0;
+}
+
 
 class GpuRuntimeError : public std::exception
 {
@@ -332,7 +344,8 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
       other.devDColInd_), dnnz_(other.dnnz_), devERowPtr_(other.devERowPtr_), devEColInd_(other.devEColInd_), ennz_(other.ennz_), epsilon_(
       other.epsilon_), gamma1_(other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_)
 {
-
+  timeval start,end;
+  gettimeofday(&start, NULL);
   // Allocate Animals_
   checkCudaError(cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_,
       numInfecs_ * sizeof(float), numSpecies_));
@@ -390,6 +403,54 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
 
   ++*covariateCopies_; // Increment copies of covariate data
 
+  gettimeofday(&end, NULL);
+  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
+
+}
+
+
+// Assignment constructor
+const GpuLikelihood&
+GpuLikelihood::operator=(const GpuLikelihood& other)
+{
+  timeval start,end;
+  gettimeofday(&start, NULL);
+  // Copy animal powers
+  checkCudaError(cudaMemcpy2DAsync(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),numInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpy2DAsync(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+
+  // copy event times - popSize_ * NUMEVENTS matrix
+  checkCudaError(cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),numInfecs_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+
+  // copy intermediate T and DT
+  checkCudaError(cudaMemcpyAsync(devTVal_,other.devTVal_,dnnz_*sizeof(float),cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devDTVal_, other.devDTVal_, dnnz_*sizeof(float), cudaMemcpyDeviceToDevice));
+
+  // copy intermediate infectivity and susceptibility
+  checkCudaError(cudaMemcpyAsync(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devInfectivity_, other.devInfectivity_, numInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
+
+  // copy product vector
+  checkCudaError(cudaMemcpyAsync(devProduct_, other.devProduct_, numInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devEVal_, other.devEVal_, ennz_*sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devEDVal_, other. devEDVal_, ennz_*sizeof(float), cudaMemcpyDeviceToDevice));
+
+  // Device Parameters Copy
+  checkCudaError(cudaMemcpyAsync(devXi_, other.devXi_, numSpecies_ * sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devPsi_, other.devPsi_, numSpecies_ * sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devZeta_, other.devZeta_, numSpecies_ * sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaError(cudaMemcpyAsync(devPhi_, other.devPhi_, numSpecies_ * sizeof(float), cudaMemcpyDeviceToDevice));
+
+  // Host Parameters Copy
+  epsilon_ = other.epsilon_;
+  gamma1_ = other.gamma1_;
+  gamma2_ = other.gamma2_;
+  delta_ = other.delta_;
+
+  gettimeofday(&end, NULL);
+  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
+  cudaDeviceSynchronize();
+  return *this;
 }
 
 
@@ -737,6 +798,8 @@ GpuLikelihood::FullCalculate()
 void
 GpuLikelihood::Calculate()
 {
+  timeval start, end;
+  gettimeofday(&start, NULL);
   CalcInfectivity();
   CalcSusceptibility();
   CalcDistance();
@@ -746,8 +809,11 @@ GpuLikelihood::Calculate()
   CalcBgIntegral();
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
-
+  gettimeofday(&end, NULL);
+  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
 }
+
+
 
 float
 GpuLikelihood::LogLikelihood() const
