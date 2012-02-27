@@ -52,8 +52,6 @@ public:
   GpuLikelihood&
   operator=(const GpuLikelihood& other);
   void
-  swap(GpuLikelihood& other);
-  void
   SetEvents(const float* data);
   void
   SetSpecies(const float* data);
@@ -77,6 +75,8 @@ public:
   CalcBgIntegral();
   void
   UpdateDistance();
+  void
+  UpdateInfectionTime(const int idx, const float newTime);
   void
   CalcProduct();
   void

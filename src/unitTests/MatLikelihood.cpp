@@ -359,6 +359,7 @@ MatLikelihood::gpuCalculate()
   GpuLikelihood* gpu1 = new GpuLikelihood(*gpu_);
   gpu_->operator=(*gpu1);
   gpu_->Calculate();
+  gpu_->FullCalculate();
   delete gpu1;
   return gpu_->LogLikelihood();
 }

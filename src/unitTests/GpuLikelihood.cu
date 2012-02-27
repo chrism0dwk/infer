@@ -340,7 +340,7 @@ GpuLikelihood::GpuLikelihood(const size_t realPopSize, const size_t popSize,
 GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
   realPopSize_(other.realPopSize_), popSize_(other.popSize_), numInfecs_(other.numInfecs_), numSpecies_(
       other.numSpecies_), obsTime_(other.obsTime_), I1Time_(other.I1Time_), I1Idx_(other.I1Idx_), sumI_(other.sumI_), bgIntegral_(
-      other.bgIntegral_), covariateCopies_(other.covariateCopies_), devAnimals_(other.devAnimals_), animalsPitch_(other.animalsPitch_), devDVal_(other.devDVal_), devDRowPtr_(other.devDRowPtr_), devDColInd_(
+      other.bgIntegral_), lp_(other.lp_), covariateCopies_(other.covariateCopies_), devAnimals_(other.devAnimals_), animalsPitch_(other.animalsPitch_), devDVal_(other.devDVal_), devDRowPtr_(other.devDRowPtr_), devDColInd_(
       other.devDColInd_), dnnz_(other.dnnz_), devERowPtr_(other.devERowPtr_), devEColInd_(other.devEColInd_), ennz_(other.ennz_), epsilon_(
       other.epsilon_), gamma1_(other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_)
 {
@@ -446,6 +446,11 @@ GpuLikelihood::operator=(const GpuLikelihood& other)
   gamma1_ = other.gamma1_;
   gamma2_ = other.gamma2_;
   delta_ = other.delta_;
+
+  // Likelihood components
+  integral_ = other.integral_;
+  bgIntegral_ = other.bgIntegral_;
+  lp_ = other.lp_;
 
   gettimeofday(&end, NULL);
   std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
@@ -560,7 +565,7 @@ GpuLikelihood::SetDistance(const float* data, const int* rowptr,
           if (colind[jj] < numInfecs_)
             {
               tmpColInd.push_back(colind[jj]);
-              tmpVals.push_back(data[begin + jj]);
+              tmpVals.push_back(data[jj]);
               eNNZ++;
             }
         }
@@ -699,21 +704,9 @@ GpuLikelihood::CalcDistance()
   checkCudaError(err);
 
   // Apply distance kernel to E_, place result in a temporary
-//  float* val;
-//  checkCudaError(cudaMalloc(&val,ennz_*sizeof(float)));
   blocksPerGrid = (ennz_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
   calcED<<<blocksPerGrid, THREADSPERBLOCK>>>(devEVal_, devERowPtr_, devEColInd_, devDVal_, devDRowPtr_, devDColInd_, devEDVal_, numInfecs_, delta_);
-        checkCudaError(cudaGetLastError());
-
-//  // Transpose into ED_ to enable faster calculation
-//  sparseStat_ = cusparseScsr2csc(cudaSparse_,numInfecs_,numInfecs_,val,devERowPtr_,devEColInd_, devEDVal_,devEDColInd_,devEDRowPtr_,1,CUSPARSE_INDEX_BASE_ZERO);
-//  if(sparseStat_ != CUSPARSE_STATUS_SUCCESS)
-//    {
-//      std::cerr << "ED matrix transpose failed" << std::endl;
-//    }
-//
-//  cudaFree(val);
-
+  checkCudaError(cudaGetLastError());
 }
 
 void
@@ -780,6 +773,8 @@ void
 GpuLikelihood::FullCalculate()
 {
 
+  timeval start, end;
+  gettimeofday(&start, NULL);
   CalcEvents();
   CalcInfectivityPow();
   CalcInfectivity();
@@ -788,11 +783,12 @@ GpuLikelihood::FullCalculate()
   CalcDistance();
 
   CalcProduct();
-
   CalcIntegral();
   CalcBgIntegral();
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
+  gettimeofday(&end, NULL);
+  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
 }
 
 void
@@ -811,6 +807,12 @@ GpuLikelihood::Calculate()
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
   gettimeofday(&end, NULL);
   std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): " << timeinseconds(start,end) << std::endl;
+}
+
+void
+GpuLikelihood::UpdateInfectionTime(const int idx, const float newTime)
+{
+  //updateInfectionTime<<<  >>>()
 }
 
 
