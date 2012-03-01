@@ -356,20 +356,22 @@ _calcIntegral(const int infecSize, int* DRowPtr, int* DColInd, float* D,
   __syncthreads();
 
   // Reduce all warp sums and write to global memory.
-  for (int size = THREADSPERBLOCK / 2; size > 32; size >>= 1)
+  for (unsigned int size = blockDim.x/2; size > 32; size >>= 1)
     {
       if (threadIdx.x < size)
         buff[threadIdx.x] += buff[threadIdx.x + size];
       __syncthreads();
     }
   if (threadIdx.x < 32) {
-      buff[threadIdx.x] += buff[threadIdx.x + 32];
-      buff[threadIdx.x] += buff[threadIdx.x + 16];
-      buff[threadIdx.x] += buff[threadIdx.x + 8];
-      buff[threadIdx.x] += buff[threadIdx.x + 4];
-      buff[threadIdx.x] += buff[threadIdx.x + 2];
-      buff[threadIdx.x] += buff[threadIdx.x + 1];
+      volatile float* vbuff = buff;
+      vbuff[threadIdx.x] += vbuff[threadIdx.x + 32];
+      vbuff[threadIdx.x] += vbuff[threadIdx.x + 16];
+      vbuff[threadIdx.x] += vbuff[threadIdx.x +  8];
+      vbuff[threadIdx.x] += vbuff[threadIdx.x +  4];
+      vbuff[threadIdx.x] += vbuff[threadIdx.x +  2];
+      vbuff[threadIdx.x] += vbuff[threadIdx.x +  1];
   }
+
 
   if (threadIdx.x == 0)
     {
@@ -1015,7 +1017,6 @@ GpuLikelihood::Calculate()
   timeval start, end;
   CalcEvents();
   gettimeofday(&start, NULL);
-
   CalcInfectivity();
   CalcSusceptibility();
   CalcDistance();
