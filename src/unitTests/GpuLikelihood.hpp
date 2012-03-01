@@ -85,6 +85,8 @@ public:
   FullCalculate();
   void
   Calculate();
+  void
+  NewCalculate();
   float
   LogLikelihood() const;
 
@@ -106,10 +108,14 @@ private:
   float* devAnimals_;
   size_t animalsPitch_;
   float* devDVal_; int* devDRowPtr_; int* devDColInd_; size_t dnnz_; //CRS
+#ifdef __CUDACC__
+
+#endif
 
   size_t animalsInfPowPitch_, animalsSuscPowPitch_;
   float* devAnimalsInfPow_; float* devAnimalsSuscPow_;
   float* devEventTimes_;
+
   size_t eventTimesPitch_;
   float* devSusceptibility_;
   float* devInfectivity_;

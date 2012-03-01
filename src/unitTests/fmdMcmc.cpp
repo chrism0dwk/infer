@@ -331,7 +331,7 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 6)
+  if (argc != 7)
     {
       cerr
           << "Usage: testSpatPointPop <pop file> <epi file> <output folder> <obs time> <num iterations>"
@@ -342,7 +342,7 @@ main(int argc, char* argv[])
   typedef Population<TestCovars> MyPopulation;
 
   // Make output directory
-  string outputFolder(argv[3]);
+  string outputFolder(argv[4]);
   mkdir(outputFolder.c_str(), S_IFDIR | S_IRWXU);
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
@@ -353,9 +353,8 @@ main(int argc, char* argv[])
   myPopulation->importPopData(*popDataImporter);
   myPopulation->importEpiData(*epiDataImporter);
   //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph(//"/Users/stsiab/Documents/InFER/FMD2001/data/toy.con");
-     "/Users/stsiab/Documents/InFER/FMD2001/data/fmd2001_short.con");
-  myPopulation->setObsTime(atof(argv[4]));
+  myPopulation->loadConnectionGraph(argv[3]);
+  myPopulation->setObsTime(atof(argv[5]));
 
   delete popDataImporter;
   delete epiDataImporter;

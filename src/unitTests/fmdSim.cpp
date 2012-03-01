@@ -43,7 +43,7 @@ struct Settings
   string output;
 
   double minTime, maxTime;
-
+  bool simCensoredEvents;
   double ntor;
 
   double epsilon;
@@ -73,7 +73,8 @@ struct Settings
     output = pt.get<string> ("fmdGillespieSim.paths.output");
 
     minTime = pt.get<double> ("fmdGillespieSim.options.mintime", 0);
-    maxTime = pt.get<double> ("fmdGillespieSim.options.maxtime", POSINF);
+    maxTime = pt.get<double> ("fmdGillespieSim.options.maxtime", (double)POSINF);
+    simCensoredEvents = pt.get<bool> ("fmdGillespieSim.options.simcensoredevents", true);
     ntor = pt.get<double> ("fmdGillespieSim.constants.ntor");
 
     epsilon = pt.get<double> ("fmdGillespieSim.parameters.epsilon");
@@ -92,7 +93,6 @@ struct Settings
     phi_s = pt.get<double> ("fmdGillespieSim.parameters.phi_s");
     a = pt.get<double> ("fmdGillespieSim.parameters.a");
     b = pt.get<double> ("fmdGillespieSim.parameters.b");
-
   }
 
 };
@@ -170,9 +170,10 @@ main(int argc, char* argv[])
 
   FmdModel::PopulationType myPopulation;
 
+  myPopulation.setObsTime(settings.minTime);
   myPopulation.importPopData(*popDataImporter);
   myPopulation.importEpiData(*epiDataImporter);
-  myPopulation.setObsTime(settings.minTime);
+
 
   delete popDataImporter;
   delete epiDataImporter;
