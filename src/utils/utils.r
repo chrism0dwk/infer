@@ -45,10 +45,10 @@ mcconvergence <- function(posterior)
     C=diag(diag(sigmainv)^(-0.5),nrow=ndims)%*%sigmainv%*%diag(diag(sigmainv)^(-0.5),nrow=ndims)
 
     # Compute B = (I-L)^-1 %*% U
-    L=tril(C)
+    L=-tril(C)
     diag(L)<-rep(0,ndims)
-    U=triu(C)
-    diag(L)<-rep(0,ndims)
+    U=-triu(C)
+    diag(U)<-rep(0,ndims)
     B = solve(diag(rep(1,ndims))-L)%*%U
 
     # Get ratio of L2 norm to L1 norm

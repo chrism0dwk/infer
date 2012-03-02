@@ -109,13 +109,13 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   T_.resize(infectivesSz_, subPopSz_,false);
 
   cerr << "Populating data tables..." << endl;
-  std::map<size_t,size_t> rawtoblas;
+  rawtoblas_.clear();
   size_t j_idx = 0;
   for (SubPopulation::const_iterator j = subpop.begin(); j != subpop.end(); ++j)
     {
       // Enter into jcoord
       jcoord_(j_idx) = *j;
-      rawtoblas.insert(make_pair(*j,j_idx));
+      rawtoblas_.insert(make_pair(*j,j_idx));
 
       // Copy covariates
       const Individual::CovarsType& covars = population_[*j].getCovariates();
@@ -175,7 +175,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
               float sqDist = dx * dx + dy * dy;
 
               // Get con's index in jcoord
-              size_t j = rawtoblas[*con];
+              size_t j = rawtoblas_[*con];
 
               // Product mask
               if(j < infectivesSz_ and i != j) {
@@ -269,6 +269,64 @@ double
 MatLikelihood::calculate()
 {
 
+//  for (size_t j=0; j<subPopSz_; ++j)
+//    {
+//      // Copy covariates
+//      animalsSuscPow_(j,0) = powf(animals_(j,0),txparams_(13));
+//      animalsSuscPow_(j,1) = powf(animals_(j,1),txparams_(14));
+//      animalsSuscPow_(j,2) = powf(animals_(j,2),txparams_(15));
+//
+//      if(j < infectivesSz_)
+//        {
+//          animalsInfPow_(j,0) = powf(animals_(j,0),txparams_(10));
+//          animalsInfPow_(j,1) = powf(animals_(j,1),txparams_(11));
+//          animalsInfPow_(j,2) = powf(animals_(j,2),txparams_(12));
+//        }
+//    }
+
+  // Calculate product mask and exposure times
+  for(size_t i = 0; i < infectivesSz_; ++i) {
+          // Populate row of D_ and T_
+          for (Individual::ConnectionList::const_iterator con =
+              population_[jcoord_[i]].getConnectionList().begin(); con
+              != population_[jcoord_[i]].getConnectionList().end(); ++con)
+            {
+              float dx = population_[jcoord_[i]].getCovariates().x
+                  - population_[*con].getCovariates().x;
+              float dy = population_[jcoord_[i]].getCovariates().y
+                  - population_[*con].getCovariates().y;
+              float sqDist = dx * dx + dy * dy;
+
+              // Get con's index in jcoord
+              size_t j = rawtoblas_[*con];
+
+              // Product mask
+              if(j < infectivesSz_ and i != j) {
+                  if (infecTimes_->operator()(i,0) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,1)) E_(i,j) = 1.0f;
+                  else if (infecTimes_->operator()(i,1) < infecTimes_->operator()(j,0) and infecTimes_->operator()(j,0) <= infecTimes_->operator()(i,2)) E_(i,j) = txparams_(1);
+                  else E_(i,j) = 0.0;
+              }
+
+              // Integral of infection time
+              float jMaxSuscepTime = 0.0;
+              if(j < infectivesSz_)
+                {
+                  if(infecTimes_->operator()(i,0) < infecTimes_->operator()(j,0)) jMaxSuscepTime = infecTimes_->operator()(j,0);
+                }
+              else
+                {
+                  jMaxSuscepTime = min((float)population_[*con].getN(),obsTime_);
+                }
+              D_(i, j) = sqDist;
+              float exposureTime;
+              exposureTime = min(infecTimes_->operator()(i,1),jMaxSuscepTime) - min(infecTimes_->operator()(i,0),jMaxSuscepTime);
+              exposureTime += txparams_(1)*(min(infecTimes_->operator()(i,2),jMaxSuscepTime)-min(infecTimes_->operator()(i,1),jMaxSuscepTime));
+              if (exposureTime < 0.0) cerr << "T_(" << population_[icoord_[i]].getId() << "," << population_[*con].getId() << ") = " << exposureTime << endl;
+              T_(i, j) = exposureTime;
+            }
+    }
+
+
   // Temporaries
   ublas::vector<float> tmp(infectivesSz_);
   
@@ -358,7 +416,6 @@ MatLikelihood::gpuCalculate()
 {
   gpu_->FullCalculate();
   gpu_->Calculate();
-  gpu_->NewCalculate();
   return gpu_->LogLikelihood();
 }
 

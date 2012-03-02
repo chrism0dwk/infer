@@ -60,8 +60,6 @@ public:
   void
   SetParameters(float* epsilon, float* gamma1, float* gamma2, float* xi, float* psi, float* zeta, float* phi, float* delta);
   void
-  CalcEvents();
-  void
   CalcSusceptibilityPow();
   void
   CalcSusceptibility();
@@ -70,11 +68,7 @@ public:
   void
   CalcInfectivity();
   void
-  CalcDistance();
-  void
   CalcBgIntegral();
-  void
-  UpdateDistance();
   void
   UpdateInfectionTime(const int idx, const float newTime);
   void
@@ -107,7 +101,7 @@ private:
   size_t* covariateCopies_;
   float* devAnimals_;
   size_t animalsPitch_;
-  float* devDVal_; int* devDRowPtr_; int* devDColInd_; size_t dnnz_; //CRS
+  float* devDVal_; int* devDRowPtr_; int* devDColInd_; int* hostDRowPtr_; size_t dnnz_; //CRS
 #ifdef __CUDACC__
 
 #endif
@@ -120,12 +114,8 @@ private:
   float* devSusceptibility_;
   float* devInfectivity_;
   float* devProduct_;
-
-  float* devTVal_;  //CRS
-  float* devDTVal_; // CRS
-  float* devEVal_; int* devERowPtr_; int* devEColInd_; size_t ennz_; //CRS
-  float* devEDVal_;// CRS
-  float* devTmp_;
+  float* devIntegral_;
+  int integralBuffSize_;
 
   // Parameters
   float epsilon_;

@@ -58,7 +58,7 @@ public:
 
 
 private:
-
+  std::map<size_t,size_t> rawtoblas_;
   const EpiRisk::Population<TestCovars>& population_;
   EpiRisk::Parameters& txparams_;
   fp_t obsTime_;
