@@ -29,6 +29,8 @@
 #include <map>
 #include <boost/numeric/ublas/operation.hpp>
 #include <sys/time.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 
 
 
@@ -415,7 +417,20 @@ double
 MatLikelihood::gpuCalculate()
 {
   gpu_->FullCalculate();
+  unsigned int moveIdx;
+
+  gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
+
+  for(size_t i=0; i<2000; ++i)
+  {
+      int toMove = gsl_rng_uniform_int(r, infectivesSz_);
+      float inTime = gsl_ran_gamma(r, 10, 1);
+      gpu_->UpdateInfectionTime(toMove,inTime);
+
+  }
+  cerr << "Update likelihood: " << gpu_->LogLikelihood();
   gpu_->Calculate();
+
   return gpu_->LogLikelihood();
 }
 

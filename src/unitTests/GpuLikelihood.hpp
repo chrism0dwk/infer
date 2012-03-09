@@ -70,7 +70,7 @@ public:
   void
   CalcBgIntegral();
   void
-  UpdateInfectionTime(const int idx, const float newTime);
+  UpdateInfectionTime(const int idx, const float inTime);
   void
   CalcProduct();
   void
@@ -83,6 +83,8 @@ public:
   NewCalculate();
   float
   LogLikelihood() const;
+  float
+  GetN(const int idx) const;
 
 private:
   // Host vars
