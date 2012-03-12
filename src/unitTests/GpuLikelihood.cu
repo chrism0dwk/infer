@@ -15,6 +15,8 @@
 #include <device_functions.h>
 #include <sys/time.h>
 #include <thrust/sort.h>
+#include <thrust/count.h>
+#include <thrust/find.h>
 
 #include "GpuLikelihood.hpp"
 
@@ -83,6 +85,17 @@ template<typename T>
       return logf(val);
     }
   };
+
+template<typename T>
+struct LessThanZero
+{
+  __host__ __device__
+  bool
+  operator()(const T& val) const
+  {
+    return val < 0;
+  }
+};
 
 __device__ float
 _atomicAdd(float* address, float val)
@@ -207,7 +220,6 @@ _calcProduct(const int infecSize, const int* DRowPtr, const int* DColInd,
 
   if (row < infecSize)
     {
-      //threadProdCache[threadIdx.x] = 0.0f;
       int begin = DRowPtr[row];
       int end = DRowPtr[row + 1];
 
@@ -243,7 +255,7 @@ _calcProduct(const int infecSize, const int* DRowPtr, const int* DColInd,
         }
       __syncthreads();
 
-      // Write out to global memory -- we're going to get a bank conflict here!
+      // Write out to global memory
       if (lane == 0)
         prodCache[row] = threadProdCache[threadIdx.x] * susceptibility[row]
             * gamma1 + epsilon;
@@ -295,7 +307,7 @@ _updateInfectionTimeIntegral(const int idx, const float newTime,
       float Nj = eventTimes[j + eventTimesPitch];
       float Rj = eventTimes[j + eventTimesPitch * 2];
 
-      double jOnIdx = 0.0f;
+      float jOnIdx = 0.0f;
       if (j < infecSz)
         {
           // Recalculate pressure from j on idx
@@ -309,7 +321,7 @@ _updateInfectionTimeIntegral(const int idx, const float newTime,
         }
 
       // Recalculate pressure from idx on j
-      double IdxOnj = fminf(Ni, Ij) - fminf(newTime, Ij);
+      float IdxOnj = fminf(Ni, Ij) - fminf(newTime, Ij);
       IdxOnj -= fminf(Ni, Ij) - fminf(Ii, Ij);
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
@@ -376,20 +388,20 @@ _updateInfectionTimeProduct(const int idx, const float newTime,
 
           // Adjust product cache from idx on others
           float idxOnj = 0.0;
-          if (Ii <= Ij and Ij <= Ni)
+          if (Ii < Ij and Ij <= Ni)
             idxOnj -= 1.0;
-          if (newTime <= Ij and Ij <= Ni)
+          if (newTime < Ij and Ij <= Ni)
             idxOnj += 1.0;
 
-          idxOnj *= gamma1*infectivity[i] * susceptibility[j] * delta
+          idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + D[begin + tid]);
           prodCache[j] += idxOnj;
 
           // Recalculate instantaneous pressure on idx
           float jOnIdx = 0.0;
-          if (Ij <= newTime and newTime <= Nj)
+          if (Ij < newTime and newTime <= Nj)
             jOnIdx = 1.0;
-          else if (Nj <= newTime and newTime <= Rj)
+          else if (Nj < newTime and newTime <= Rj)
             jOnIdx = gamma2;
 
           jOnIdx *= susceptibility[i] * infectivity[j] * delta
@@ -681,9 +693,10 @@ GpuLikelihood::SetEvents(const float* data)
     throw GpuRuntimeError("Copying event times to device failed", rv);
 
   std::cerr << "Sanitizing events with obsTime: " << obsTime_ << std::endl;
+  std::cerr << "Num infecs: " << numInfecs_ << std::endl;
   // Set any event times greater than obsTime to obsTime
   int blocksPerGrid = (popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
-_sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTimesPitch_, obsTime_, popSize_);
+  _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTimesPitch_, obsTime_, popSize_);
   checkCudaError(cudaGetLastError());
 }
 
@@ -851,6 +864,7 @@ GpuLikelihood::FullCalculate()
       << timeinseconds(start, end) << std::endl;
   std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
       << std::endl;
+
 }
 
 void
@@ -877,6 +891,7 @@ GpuLikelihood::UpdateInfectionTime(const int idx, const float inTime)
 {
   // Require to know number of cols per row -- probably store in host mem.
   // Also, may be optimal to use a much lower THREADSPERBLOCK than the app-wide setting.
+
 
   timeval start, end;
   gettimeofday(&start, NULL);
@@ -916,6 +931,24 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
 
   // Reduce product vector, correcting for I1
   prodPtr[I1Idx_] = 1.0f;
+//  if(thrust::count_if(prodPtr, prodPtr + numInfecs_, LessThanZero<float>()) > 0)
+//    {
+//      thrust::device_vector<float>::iterator it = thrust::find_if(prodPtr, prodPtr+numInfecs_, LessThanZero<float>());
+//     std::cerr << "PROD VEC < 0!\t" << *it << " (" << it.base() - prodPtr << ")" << std::endl;
+//     thrust::host_vector<float> v(prodPtr, prodPtr+numInfecs_);
+//     CalcProduct();
+//
+//     for(size_t i=0; i<numInfecs_; ++i)
+//       {
+//         float fast = v[i]; float slow = *(prodPtr+i);
+//         std::cerr << i << "\t" << fast << "\t" << slow << "\t";
+//         if (fast != slow) std::cerr << "***";
+//         std::cerr << std::endl;
+//       }
+//     throw std::logic_error("Mismatch in product vector");
+//    }
+
+
   lp_ = thrust::transform_reduce(prodPtr, prodPtr + numInfecs_, Log<float>(),
       0.0f, thrust::plus<float>());
 

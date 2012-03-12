@@ -416,19 +416,20 @@ MatLikelihood::calculate()
 double
 MatLikelihood::gpuCalculate()
 {
+  cerr << "D[111,116] = " << D_(111,116) << "; D[116,111] = " << D_(116,111) <<endl;
+
   gpu_->FullCalculate();
   unsigned int moveIdx;
 
   gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
 
-  for(size_t i=0; i<2000; ++i)
+  for(size_t i=0; i<20; ++i)
   {
       int toMove = gsl_rng_uniform_int(r, infectivesSz_);
       float inTime = gsl_ran_gamma(r, 10, 1);
       gpu_->UpdateInfectionTime(toMove,inTime);
 
   }
-  cerr << "Update likelihood: " << gpu_->LogLikelihood();
   gpu_->Calculate();
 
   return gpu_->LogLikelihood();
