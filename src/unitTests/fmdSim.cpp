@@ -202,7 +202,7 @@ main(int argc, char* argv[])
   GillespieSim<FmdModel> simulation(model, random);
   simulation.setMaxTime(settings.maxTime);
 
-  simulation.simulate();
+  simulation.simulate(settings.simCensoredEvents);
 
   stringstream s(settings.output);
   s << "." << seed;

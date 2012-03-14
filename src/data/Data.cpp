@@ -140,12 +140,15 @@ EpiDataImporter::next()
 
   record.id = tokens[0];
   if(tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;
+  else if(tokens[1] == "") record.data.I = EpiRisk::POSINF;
   else record.data.I = atof(tokens[1].c_str());
 
   if(tokens[2] == "Inf") record.data.N = EpiRisk::POSINF;
+  else if(tokens[2] == "") record.data.N = EpiRisk::POSINF;
   else record.data.N = atof(tokens[2].c_str());
 
   if(tokens[3] == "Inf") record.data.R = EpiRisk::POSINF;
+  else if(tokens[3] == "") record.data.R = EpiRisk::POSINF;
   else record.data.R = atof(tokens[3].c_str());
 
   return record;

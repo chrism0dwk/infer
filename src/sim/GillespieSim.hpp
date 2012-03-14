@@ -56,7 +56,7 @@ namespace EpiRisk
       double
       getMaxTime() const;
       void
-      simulate();
+      simulate(bool simCensoredEvents = false);
       void
       dumpPressureCDF() const;
       void
@@ -161,6 +161,8 @@ namespace EpiRisk
       void
       checkPressureCDF() const;
       void
+      simulateCensoredEvents();
+      void
       initEventQueue();
       double
       beta_max() const;
@@ -217,6 +219,27 @@ namespace EpiRisk
               model_.getObsTime());
           pressureCDF_.insert(pair<double, const typename Model::Individual*> (
               cumulativePressure, &(*it)));
+        }
+    }
+
+  template<typename Model>
+    void
+    GillespieSim<Model>::simulateCensoredEvents()
+    {
+      typename Model::PopulationType::InfectiveIterator stop =
+          population_.infecLowerBound(population_.getObsTime());
+      for (typename Model::PopulationType::InfectiveIterator it =
+          population_.infecBegin(); it != stop; it++)
+        {
+          if (it->getN() > population_.getObsTime())
+            {
+              Events events;
+              events.I = it->getI();
+              events.N = events.I + model_.ItoN(random_);
+              events.R = events.N + model_.NtoR();
+
+              population_.updateEvents(*it,events);
+            }
         }
     }
 
@@ -372,7 +395,7 @@ namespace EpiRisk
 
   template<typename Model>
     void
-    GillespieSim<Model>::simulate()
+    GillespieSim<Model>::simulate(bool simCensoredEvents)
     {
       numS_ = population_.size() - 1;
       numI_ = 1;
@@ -383,6 +406,7 @@ namespace EpiRisk
 
       // Create the PressureCDF
       calcPressureCDF();
+      if (simCensoredEvents) simulateCensoredEvents();
       initEventQueue();
 
       // Simulate forward until maxTime

@@ -396,7 +396,7 @@ main(int argc, char* argv[])
 
   Parameters txparams(19);
   txparams(0) = Parameter(0.01/*08081*/, GammaPrior(1, 1), "gamma1");
-  txparams(1) = Parameter(0.0, GammaPrior(1, 1), "gamma2");
+  txparams(1) = Parameter(0.5, GammaPrior(1, 1), "gamma2");
   txparams(2) = Parameter(1.14985, GammaPrior(1, 1), "delta");
   txparams(3) = Parameter(7.72081e-05, GammaPrior(1, 1), "epsilon");
   txparams(4) = Parameter(1.0, GammaPrior(1, 1), "xi_c");
