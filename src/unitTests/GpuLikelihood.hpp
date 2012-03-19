@@ -44,7 +44,7 @@
 class GpuLikelihood
 {
 public:
-  GpuLikelihood(const size_t realPopSize, const size_t popSize, const size_t numInfecs, const size_t nSpecies, const float obsTime, const size_t distanceNNZ);
+  GpuLikelihood(const size_t realPopSize, const size_t popSize, const size_t numInfecs, const size_t maxInfecs, const size_t nSpecies, const float obsTime, const size_t distanceNNZ);
   GpuLikelihood(const GpuLikelihood& other);
   virtual
   ~GpuLikelihood();
@@ -68,9 +68,15 @@ public:
   void
   CalcInfectivity();
   void
+  UpdateI1();
+  void
   CalcBgIntegral();
   void
-  UpdateInfectionTime(const int idx, const float inTime);
+  UpdateInfectionTime(const unsigned int idx, const float inTime);
+  void
+  AddInfectionTime(const unsigned int idx, const float inTime);
+  void
+  DeleteInfectionTime(const unsigned int idx);
   void
   CalcProduct();
   void
@@ -85,16 +91,21 @@ public:
   LogLikelihood() const;
   float
   GetN(const int idx) const;
+  void
+  LazyAddInfecTime(const int idx, const float inTime);
 
 private:
   // Host vars
   const size_t realPopSize_;
   const size_t popSize_;
   size_t numInfecs_;
+  size_t maxInfecs_;
+  thrust::host_vector<unsigned int> hostInfecIdx_;
+  thrust::device_vector<unsigned int> devInfecIdx_;
   const size_t numSpecies_;
   float logLikelihood_;
   const float obsTime_;
-  float I1Time_; int I1Idx_; float sumI_;
+  float I1Time_; unsigned int I1Idx_; float sumI_;
   float bgIntegral_; float lp_; float integral_;
 
   // GPU data structures
@@ -115,8 +126,8 @@ private:
   size_t eventTimesPitch_;
   float* devSusceptibility_;
   float* devInfectivity_;
-  float* devProduct_;
-  float* devIntegral_;
+  thrust::device_vector<float> devProduct_;
+  thrust::device_vector<float> devIntegral_;
   int integralBuffSize_;
 
   // Parameters

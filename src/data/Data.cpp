@@ -78,11 +78,11 @@ PopDataImporter::next()
   record.id = tokens[0];
   record.data.x = atof(tokens[1].c_str()) / 1000;
   record.data.y = atof(tokens[2].c_str()) / 1000;
-  record.data.cattle = atoi(tokens[3].c_str());
-  record.data.pigs = atoi(tokens[4].c_str());
-  record.data.sheep = atoi(tokens[5].c_str());
-  record.data.goats = atoi(tokens[6].c_str());
-  record.data.deer = atoi(tokens[7].c_str());
+  record.data.cattle = atof(tokens[3].c_str());
+  record.data.pigs = atof(tokens[4].c_str());
+  record.data.sheep = atof(tokens[5].c_str());
+  record.data.goats = atof(tokens[6].c_str());
+  record.data.deer = atof(tokens[7].c_str());
 
   return record;
 }
@@ -151,6 +151,8 @@ EpiDataImporter::next()
   else if(tokens[3] == "") record.data.R = EpiRisk::POSINF;
   else record.data.R = atof(tokens[3].c_str());
 
+  if(tokens[4] != "IP") record.data.I = EpiRisk::POSINF;
+
   return record;
 }
 
@@ -162,3 +164,68 @@ EpiDataImporter::reset()
   string row;
   getline(dataFile_,row);
 }
+
+
+
+DistMatrixImporter::DistMatrixImporter(const string filename) : filename_(filename)
+{
+
+}
+
+DistMatrixImporter::~DistMatrixImporter()
+{
+  if(matrixFile_.is_open())
+    matrixFile_.close();
+}
+
+void
+DistMatrixImporter::open()
+{
+  matrixFile_.open(filename_.c_str(),ios::in);
+      if(!matrixFile_.is_open()) {
+          throw EpiRisk::data_exception("Cannot open population file for reading");
+      }
+
+  string row;
+  getline(matrixFile_,row);
+}
+
+void
+DistMatrixImporter::close()
+{
+  matrixFile_.close();
+}
+
+DistMatrixImporter::Record
+DistMatrixImporter::next()
+{
+  string row;
+  Record record;
+  vector<string> tokens;
+
+  if(matrixFile_.eof()) throw EpiRisk::fileEOF();
+
+  getline(matrixFile_,row);
+  stlStrTok(tokens,row,",");
+  if (tokens.size() < 2) throw EpiRisk::fileEOF();
+
+  record.id = tokens[0];
+  record.data.i = tokens[0];
+  record.data.j = tokens[1];
+  stringstream s;
+  s << tokens[2];
+  s >> record.data.distance;
+
+  return record;
+}
+
+
+void
+DistMatrixImporter::reset()
+{
+  matrixFile_.seekg(0);
+  string row;
+  getline(matrixFile_,row);
+}
+
+

@@ -32,271 +32,361 @@
  */
 
 #include <iostream>
+#include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <sstream>
+#include <vector>
+#include <map>
+#include <set>
+#include <algorithm>
+#include <stdexcept>
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
+#include <boost/numeric/ublas/matrix_sparse.hpp>
 
-#include "SpatPointPop.hpp"
-#include "Mcmc.hpp"
 #include "Data.hpp"
-#include "McmcWriter.hpp"
+#include "GpuLikelihood.hpp"
 
+using namespace std;
+using namespace boost::numeric;
 
-using namespace EpiRisk;
+#define NSPECIES 3
+#define NEVENTS 3
 
-  class GammaPrior : public Prior
-  {
-    double shape_;
-    double rate_;
-  public:
-    GammaPrior(const double shape, const double rate)
-    {
-      shape_ = shape;
-      rate_ = rate;
-    }
-    double
-    operator()(const double x)
-    {
-      return gsl_ran_gamma_pdf(x,shape_,1/rate_);
-    }
-    Prior*
-    create() const
-    {
-      return new GammaPrior(shape_,rate_);
-    }
-    Prior*
-    clone() const
-    {
-      return new GammaPrior(*this);
-    }
-  };
-
-  class BetaPrior : public Prior
-  {
-    double a_;
-    double b_;
-  public:
-    BetaPrior(const double a, const double b) : a_(a),b_(b) {};
-    double operator()(const double x)
-    {
-      return gsl_ran_beta_pdf(x,a_,b_);
-    }
-    Prior*
-    create() const
-    {
-      return new BetaPrior(a_,b_);
-    }
-    Prior*
-    clone() const
-    {
-      return new BetaPrior(*this);
-    }
-  };
-
-
-  class InfSuscSN : public StochasticNode
-  {
-    Parameter* A_;
-  public:
-    InfSuscSN(Parameter& A, Parameter& B) : A_(&A), StochasticNode(B)
-    {
-    }
-    InfSuscSN*
-    clone()
-    {
-      return new InfSuscSN(*this);
-    }
-    double getValue() const
-    {
-      return *A_ * *param_;
-    }
-    void setValue(const double x)
-    {
-      *param_ = x / *A_;
-    }
-  };
-
-
-struct ParamSetting
+enum DiseaseStatus
 {
-    double value;
-    double priorparams[2];
+  IP = 0,
+  DC = 1,
+  SUSC = 2
 };
 
-struct ParamSettings
+
+struct Covars
 {
-  ParamSetting epsilon;
-  ParamSetting gamma1;
-  ParamSetting gamma2;
-  ParamSetting delta;
-  ParamSetting xi_p,xi_s;
-  ParamSetting psi_c,psi_p,psi_s;
-  ParamSetting zeta_p,zeta_s;
-  ParamSetting phi_c,phi_p,phi_s;
-  ParamSetting a,b;
+  string id;
+  DiseaseStatus status;
+  float I;
+  float N;
+  float R;
+  float cattle;
+  float pigs;
+  float sheep;
 };
 
-struct Settings
+typedef vector<Covars> Population;
+
+
+struct IsId
 {
-    string populationfile;
-    string epidemicfile;
-    string posteriorfile;
+  IsId(string id) : id_(id) {};
+  bool
+  operator()(const Covars& cov) const
+  {
+    return cov.id == id_;
+  }
+private:
+  string id_;
+};
 
-    double obstime;
-    size_t iterations;
-    size_t iupdates;
-    int seed;
+struct CompareByI
+{
+  bool
+  operator()(const Covars& lhs, const Covars& rhs) const
+  {
+    return lhs.I < rhs.I;
+  }
+};
 
-    ParamSettings parameters;
+struct CompareByStatus
+{
+  bool
+  operator()(const Covars& lhs, const Covars& rhs) const
+  {
+    return (int)lhs.status < (int)rhs.status;
+  }
+};
 
-    void
-    load(const string& filename)
+
+void
+importPopData(Population& population, const char* filename, map<string,size_t>& idMap)
+{
+  PopDataImporter importer(filename);
+  idMap.clear();
+
+  importer.open();
+  try
     {
-      using boost::property_tree::ptree;
-
-      typedef boost::property_tree::ptree_bad_data bad_data;
-      typedef boost::property_tree::ptree_bad_path bad_xml;
-      typedef boost::property_tree::ptree_error runtime_error;
-      ptree pt;
-
-      read_xml(filename,pt);
-
-      populationfile = pt.get<string> ("fmdMcmc.paths.population");
-      epidemicfile = pt.get<string> ("fmdMcmc.paths.epidemic");
-      posteriorfile = pt.get<string> ("fmdMcmc.paths.posterior");
-
-      obstime = pt.get<double> ("fmdMcmc.options.obstime",POSINF);
-      iterations = pt.get<double> ("fmdMcmc.options.iterations",1);
-      iupdates = pt.get<double> ("fmdMcmc.options.iupdates",0);
-      seed = pt.get<int> ("fmdMcmc.options.seed",1);
-
-      parameters.epsilon.value = pt.get<double> ("fmdMcmc.parameters.epsilon.value",0.5);
-      parameters.epsilon.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.epsilon.prior.gamma.a",1);
-      parameters.epsilon.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.epsilon.prior.gamma.b",1);
-
-      parameters.gamma1.value = pt.get<double> ("fmdMcmc.parameters.gamma1.value",0.5);
-      parameters.gamma1.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.gamma1.prior.gamma.a",1);
-      parameters.gamma1.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.gamma1.prior.gamma.b",1);
-
-      parameters.gamma2.value = pt.get<double> ("fmdMcmc.parameters.gamma2.value",0.5);
-      parameters.gamma2.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.gamma2.prior.gamma.a",1);
-      parameters.gamma2.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.gamma2.prior.gamma.b",1);
-
-      parameters.delta.value = pt.get<double> ("fmdMcmc.parameters.delta.value",0.5);
-      parameters.delta.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.delta.prior.gamma.a",1);
-      parameters.delta.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.delta.prior.gamma.b",1);
-
-      parameters.xi_p.value = pt.get<double> ("fmdMcmc.parameters.xi_p.value",0.5);
-      parameters.xi_p.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.xi_p.prior.gamma.a",1);
-      parameters.xi_p.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.xi_p.prior.gamma.b",1);
-
-      parameters.xi_s.value = pt.get<double> ("fmdMcmc.parameters.xi_s.value",0.5);
-      parameters.xi_s.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.xi_s.prior.gamma.a",1);
-      parameters.xi_s.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.xi_s.prior.gamma.b",1);
-
-      parameters.phi_c.value = pt.get<double> ("fmdMcmc.parameters.phi_c.value",0.5);
-      parameters.phi_c.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.phi_c.prior.beta.a",1);
-      parameters.phi_c.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.phi_c.prior.beta.b",1);
-
-      parameters.phi_p.value = pt.get<double> ("fmdMcmc.parameters.phi_p.value",0.5);
-      parameters.phi_p.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.phi_p.prior.beta.a",1);
-      parameters.phi_p.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.phi_p.prior.beta.b",1);
-
-      parameters.phi_s.value = pt.get<double> ("fmdMcmc.parameters.phi_s.value",0.5);
-      parameters.phi_s.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.phi_s.prior.beta.a",1);
-      parameters.phi_s.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.phi_s.prior.beta.b",1);
-
-      parameters.zeta_p.value = pt.get<double> ("fmdMcmc.parameters.zeta_p.value",0.5);
-      parameters.zeta_p.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.zeta_p.prior.gamma.a",1);
-      parameters.zeta_p.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.zeta_p.prior.gamma.b",1);
-
-      parameters.zeta_s.value = pt.get<double> ("fmdMcmc.parameters.zeta_s.value",0.5);
-      parameters.zeta_s.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.zeta_s.prior.gamma.a",1);
-      parameters.zeta_s.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.zeta_s.prior.gamma.b",1);
-
-      parameters.psi_c.value = pt.get<double> ("fmdMcmc.parameters.psi_c.value",0.5);
-      parameters.psi_c.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.psi_c.prior.beta.a",1);
-      parameters.psi_c.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.psi_c.prior.beta.b",1);
-
-      parameters.psi_p.value = pt.get<double> ("fmdMcmc.parameters.psi_p.value",0.5);
-      parameters.psi_p.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.psi_p.prior.beta.a",1);
-      parameters.psi_p.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.psi_p.prior.beta.b",1);
-
-      parameters.psi_s.value = pt.get<double> ("fmdMcmc.parameters.psi_s.value",0.5);
-      parameters.psi_s.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.psi_s.prior.beta.a",1);
-      parameters.psi_s.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.psi_s.prior.beta.b",1);
-
-      parameters.a.value = pt.get<double> ("fmdMcmc.parameter.a.value",0.08);
-      parameters.b.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.a.prior.gamma.a",1);
-      parameters.b.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.a.prior.gamma.b",1);
-
-      parameters.b.value = pt.get<double> ("fmdMcmc.parameter.b.value",0.005);
-      parameters.b.priorparams[0] = pt.get<double> ("fmdMcmc.parameters.b.prior.gamma.a",1);
-      parameters.b.priorparams[1] = pt.get<double> ("fmdMcmc.parameters.b.prior.gamma.b",1);
-
+      size_t idx = 0;
+      while (1)
+        {
+          PopDataImporter::Record record = importer.next();
+          Covars covars;
+          covars.id = record.id;
+          covars.status = SUSC;
+          covars.I = EpiRisk::POSINF;
+          covars.N = EpiRisk::POSINF;
+          covars.R = EpiRisk::POSINF;
+          covars.cattle = record.data.cattle;
+          covars.pigs = record.data.pigs;
+          covars.sheep = record.data.sheep;
+          idMap.insert(make_pair(covars.id, idx)); idx++;
+          population.push_back(covars);
+        }
     }
-};
+  catch (EpiRisk::fileEOF& e)
+    {
+      return;
+    }
 
+  importer.close();
+
+}
+
+void
+importEpiData(Population& population, const char* filename, const float obsTime, map<string, size_t>& idMap, size_t* numCulled)
+{
+  EpiDataImporter importer(filename);
+  size_t _numCulled = 0;
+
+  importer.open();
+  try
+    {
+      while (1)
+        {
+          EpiDataImporter::Record record = importer.next();
+          map<string, size_t>::const_iterator map = idMap.find(record.id);
+          if (map == idMap.end())
+            throw range_error(
+                "Key in epidemic data not found in population data");
+
+          Population::iterator ref = population.begin() + map->second;
+          // Check type
+          if(record.data.I == EpiRisk::POSINF) ref->status = DC;
+          else ref->status = IP;
+
+          // Check data integrity
+          if (record.data.N > record.data.R) {
+              cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
+              record.data.N = record.data.R;
+          }
+          if (record.data.R < record.data.I and record.data.I != EpiRisk::POSINF)
+            {
+              cerr << "WARNING: Individual " << record.id << " has I > R!  Setting I = R-7\n";
+              record.data.I = record.data.R - 7;
+            }
+
+          ref->I = record.data.I; ref->N = record.data.N; ref->R = record.data.R;
+
+          ref->R = min(ref->R, obsTime);
+          ref->N = min(ref->N, ref->R);
+          ref->I = min(ref->I, ref->N);
+
+          _numCulled++;
+        }
+    }
+  catch (EpiRisk::fileEOF& e)
+    {
+      *numCulled = _numCulled;
+      return;
+    }
+
+  importer.close();
+}
 
 
 int main(int argc, char* argv[])
 {
-  // Tests out class Mcmc
-
-
+  // Tests out GpuLikelihood class
 
   if (argc != 5) {
-      cerr << "Usage: testSpatPointPop <pop file> <epi file> <covar matrix> <num iterations>" << endl;
+      cerr << "Usage: testSpatPointPop <pop file> <epi file> <dist matrix> <obsTime>" << endl;
       return EXIT_FAILURE;
   }
 
-  typedef Population<TestCovars> MyPopulation;
+  float obsTime = atof(argv[4]);
 
-  PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
-  EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
+  Population population;
+  size_t numCulled;
+  size_t numInfecs;
+  map<string, size_t> idMap;
 
-  Population<TestCovars>* myPopulation = new Population<TestCovars>;
+  // Import population data
+  importPopData(population, argv[1], idMap);
+  importEpiData(population, argv[2], obsTime, idMap, &numCulled);
 
-  myPopulation->importPopData(*popDataImporter);
-  myPopulation->importEpiData(*epiDataImporter);
-  myPopulation->setObsTime(325.0);
+  // Sort individuals by disease status (IPs -> DCs -> SUSCs)
+  sort(population.begin(), population.end(), CompareByStatus());
+  Covars cmp; cmp.status = DC;
+  Population::iterator topOfIPs = lower_bound(population.begin(), population.end(), cmp, CompareByStatus());
+  numInfecs = topOfIPs - population.begin();
+  sort(population.begin(), topOfIPs, CompareByI());
 
-  delete popDataImporter;
-  delete epiDataImporter;
+  cout << "Population size: " << population.size() << "\n";
+  cout << "Num infecs: " << numInfecs << "\n";
+  cout << "Num culled: " << numCulled << "\n";
+
+  // Rebuild population ID index
+  idMap.clear();
+  Population::const_iterator it = population.begin();
+  for(size_t i=0; i<population.size(); i++)
+    {
+      idMap.insert(make_pair(it->id,i));
+      it++;
+    }
+
+  // Import distances
+  ublas::mapped_matrix<float> Dimport(numCulled, population.size());
+  DistMatrixImporter* distMatrixImporter = new DistMatrixImporter(argv[3]);
+  try {
+      distMatrixImporter->open();
+      while(1)
+        {
+          DistMatrixImporter::Record record = distMatrixImporter->next();
+          map<string,size_t>::const_iterator i = idMap.find(record.id);
+          map<string,size_t>::const_iterator j = idMap.find(record.data.j);
+          if(i == idMap.end() or j == idMap.end())
+            throw range_error("Key pair not found in population");
+          if (i != j)
+            Dimport(i->second, j->second) = record.data.distance*record.data.distance;
+        }
+  }
+  catch (EpiRisk::fileEOF& e)
+  {
+      cout << "Imported " << Dimport.nnz() << " distance elements" << endl;
+  }
+  catch (exception& e)
+  {
+      throw e;
+  }
+
+  delete distMatrixImporter;
+
+  // Set up GpuLikelihood
+  GpuLikelihood* likelihood = new GpuLikelihood(population.size(), population.size(), numInfecs, numCulled, NSPECIES, obsTime, Dimport.nnz());
+
+  // Set up Species and events
+  float* speciesMatrix = new float[population.size()*NSPECIES];
+  float* eventsMatrix = new float[population.size()*NEVENTS];
+  it = population.begin();
+  for(size_t i=0; i<population.size(); ++i)
+    {
+      speciesMatrix[i] = it->cattle;
+      speciesMatrix[i+population.size()] = it->pigs;
+      speciesMatrix[i+population.size()*2] = it->sheep;
+
+      eventsMatrix[i] = it->I;
+      eventsMatrix[i+population.size()] = it->N;
+      eventsMatrix[i+population.size()*2] = it->R;
+      ++it;
+    }
+
+  likelihood->SetEvents(eventsMatrix);
+  likelihood->SetSpecies(speciesMatrix);
+
+  // Set up distance matrix
+  ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(Dimport);
+  int* rowPtr = new int[D->index1_data().size()];
+  for(size_t i=0; i<D->index1_data().size(); ++i) rowPtr[i] = D->index1_data()[i];
+  int* colInd = new int[D->index2_data().size()];
+  for(size_t i=0; i<D->index2_data().size(); ++i) colInd[i] = D->index2_data()[i];
+  likelihood->SetDistance(D->value_data().begin(), rowPtr, colInd);
+
+  delete[] rowPtr;
+  delete[] colInd;
+  delete D;
+
+  // Set up parameters
+
+  float epsilon = 7.72081e-05;
+  float gamma1 = 0.01;
+  float gamma2 = 0.0;
+  float xi[] = {1.0, 0.00205606, 0.613016};
+  float psi[] = {0.237344, 0.665464, 0.129998};
+  float zeta[] = {1.0, 0.000295018, 0.259683};
+  float phi[] = {0.402155, 0.749019, 0.365774};
+  float delta = 1.14985;
+
+  likelihood->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
+
+  // Calculate
+  likelihood->FullCalculate();
 
 
-  Parameters txparams(18);
-  txparams(0) = Parameter(0.0108081,GammaPrior(1,1),"gamma1");
-  txparams(1) = Parameter(0.5,GammaPrior(1,1),"gamma2");
-  txparams(2) = Parameter(1.14985,GammaPrior(1,1),"delta");
-  txparams(3) = Parameter(7.72081e-05,GammaPrior(1,1),"epsilon");
-  txparams(4) = Parameter(1.0,GammaPrior(1,1),"xi_c");
-  txparams(5) = Parameter(0.00205606,GammaPrior(1,1),"xi_p");
-  txparams(6) = Parameter(0.613016,GammaPrior(1,1),"xi_s");
-  txparams(7) = Parameter(0.237344,BetaPrior(2,2),"psi_c");
-  txparams(8) = Parameter(0.665464,BetaPrior(2,2),"psi_p");
-  txparams(9) = Parameter(0.129998,BetaPrior(2,2),"psi_s");
-  txparams(10) = Parameter(1.0,GammaPrior(1,1),"zeta_c");
-  txparams(11) = Parameter(0.000295018,GammaPrior(1,1),"zeta_p");
-  txparams(12) = Parameter(0.259683,GammaPrior(1,1),"zeta_s");
-  txparams(13) = Parameter(0.402155,BetaPrior(2,2),"phi_c");
-  txparams(14) = Parameter(0.749019,BetaPrior(2,2),"phi_p");
-  txparams(15) = Parameter(0.365774,BetaPrior(2,2),"phi_s");
-  txparams(16) = Parameter(0.0,GammaPrior(1,1),"meanI2N");
-  txparams(17) = Parameter(0.0,GammaPrior(1,1),"meanOccI");
 
-  Parameters dxparams(1);
-  dxparams(0) = Parameter(0.1,GammaPrior(1,1),"null");
+  // Fiddle with the population
 
-  Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
+  list<int> possibleOccults;
+  for(size_t i=numInfecs; i<numCulled; ++i)
+    possibleOccults.push_back(i);
+  list<int> occults;
 
-  delete myMcmc;
-  delete myPopulation;
+  gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
+  gsl_rng_set(r, 3);
+//  list<int>::iterator iter;
+//  for(size_t i=0; i<1000; ++i) {
+//      iter = possibleOccults.begin();
+//      advance(iter,gsl_rng_uniform_int(r, possibleOccults.size()));
+//      float inTime = gsl_ran_gamma(r, 1, 0.1);
+//      cout << "Adding " << *iter << endl;
+//      likelihood->LazyAddInfecTime(*iter, inTime);
+//      occults.push_back(*iter);
+//      possibleOccults.erase(iter);
+//  }
+
+  likelihood->FullCalculate();
+
+  for(size_t i=0; i<1000; ++i)
+    {
+
+      int toMove; int pos;
+      float inTime;
+      list<int>::iterator it;
+
+
+      int chooseMove = gsl_rng_uniform_int(r,3);
+      switch(chooseMove) {
+      case 0:
+        toMove = gsl_rng_uniform_int(r, numInfecs);
+        inTime = gsl_ran_gamma(r, 10, 1);
+        likelihood->UpdateInfectionTime(toMove,inTime);
+        break;
+      case 1:
+        it = possibleOccults.begin();
+        advance(it,gsl_rng_uniform_int(r, possibleOccults.size()));
+        inTime = gsl_ran_gamma(r, 1, 0.1);
+        cout << "Adding " << *it << endl;
+        likelihood->AddInfectionTime(*it, inTime);
+        occults.push_back(*it);
+        possibleOccults.erase(it);
+        break;
+      case 2:
+        if (occults.size() > 0) {
+            pos = gsl_rng_uniform_int(r, occults.size());
+            it = occults.begin();
+            advance(it, pos);
+            cout << "Deleting " << pos << endl;;
+            likelihood->DeleteInfectionTime(numInfecs + pos);
+            possibleOccults.push_back(*it);
+            occults.erase(it);
+        }
+        break;
+
+
+      }
+
+      cerr << "Num occults = " << occults.size() << endl;
+      //likelihood->Calculate();
+    }
+  gsl_rng_free(r);
+
+  likelihood->Calculate();
+//  likelihood->AddInfectionTime(413, 5); likelihood->Calculate();
+//  likelihood->AddInfectionTime(1000,7.5); likelihood->Calculate();
+//  likelihood->DeleteInfectionTime(numInfecs); likelihood->Calculate();
+//  likelihood->DeleteInfectionTime(numInfecs); likelihood->Calculate();
+
+
+
+  delete likelihood;
 
   return EXIT_SUCCESS;
 

@@ -15,8 +15,8 @@ fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/d
 fmdSim_SOURCES = fmdSim.cpp fmdModel.cpp
 fmdSim_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la @BOOST_LDFLAGS@ -lboost_program_options @GSL_LIBS@ @MATHLIB@
 
-testLikelihood_SOURCES = testLikelihood.cpp
-testLikelihood_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la @BOOST_LDFLAGS@ @BOOST_MPI_LIB@ @BOOST_SERIALIZATION_LIB@ @GSL_LIBS@ @MATHLIB@
+testLikelihood_SOURCES = testLikelihood.cpp GpuLikelihood.cu
+testLikelihood_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la @CUDA_LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SERIALIZATION_LIB@ @GSL_LIBS@ @MATHLIB@
 
 testPosteriorReader_SOURCES = testPosteriorReader.cpp
 testPosteriorReader_LDADD = $(top_builddir)/src/data/libPosteriorReader.la $(top_builddir)/src/Framework/libstlstrtok.la

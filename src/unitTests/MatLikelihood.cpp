@@ -231,7 +231,7 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   
   // Set up GPU environment
   cerr << "Initialising GPU" << endl;
-  gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,3, obsTime_, D_.nnz());
+  gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,infectivesSz_, 3, obsTime_, D_.nnz());
 
 
   // Parameters(needs glue code!)
@@ -416,20 +416,56 @@ MatLikelihood::calculate()
 double
 MatLikelihood::gpuCalculate()
 {
-  cerr << "D[111,116] = " << D_(111,116) << "; D[116,111] = " << D_(116,111) <<endl;
 
   gpu_->FullCalculate();
   unsigned int moveIdx;
 
   gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
 
-  for(size_t i=0; i<20; ++i)
-  {
-      int toMove = gsl_rng_uniform_int(r, infectivesSz_);
-      float inTime = gsl_ran_gamma(r, 10, 1);
-      gpu_->UpdateInfectionTime(toMove,inTime);
+//  for(size_t i=0; i<2000; ++i)
+//  {
+//      int toMove = gsl_rng_uniform_int(r, infectivesSz_);
+//      float inTime = gsl_ran_gamma(r, 10, 1);
+//      gpu_->UpdateInfectionTime(toMove,inTime);
+//
+//  }
 
-  }
+  size_t moveType;
+  float inTime;
+  bool stop = false;
+  do
+    {
+      cout << "Choose move (1=move, 2=add, 3=delete, 4=stop): ";
+      cin >> moveType;
+
+      switch (moveType)
+      {
+      case 1:
+        cout << "Choose index: ";
+        cin >> moveIdx;
+        cout << "I->N time: ";
+        cin >> inTime;
+        gpu_->UpdateInfectionTime(moveIdx, inTime);
+        break;
+
+      case 2:
+        cout << "Choose index: ";
+        cin >> moveIdx;
+        cout << "I->N time: ";
+        cin >> inTime;
+        gpu_->AddInfectionTime(moveIdx, inTime);
+        break;
+
+      case 3:
+        cout << "Choose index: ";
+        cin >> moveIdx;
+        gpu_->DeleteInfectionTime(moveIdx);
+        break;
+      case 4:
+        stop = true;
+        break;
+      }
+    } while(!stop);
   gpu_->Calculate();
 
   return gpu_->LogLikelihood();

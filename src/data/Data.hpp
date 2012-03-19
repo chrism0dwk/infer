@@ -36,17 +36,24 @@
 struct TestCovars {
   double x;
   double y;
-  long int cattle;
-  long int pigs;
-  long int sheep;
-  long int goats;
-  long int deer;
+  double cattle;
+  double pigs;
+  double sheep;
+  double goats;
+  double deer;
   double cattleinf;
   double pigsinf;
   double sheepinf;
   double cattlesusc;
   double pigssusc;
   double sheepsusc;
+};
+
+struct COOMatrixElement
+{
+  string i;
+  string j;
+  float distance;
 };
 
 
@@ -79,6 +86,20 @@ public:
   void reset();
 };
 
+
+class DistMatrixImporter : public EpiRisk::DataImporter<COOMatrixElement>
+{
+private:
+  ifstream matrixFile_;
+  string filename_;
+public:
+  DistMatrixImporter(const string filename);
+  virtual ~DistMatrixImporter();
+  void open();
+  void close();
+  Record next();
+  void reset();
+};
 
 
 
