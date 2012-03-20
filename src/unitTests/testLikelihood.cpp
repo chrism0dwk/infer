@@ -52,147 +52,6 @@ using namespace boost::numeric;
 #define NSPECIES 3
 #define NEVENTS 3
 
-enum DiseaseStatus
-{
-  IP = 0,
-  DC = 1,
-  SUSC = 2
-};
-
-
-struct Covars
-{
-  string id;
-  DiseaseStatus status;
-  float I;
-  float N;
-  float R;
-  float cattle;
-  float pigs;
-  float sheep;
-};
-
-typedef vector<Covars> Population;
-
-
-struct IsId
-{
-  IsId(string id) : id_(id) {};
-  bool
-  operator()(const Covars& cov) const
-  {
-    return cov.id == id_;
-  }
-private:
-  string id_;
-};
-
-struct CompareByI
-{
-  bool
-  operator()(const Covars& lhs, const Covars& rhs) const
-  {
-    return lhs.I < rhs.I;
-  }
-};
-
-struct CompareByStatus
-{
-  bool
-  operator()(const Covars& lhs, const Covars& rhs) const
-  {
-    return (int)lhs.status < (int)rhs.status;
-  }
-};
-
-
-void
-importPopData(Population& population, const char* filename, map<string,size_t>& idMap)
-{
-  PopDataImporter importer(filename);
-  idMap.clear();
-
-  importer.open();
-  try
-    {
-      size_t idx = 0;
-      while (1)
-        {
-          PopDataImporter::Record record = importer.next();
-          Covars covars;
-          covars.id = record.id;
-          covars.status = SUSC;
-          covars.I = EpiRisk::POSINF;
-          covars.N = EpiRisk::POSINF;
-          covars.R = EpiRisk::POSINF;
-          covars.cattle = record.data.cattle;
-          covars.pigs = record.data.pigs;
-          covars.sheep = record.data.sheep;
-          idMap.insert(make_pair(covars.id, idx)); idx++;
-          population.push_back(covars);
-        }
-    }
-  catch (EpiRisk::fileEOF& e)
-    {
-      return;
-    }
-
-  importer.close();
-
-}
-
-void
-importEpiData(Population& population, const char* filename, const float obsTime, map<string, size_t>& idMap, size_t* numCulled)
-{
-  EpiDataImporter importer(filename);
-  size_t _numCulled = 0;
-
-  importer.open();
-  try
-    {
-      while (1)
-        {
-          EpiDataImporter::Record record = importer.next();
-          map<string, size_t>::const_iterator map = idMap.find(record.id);
-          if (map == idMap.end())
-            throw range_error(
-                "Key in epidemic data not found in population data");
-
-          Population::iterator ref = population.begin() + map->second;
-          // Check type
-          if(record.data.I == EpiRisk::POSINF) ref->status = DC;
-          else ref->status = IP;
-
-          // Check data integrity
-          if (record.data.N > record.data.R) {
-              cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
-              record.data.N = record.data.R;
-          }
-          if (record.data.R < record.data.I and record.data.I != EpiRisk::POSINF)
-            {
-              cerr << "WARNING: Individual " << record.id << " has I > R!  Setting I = R-7\n";
-              record.data.I = record.data.R - 7;
-            }
-
-          ref->I = record.data.I; ref->N = record.data.N; ref->R = record.data.R;
-
-          ref->R = min(ref->R, obsTime);
-          ref->N = min(ref->N, ref->R);
-          ref->I = min(ref->I, ref->N);
-
-          _numCulled++;
-        }
-    }
-  catch (EpiRisk::fileEOF& e)
-    {
-      *numCulled = _numCulled;
-      return;
-    }
-
-  importer.close();
-}
-
-
 int main(int argc, char* argv[])
 {
   // Tests out GpuLikelihood class
@@ -204,95 +63,14 @@ int main(int argc, char* argv[])
 
   float obsTime = atof(argv[4]);
 
-  Population population;
-  size_t numCulled;
-  size_t numInfecs;
-  map<string, size_t> idMap;
-
-  // Import population data
-  importPopData(population, argv[1], idMap);
-  importEpiData(population, argv[2], obsTime, idMap, &numCulled);
-
-  // Sort individuals by disease status (IPs -> DCs -> SUSCs)
-  sort(population.begin(), population.end(), CompareByStatus());
-  Covars cmp; cmp.status = DC;
-  Population::iterator topOfIPs = lower_bound(population.begin(), population.end(), cmp, CompareByStatus());
-  numInfecs = topOfIPs - population.begin();
-  sort(population.begin(), topOfIPs, CompareByI());
-
-  cout << "Population size: " << population.size() << "\n";
-  cout << "Num infecs: " << numInfecs << "\n";
-  cout << "Num culled: " << numCulled << "\n";
-
-  // Rebuild population ID index
-  idMap.clear();
-  Population::const_iterator it = population.begin();
-  for(size_t i=0; i<population.size(); i++)
-    {
-      idMap.insert(make_pair(it->id,i));
-      it++;
-    }
-
-  // Import distances
-  ublas::mapped_matrix<float> Dimport(numCulled, population.size());
-  DistMatrixImporter* distMatrixImporter = new DistMatrixImporter(argv[3]);
-  try {
-      distMatrixImporter->open();
-      while(1)
-        {
-          DistMatrixImporter::Record record = distMatrixImporter->next();
-          map<string,size_t>::const_iterator i = idMap.find(record.id);
-          map<string,size_t>::const_iterator j = idMap.find(record.data.j);
-          if(i == idMap.end() or j == idMap.end())
-            throw range_error("Key pair not found in population");
-          if (i != j)
-            Dimport(i->second, j->second) = record.data.distance*record.data.distance;
-        }
-  }
-  catch (EpiRisk::fileEOF& e)
-  {
-      cout << "Imported " << Dimport.nnz() << " distance elements" << endl;
-  }
-  catch (exception& e)
-  {
-      throw e;
-  }
-
-  delete distMatrixImporter;
+  // Import  data
+  PopDataImporter population(argv[1]);
+  EpiDataImporter epidemic(argv[2]);
+  DistMatrixImporter distance(argv[3]);
 
   // Set up GpuLikelihood
-  GpuLikelihood* likelihood = new GpuLikelihood(population.size(), population.size(), numInfecs, numCulled, NSPECIES, obsTime, Dimport.nnz());
+  GpuLikelihood* likelihood = new GpuLikelihood(population, epidemic, distance, NSPECIES, obsTime);
 
-  // Set up Species and events
-  float* speciesMatrix = new float[population.size()*NSPECIES];
-  float* eventsMatrix = new float[population.size()*NEVENTS];
-  it = population.begin();
-  for(size_t i=0; i<population.size(); ++i)
-    {
-      speciesMatrix[i] = it->cattle;
-      speciesMatrix[i+population.size()] = it->pigs;
-      speciesMatrix[i+population.size()*2] = it->sheep;
-
-      eventsMatrix[i] = it->I;
-      eventsMatrix[i+population.size()] = it->N;
-      eventsMatrix[i+population.size()*2] = it->R;
-      ++it;
-    }
-
-  likelihood->SetEvents(eventsMatrix);
-  likelihood->SetSpecies(speciesMatrix);
-
-  // Set up distance matrix
-  ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(Dimport);
-  int* rowPtr = new int[D->index1_data().size()];
-  for(size_t i=0; i<D->index1_data().size(); ++i) rowPtr[i] = D->index1_data()[i];
-  int* colInd = new int[D->index2_data().size()];
-  for(size_t i=0; i<D->index2_data().size(); ++i) colInd[i] = D->index2_data()[i];
-  likelihood->SetDistance(D->value_data().begin(), rowPtr, colInd);
-
-  delete[] rowPtr;
-  delete[] colInd;
-  delete D;
 
   // Set up parameters
 
@@ -315,22 +93,13 @@ int main(int argc, char* argv[])
   // Fiddle with the population
 
   list<int> possibleOccults;
-  for(size_t i=numInfecs; i<numCulled; ++i)
+  for(size_t i=likelihood->GetNumInfecs(); i<likelihood->GetMaxInfecs(); ++i)
     possibleOccults.push_back(i);
   list<int> occults;
 
   gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
   gsl_rng_set(r, 3);
-//  list<int>::iterator iter;
-//  for(size_t i=0; i<1000; ++i) {
-//      iter = possibleOccults.begin();
-//      advance(iter,gsl_rng_uniform_int(r, possibleOccults.size()));
-//      float inTime = gsl_ran_gamma(r, 1, 0.1);
-//      cout << "Adding " << *iter << endl;
-//      likelihood->LazyAddInfecTime(*iter, inTime);
-//      occults.push_back(*iter);
-//      possibleOccults.erase(iter);
-//  }
+
 
   likelihood->FullCalculate();
 
@@ -345,7 +114,7 @@ int main(int argc, char* argv[])
       int chooseMove = gsl_rng_uniform_int(r,3);
       switch(chooseMove) {
       case 0:
-        toMove = gsl_rng_uniform_int(r, numInfecs);
+        toMove = gsl_rng_uniform_int(r, likelihood->GetNumInfecs());
         inTime = gsl_ran_gamma(r, 10, 1);
         likelihood->UpdateInfectionTime(toMove,inTime);
         break;
@@ -364,7 +133,7 @@ int main(int argc, char* argv[])
             it = occults.begin();
             advance(it, pos);
             cout << "Deleting " << pos << endl;;
-            likelihood->DeleteInfectionTime(numInfecs + pos);
+            likelihood->DeleteInfectionTime(likelihood->GetNumInfecs() + pos);
             possibleOccults.push_back(*it);
             occults.erase(it);
         }
@@ -379,12 +148,6 @@ int main(int argc, char* argv[])
   gsl_rng_free(r);
 
   likelihood->Calculate();
-//  likelihood->AddInfectionTime(413, 5); likelihood->Calculate();
-//  likelihood->AddInfectionTime(1000,7.5); likelihood->Calculate();
-//  likelihood->DeleteInfectionTime(numInfecs); likelihood->Calculate();
-//  likelihood->DeleteInfectionTime(numInfecs); likelihood->Calculate();
-
-
 
   delete likelihood;
 

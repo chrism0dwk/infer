@@ -27,7 +27,6 @@
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
-#include <gsl/gsl_randist.h>
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -40,14 +39,19 @@
 namespace po = boost::program_options;
 
 #include "config.h"
-#include "SpatPointPop.hpp"
 #include "Mcmc.hpp"
 #include "Data.hpp"
 #include "McmcWriter.hpp"
-#include "MatLikelihood.hpp"
+#include "Parameter.hpp"
+#include "GpuLikelihood.hpp"
 
-#define CONNECTIONCUTOFF 25.0
-#define REPS 1
+
+
+using namespace std;
+using namespace boost::numeric;
+
+#define NSPECIES 3
+#define NEVENTS 3
 
 using namespace EpiRisk;
 
@@ -62,16 +66,16 @@ timeinseconds(const timeval a, const timeval b)
 
 class GammaPrior : public Prior
 {
-  double shape_;
-  double rate_;
+  float shape_;
+  float rate_;
 public:
-  GammaPrior(const double shape, const double rate)
+  GammaPrior(const float shape, const float rate)
   {
     shape_ = shape;
     rate_ = rate;
   }
-  double
-  operator()(const double x)
+  float
+  operator()(const float x)
   {
     return gsl_ran_gamma_pdf(x, shape_, 1 / rate_);
   }
@@ -89,16 +93,16 @@ public:
 
 class BetaPrior : public Prior
 {
-  double a_;
-  double b_;
+  float a_;
+  float b_;
 public:
-  BetaPrior(const double a, const double b) :
+  BetaPrior(const float a, const float b) :
     a_(a), b_(b)
   {
   }
   ;
-  double
-  operator()(const double x)
+  float
+  operator()(const float x)
   {
     return gsl_ran_beta_pdf(x, a_, b_);
   }
@@ -139,21 +143,6 @@ public:
   }
 };
 
-struct ConnectionPredicate
-{
-  bool
-  operator()(Population<TestCovars>::Individual i,
-      Population<TestCovars>::Individual j)
-  {
-    double dx = i.getCovariates().x - j.getCovariates().x;
-    double dy = i.getCovariates().y - j.getCovariates().y;
-
-    if (dx > CONNECTIONCUTOFF or dy > CONNECTIONCUTOFF)
-      return false;
-    else
-      return sqrt(dx * dx + dy * dy) <= CONNECTIONCUTOFF;
-  }
-};
 
 struct ParamSetting
 {
@@ -347,51 +336,13 @@ main(int argc, char* argv[])
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
+  DistMatrixImporter* distMatrixImporter = new DistMatrixImporter(argv[3]);
 
-  Population<TestCovars>* myPopulation = new Population<TestCovars> ;
-
-  myPopulation->importPopData(*popDataImporter);
-  myPopulation->importEpiData(*epiDataImporter);
-  //myPopulation->createConnectionGraph(ConnectionPredicate());
-  myPopulation->loadConnectionGraph(argv[3]);
-  myPopulation->setObsTime(atof(argv[5]));
+  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *distMatrixImporter, (size_t)3, (float)atof(argv[5]));
 
   delete popDataImporter;
   delete epiDataImporter;
-
-  //  ofstream confile;
-  //  confile.open("/storage/stsiab/FMD2001/data/fmd2001_uk_15km.con",ios::out);
-  //  size_t counter = 0;
-  //  size_t numcons = 0;
-  //  for(Population<TestCovars>::PopulationIterator it = myPopulation->begin();
-  //      it != myPopulation->end();
-  //      it++) {
-  //
-  //    for(Population<TestCovars>::PopulationIterator jt = myPopulation->begin();
-  //        jt != it;
-  //        jt++ )
-  //      {
-  //        double dx = it->getCovariates().x - jt->getCovariates().x;
-  //        double dy = it->getCovariates().y - jt->getCovariates().y;
-  //        if(dx <= 15.0 and dy <= 15.0) {
-  //            if(sqrt(dx*dx + dy*dy) <= 15.0) {
-  //                confile << it->getId() << "," << jt->getId() << endl;
-  //                confile << jt->getId() << "," << it->getId() << endl;
-  //            }
-  //        }
-  //      }
-  //    cout << counter << ": " << numcons << endl;
-  //    counter++;
-  //  }
-  //  confile.close();
-  //  return 0;
-
-  // Data covariance matrix
-  //  EmpCovar<LogTransform>::CovMatrix speciesCovar;
-  //  ifstream covMatrix;
-  //  covMatrix.open(argv[3],ios::in);
-  //  covMatrix >> speciesCovar;
-  //  covMatrix.close();
+  delete distMatrixImporter;
 
 
   Parameters txparams(19);
@@ -418,38 +369,14 @@ main(int argc, char* argv[])
   Parameters dxparams(1);
   dxparams(0) = Parameter(0.1, GammaPrior(1, 1), "null");
 
-  cerr << "Initialising BLAS class..." << endl;
-  MatLikelihood matLikelihood(*myPopulation, txparams);
-  cerr << "Done" << endl;
-
-  cerr << "======== CPU likelihood ========" << endl;
-  timeval start, end;
-  gettimeofday(&start, NULL);
-  float integral = 0.0f;
-  for(size_t i = 0; i<REPS; ++i)
-    integral = matLikelihood.calculate();
-  gettimeofday(&end, NULL);
-  cerr << "Done in " << timeinseconds(start,end) / (double)REPS << endl;
-  cerr.precision(20);
-  cerr << "Likelihood = " << integral << endl << endl;
-
-  cerr << "======== GPU likelihood ========" << endl;
-  gettimeofday(&start, NULL);
-  integral = 0.0f;
-  for(size_t i = 0; i<REPS; ++i)
-    integral = matLikelihood.gpuCalculate();
-  gettimeofday(&end, NULL);
-  cerr << "Done in " << timeinseconds(start,end) / (double)REPS << endl;
-  cerr.precision(20);
-  cerr << "Likelihood = " << integral << endl;
 
 
-//  cout << "Press <enter> to exit....";
-//  char m = getchar();
 
-
-  //Mcmc* myMcmc = new Mcmc(*myPopulation, txparams, dxparams,0);
 
   return EXIT_SUCCESS;
 
 }
+
+
+
+

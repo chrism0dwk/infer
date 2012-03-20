@@ -58,15 +58,15 @@ namespace EpiRisk
      * @return The value of \f$f(x)$\f
      */
     virtual
-    double
-    operator()(const double x) = 0;
+    float
+    operator()(const float x) = 0;
 
   };
 
   class UniformPrior : public Prior
   {
-    double
-    operator()(const double x = 0)
+    float
+    operator()(const float x = 0)
     {
       return 1.0;
     }
@@ -86,12 +86,12 @@ namespace EpiRisk
   class Parameter
   {
     std::string tag_;
-    double value_;
+    float value_;
     Prior* prior_;
 
   public:
     Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {};
-    Parameter(const double value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
+    Parameter(const float value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
     {
       prior_ = prior.clone();
     }
@@ -126,7 +126,7 @@ namespace EpiRisk
       return *this;
     }
     Parameter&
-    operator=(const double x)
+    operator=(const float x)
     {
       value_ = x;
       return *this;
@@ -135,37 +135,42 @@ namespace EpiRisk
     ~Parameter() {
       delete prior_;
     };
-    double prior() const
+    float prior() const
     {
       return (*prior_)(value_);
     }
-    operator double () const
+    operator float () const
     {
       return value_;
     }
     Parameter&
-    operator+=(double x)
+    operator+=(float x)
     {
       value_ += x;
       return *this;
     }
     Parameter&
-    operator*=(double x)
+    operator*=(float x)
     {
       value_ *= x;
       return *this;
     }
     Parameter&
-    operator/=(double x)
+    operator/=(float x)
     {
       value_ /= x;
       return *this;
     }
     Parameter&
-    operator-=(double x)
+    operator-=(float x)
     {
       value_ -= x;
       return *this;
+    }
+    float*
+    GetValuePtr()
+    {
+      return &value_;
     }
   };
 
