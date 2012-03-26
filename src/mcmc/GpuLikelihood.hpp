@@ -33,10 +33,10 @@
 
 #include <map>
 #include <ostream>
+#include <vector>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
-#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "Data.hpp"
 #include "Parameter.hpp"
@@ -47,6 +47,37 @@
 // Model defines
 #define NUMEVENTS 3
 #define NUMSPECIES 3
+
+// Helper classes
+template <typename T>
+class PointerVector
+{
+public:
+  PointerVector() {};
+
+  PointerVector(const size_t size)
+   { content_.resize(size); }
+
+  PointerVector(PointerVector& other)
+  { content_ = other.content_; }
+
+  void
+  push_back(T* x)
+  { content_.push_back(x); }
+
+  T
+  operator[](const size_t index) const
+    { return *(content_[index]); };
+
+  size_t
+  size() const { return content_.size(); };
+
+  void
+  clear() { content_.clear(); };
+
+private:
+  std::vector<T*> content_;
+};
 
 using EpiRisk::Parameter;
 using EpiRisk::Parameters;
@@ -230,10 +261,10 @@ private:
   float* gamma1_;
   float* gamma2_;
   float* delta_;
-  boost::ptr_vector<float> xi_;
-  boost::ptr_vector<float> psi_;
-  boost::ptr_vector<float> zeta_;
-  boost::ptr_vector<float> phi_;
+  PointerVector<float> xi_;
+  PointerVector<float> psi_;
+  PointerVector<float> zeta_;
+  PointerVector<float> phi_;
 
   float* devXi_;
   float* devPsi_;
