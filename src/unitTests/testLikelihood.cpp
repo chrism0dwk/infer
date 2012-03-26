@@ -45,12 +45,69 @@
 
 #include "Data.hpp"
 #include "GpuLikelihood.hpp"
+#include "Parameter.hpp"
 
 using namespace std;
 using namespace boost::numeric;
 
 #define NSPECIES 3
 #define NEVENTS 3
+
+class GammaPrior : public EpiRisk::Prior
+{
+  float shape_;
+  float rate_;
+public:
+  GammaPrior(const float shape, const float rate)
+  {
+    shape_ = shape;
+    rate_ = rate;
+  }
+  float
+  operator()(const float x)
+  {
+    return gsl_ran_gamma_pdf(x, shape_, 1 / rate_);
+  }
+  Prior*
+  create() const
+  {
+    return new GammaPrior(shape_, rate_);
+  }
+  Prior*
+  clone() const
+  {
+    return new GammaPrior(*this);
+  }
+};
+
+class BetaPrior : public EpiRisk::Prior
+{
+  float a_;
+  float b_;
+public:
+  BetaPrior(const float a, const float b) :
+    a_(a), b_(b)
+  {
+  }
+  ;
+  float
+  operator()(const float x)
+  {
+    return gsl_ran_beta_pdf(x, a_, b_);
+  }
+  Prior*
+  create() const
+  {
+    return new BetaPrior(a_, b_);
+  }
+  Prior*
+  clone() const
+  {
+    return new BetaPrior(*this);
+  }
+};
+
+
 
 int main(int argc, char* argv[])
 {
@@ -73,17 +130,28 @@ int main(int argc, char* argv[])
 
 
   // Set up parameters
+  Parameter epsilon(7.72081e-05, GammaPrior(1, 1), "epsilon");
+  Parameter gamma1(0.01, GammaPrior(1, 1), "gamma1");
+  Parameter gamma2(0.5, GammaPrior(1, 1), "gamma2");
+  Parameters xi(3);
+  xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
+  xi[1] = Parameter(0.00205606, GammaPrior(1, 1), "xi_p");
+  xi[2] = Parameter(0.613016, GammaPrior(1, 1), "xi_s");
+  Parameters psi(3);
+  psi[0] = Parameter(0.237344, BetaPrior(2, 2), "psi_c");
+  psi[1] = Parameter(0.665464, BetaPrior(2, 2), "psi_p");
+  psi[2] = Parameter(0.129998, BetaPrior(2, 2), "psi_s");
+  Parameters zeta(3);
+  zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
+  zeta[1] = Parameter(0.000295018, GammaPrior(1, 1), "zeta_p");
+  zeta[2] = Parameter(0.259683, GammaPrior(1, 1), "zeta_s");
+  Parameters phi(3);
+  phi[0] = Parameter(0.402155, BetaPrior(2, 2), "phi_c");
+  phi[1] = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
+  phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
+  Parameter delta(1.14985, GammaPrior(1, 1), "delta");
 
-  float epsilon = 7.72081e-05;
-  float gamma1 = 0.01;
-  float gamma2 = 0.0;
-  float xi[] = {1.0, 0.00205606, 0.613016};
-  float psi[] = {0.237344, 0.665464, 0.129998};
-  float zeta[] = {1.0, 0.000295018, 0.259683};
-  float phi[] = {0.402155, 0.749019, 0.365774};
-  float delta = 1.14985;
-
-  likelihood->SetParameters(&epsilon,&gamma1,&gamma2,xi,psi,zeta,phi,&delta);
+  likelihood->SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta);
 
   // Calculate
   likelihood->FullCalculate();

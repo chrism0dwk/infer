@@ -42,18 +42,18 @@ FmdModel::~FmdModel()
 double
 FmdModel::infectivity(const Individual& i, const double time) const
 {
-  double infectivity = pow(i.getCovariates().cattle,params_.psi_c) +
-                       params_.xi_p*pow(i.getCovariates().pigs,params_.psi_p) +
-                       params_.xi_s*pow(i.getCovariates().sheep,params_.psi_s);
+  double infectivity = powf(i.getCovariates().cattle,params_.psi_c) +
+                       params_.xi_p*powf(i.getCovariates().pigs,params_.psi_p) +
+                       params_.xi_s*powf(i.getCovariates().sheep,params_.psi_s);
   return infectivity;
 }
 
 double
 FmdModel::susceptibility(const Individual& j) const
 {
-  double susceptibility = pow(j.getCovariates().cattle,params_.phi_c) +
-                          params_.zeta_p*pow(j.getCovariates().pigs,params_.phi_p) +
-                          params_.zeta_s*pow(j.getCovariates().sheep,params_.phi_s);
+  double susceptibility = powf(j.getCovariates().cattle,params_.phi_c) +
+                          params_.zeta_p*powf(j.getCovariates().pigs,params_.phi_p) +
+                          params_.zeta_s*powf(j.getCovariates().sheep,params_.phi_s);
 
   return susceptibility;
 }

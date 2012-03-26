@@ -110,7 +110,7 @@ namespace EpiRisk
       return new Parameter();
     }
     const std::string&
-    getTag() const
+    GetTag() const
     {
       return tag_;
     }
@@ -172,10 +172,41 @@ namespace EpiRisk
     {
       return &value_;
     }
+    float
+    GetValue() const
+    {
+      return value_;
+    }
   };
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
   typedef boost::numeric::ublas::slice ParameterSlice;
+
+  typedef boost::ptr_vector<Parameter> ParameterSerializerList;
+
+  class ParameterSerializer
+  {
+  public:
+    ParameterSerializer(ParameterSerializerList& params, std::ostream& os) : params_(params)
+    {
+      ParameterSerializerList::const_iterator it = params_.begin();
+      os << it->GetTag();
+      ++it;
+      while(it != params_.end())
+        {
+          os << "," << it->GetTag();
+          ++it;
+        }
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);
+
+  private:
+    ParameterSerializerList& params_;
+  };
+
+  std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);
+
 
 }
 

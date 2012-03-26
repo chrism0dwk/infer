@@ -36,16 +36,16 @@ using namespace EpiRisk;
 
   class GammaPrior : public Prior
   {
-    double shape_;
-    double rate_;
+    float shape_;
+    float rate_;
   public:
-    GammaPrior(const double shape, const double rate)
+    GammaPrior(const float shape, const float rate)
     {
       shape_ = shape;
       rate_ = rate;
     }
-    double
-    operator()(const double x)
+    float
+    operator()(const float x)
     {
       return gsl_ran_gamma_pdf(x,shape_,1/rate_);
     }
@@ -63,11 +63,11 @@ using namespace EpiRisk;
 
   class BetaPrior : public Prior
   {
-    double a_;
-    double b_;
+    float a_;
+    float b_;
   public:
-    BetaPrior(const double a, const double b) : a_(a),b_(b) {};
-    double operator()(const double x)
+    BetaPrior(const float a, const float b) : a_(a),b_(b) {};
+    float operator()(const float x)
     {
       return gsl_ran_beta_pdf(x,a_,b_);
     }

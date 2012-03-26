@@ -202,10 +202,10 @@ void
 GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2,
     Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta)
 {
-  epsilon_ = epsilon;
-  gamma1_ = gamma1;
-  gamma2_ = gamma2;
-  delta_ = delta;
+  epsilon_ = epsilon.GetValuePtr();
+  gamma1_ = gamma1.GetValuePtr();
+  gamma2_ = gamma2.GetValuePtr();
+  delta_ = delta.GetValuePtr();
 
   xi_.clear(); psi_.clear(); zeta_.clear(); phi_.clear();
   for(size_t p=0; p<numSpecies_; ++p)
@@ -228,6 +228,12 @@ GpuLikelihood::GetNumInfecs() const
 }
 
 size_t
+GpuLikelihood::GetNumKnownInfecs() const
+{
+  return numKnownInfecs_;
+}
+
+size_t
 GpuLikelihood::GetMaxInfecs() const
 {
   return maxInfecs_;
@@ -243,4 +249,28 @@ size_t
 GpuLikelihood::GetNumOccults() const
 {
   return hostInfecIdx_.size() - numKnownInfecs_;
+}
+
+std::ostream&
+operator <<(std::ostream& out, const GpuLikelihood& likelihood)
+{
+  float* infecTimes = new float[likelihood.GetNumInfecs()];
+  float* notifyTimes = new float[likelihood.GetNumInfecs()];
+  thrust::device_ptr<float> eventPtr(likelihood.devEventTimes_);
+
+  thrust::copy(eventPtr, eventPtr + likelihood.GetNumInfecs(), infecTimes);
+  thrust::copy(eventPtr + likelihood.eventTimesPitch_, eventPtr + likelihood.eventTimesPitch_ + likelihood.GetNumInfecs(), notifyTimes);
+
+  map<string, size_t>::const_iterator it = likelihood.idMap_.begin();
+  if (notifyTimes[it->second] - infecTimes[it->second] == 0)
+    out << it->first << ":" << infecTimes[it->second];
+  ++it;
+  while(it != likelihood.idMap_.end())
+    {
+      if (notifyTimes[it->second] - infecTimes[it->second] == 0)
+       out << "," << it->first << ":" << infecTimes[it->second];
+      ++it;
+    }
+
+  return out;
 }

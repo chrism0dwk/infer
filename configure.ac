@@ -1,10 +1,10 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-VERSION = "0.5-1alpha"
+VERSION = "0.6-1alpha"
 
 AC_PREREQ([2.50])
-AC_INIT(brandenburg, 0.5-1alpha, Chris Jewell <chris.jewell@warwick.ac.uk>)
+AC_INIT(brandenburg, 0.6-1alpha, Chris Jewell <chris.jewell@warwick.ac.uk>)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])

@@ -7,12 +7,12 @@ bin_PROGRAMS = fmdMcmc fmdSim testLikelihood testPosteriorReader fmdOneStepAhead
 noinst_HEADERS = fmdModel.hpp
 
 fmdMcmc_SOURCES = fmdMcmc.cpp
-fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la $(top_builddir)/src/mcmc/libgpulikelihood.la @GSL_LIBS@ @BOOST_LDFLAGS@ @CUDA_LDFLAGS@ @BOOST_SERIALIZATION_LIB@ @MATHLIB@
+fmdMcmc_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/Framework/libparameter.la $(top_builddir)/src/mcmc/libmcmc.la $(top_builddir)/src/mcmc/libgpulikelihood.la @GSL_LIBS@ @BOOST_LDFLAGS@ @CUDA_LDFLAGS@ @BOOST_SERIALIZATION_LIB@ @MATHLIB@
 
 fmdSim_SOURCES = fmdSim.cpp fmdModel.cpp
 fmdSim_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la @BOOST_LDFLAGS@ -lboost_program_options @GSL_LIBS@ @MATHLIB@
 
-testLikelihood_SOURCES = testLikelihood.cpp GpuLikelihood_gpu.cu GpuLikelihood.cpp
+testLikelihood_SOURCES = testLikelihood.cpp
 testLikelihood_LDADD = $(top_builddir)/src/Framework/librandom.la $(top_builddir)/src/data/libdata.la $(top_builddir)/src/Framework/libstlstrtok.la $(top_builddir)/src/mcmc/libmcmc.la $(top_builddir)/src/mcmc/libgpulikelihood.la @BOOST_LDFLAGS@ @BOOST_SERIALIZATION_LIB@ @GSL_LIBS@ @MATHLIB@
 
 testPosteriorReader_SOURCES = testPosteriorReader.cpp

@@ -107,7 +107,7 @@ Mcmc::~Mcmc()
 SingleSiteLogMRW*
 Mcmc::NewSingleSiteLogMRW(Parameter& param, const double tuning)
 {
-  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.getTag(), param,
+  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.GetTag(), param,
       tuning, *random_, likelihood_);
   updateStack_.push_back(update);
 
@@ -398,9 +398,9 @@ Mcmc::Update()
     {
       cerr << "Logic Error occurred: " << e.what() << endl;
     }
-  catch (...)
+  catch (exception& e)
   {
-      cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << endl;
+      cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << ": " << e.what() << endl;
   }
 }
 

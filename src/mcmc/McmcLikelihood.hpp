@@ -35,6 +35,7 @@ namespace EpiRisk
   class McmcLikelihood
   {
   public:
+    explicit
     McmcLikelihood(GpuLikelihood& likelihood);
     float
     Propose();

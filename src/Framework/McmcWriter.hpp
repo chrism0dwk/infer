@@ -62,10 +62,10 @@ namespace EpiRisk
       paramFile_.open(paramFn_.c_str(),ios::out);
       if(!paramFile_.is_open()) throw output_exception("Cannot open parameter file for writing!");
       Parameters::iterator it = params.begin();
-      paramFile_ << "\"" << (*it).getTag() << "\"";
+      paramFile_ << "\"" << (*it).GetTag() << "\"";
       it++;
       while(it != params.end()) {
-          paramFile_ << ",\"" << (*it).getTag() << "\"";
+          paramFile_ << ",\"" << (*it).GetTag() << "\"";
           it++;
       }
       paramFile_ << "\n";

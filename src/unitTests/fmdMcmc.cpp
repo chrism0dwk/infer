@@ -320,19 +320,15 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 7)
+  if (argc != 8)
     {
       cerr
-          << "Usage: testSpatPointPop <pop file> <epi file> <output folder> <obs time> <num iterations>"
+          << "Usage: fmdMcmc <pop file> <epi file> <dist matrix> <output folder> <obs time> <num iterations> <seed>"
           << endl;
       return EXIT_FAILURE;
     }
 
   typedef Population<TestCovars> MyPopulation;
-
-  // Make output directory
-  string outputFolder(argv[4]);
-  mkdir(outputFolder.c_str(), S_IFDIR | S_IRWXU);
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
@@ -345,32 +341,125 @@ main(int argc, char* argv[])
   delete distMatrixImporter;
 
 
-  Parameters txparams(19);
-  txparams(0) = Parameter(0.01/*08081*/, GammaPrior(1, 1), "gamma1");
-  txparams(1) = Parameter(0.5, GammaPrior(1, 1), "gamma2");
-  txparams(2) = Parameter(1.14985, GammaPrior(1, 1), "delta");
-  txparams(3) = Parameter(7.72081e-05, GammaPrior(1, 1), "epsilon");
-  txparams(4) = Parameter(1.0, GammaPrior(1, 1), "xi_c");
-  txparams(5) = Parameter(0.00205606, GammaPrior(1, 1), "xi_p");
-  txparams(6) = Parameter(0.613016, GammaPrior(1, 1), "xi_s");
-  txparams(7) = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
-  txparams(8) = Parameter(0.000295018, GammaPrior(1, 1), "zeta_p");
-  txparams(9) = Parameter(0.259683, GammaPrior(1, 1), "zeta_s");
-  txparams(10) = Parameter(0.237344, BetaPrior(2, 2), "psi_c");
-  txparams(11) = Parameter(0.665464, BetaPrior(2, 2), "psi_p");
-  txparams(12) = Parameter(0.129998, BetaPrior(2, 2), "psi_s");
-  txparams(13) = Parameter(0.402155, BetaPrior(2, 2), "phi_c");
-  txparams(14) = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
-  txparams(15) = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
-  txparams(16) = Parameter(0.0, GammaPrior(1, 1), "meanI2N");
-  txparams(17) = Parameter(0.0, GammaPrior(1, 1), "meanOccI");
-  txparams(18) = Parameter(0.0, GammaPrior(1, 1), "logLikelihood");
+  // Parameters
+  // Set up parameters
+  Parameter epsilon(7.72081e-05, GammaPrior(1, 1), "epsilon");
+  Parameter gamma1(0.01, GammaPrior(1, 1), "gamma1");
+  Parameter gamma2(0.5, GammaPrior(1, 1), "gamma2");
+  Parameters xi(3);
+  xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
+  xi[1] = Parameter(0.00205606, GammaPrior(1, 1), "xi_p");
+  xi[2] = Parameter(0.613016, GammaPrior(1, 1), "xi_s");
+  Parameters psi(3);
+  psi[0] = Parameter(0.237344, BetaPrior(2, 2), "psi_c");
+  psi[1] = Parameter(0.665464, BetaPrior(2, 2), "psi_p");
+  psi[2] = Parameter(0.129998, BetaPrior(2, 2), "psi_s");
+  Parameters zeta(3);
+  zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
+  zeta[1] = Parameter(0.000295018, GammaPrior(1, 1), "zeta_p");
+  zeta[2] = Parameter(0.259683, GammaPrior(1, 1), "zeta_s");
+  Parameters phi(3);
+  phi[0] = Parameter(0.402155, BetaPrior(2, 2), "phi_c");
+  phi[1] = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
+  phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
+  Parameter delta(1.14985, GammaPrior(1, 1), "delta");
 
-  Parameters dxparams(1);
-  dxparams(0) = Parameter(0.1, GammaPrior(1, 1), "null");
+  likelihood.SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta);
+
+  // Set up MCMC algorithm
+  cout << "Initializing MCMC" << endl;
+  Mcmc mcmc(likelihood, atoi(argv[7]));
+  mcmc.setNumIUpdates(0);
+
+  UpdateBlock txDelta;
+    txDelta.add(epsilon);
+    txDelta.add(gamma1);
+    txDelta.add(gamma2);
+    txDelta.add(delta);
+    AdaptiveMultiLogMRW* updateDistance = mcmc.NewAdaptiveMultiLogMRW("txDistance",txDelta, 300);
 
 
+    UpdateBlock txPsi;
+    txPsi.add(psi[0]);
+    txPsi.add(psi[1]);
+    txPsi.add(psi[2]);
+    AdaptiveMultiLogMRW* updatePsi = mcmc.NewAdaptiveMultiLogMRW("txPsi",txPsi, 300);
 
+
+    UpdateBlock txPhi;
+    txPhi.add(phi[0]);
+    txPhi.add(phi[1]);
+    txPhi.add(phi[2]);
+    AdaptiveMultiLogMRW* updatePhi = mcmc.NewAdaptiveMultiLogMRW("txPhi",txPhi, 300);
+
+    UpdateBlock txInfec;
+    txInfec.add(gamma1);
+    txInfec.add(xi[1]);
+    txInfec.add(xi[2]);
+    InfectivityMRW* updateInfec = mcmc.NewInfectivityMRW("txInfec",txInfec, txPsi, 300);
+
+    UpdateBlock txSuscep;
+    txSuscep.add(gamma1);
+    txSuscep.add(zeta[1]);
+    txSuscep.add(zeta[2]);
+    SusceptibilityMRW* updateSuscep = mcmc.NewSusceptibilityMRW("txSuscep",txSuscep, txPhi, 300);
+
+    AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
+
+
+    //// Output ////
+
+    // Make output directory
+    string outputFolder(argv[4]);
+    mkdir(outputFolder.c_str(),S_IFDIR | S_IRWXU);
+
+    stringstream parmFn;
+    stringstream occFn;
+    stringstream covFn;
+
+    parmFn << outputFolder << "/parameters.asc";
+    occFn << outputFolder << "/infec.asc";
+    covFn << outputFolder << "/covariances.asc";
+
+    ofstream parmfile(parmFn.str().c_str());
+    ofstream occfile(occFn.str().c_str());
+
+    if(!parmfile.is_open()) throw data_exception("Cannot open parameter output file");
+    if(!occfile.is_open()) throw data_exception("Cannot open occ output file");
+
+    ParameterSerializerList outputparms;
+    outputparms.push_back(&epsilon); outputparms.push_back(&gamma1);
+    outputparms.push_back(&gamma2);  outputparms.push_back(&xi[0]);
+    outputparms.push_back(&xi[1]);   outputparms.push_back(&xi[2]);
+    outputparms.push_back(&psi[0]);  outputparms.push_back(&psi[1]);
+    outputparms.push_back(&psi[2]);  outputparms.push_back(&zeta[0]);
+    outputparms.push_back(&zeta[1]); outputparms.push_back(&zeta[2]);
+    outputparms.push_back(&phi[0]);  outputparms.push_back(&phi[1]);
+    outputparms.push_back(&phi[2]);  outputparms.push_back(&delta);
+
+    ParameterSerializer parmSerializer(outputparms, parmfile);
+
+    // Run the chain
+    cout << "Running MCMC" << endl;
+    for(size_t k=0; k<atoi(argv[6]); ++k)
+      {
+        mcmc.Update();
+
+        parmfile << parmSerializer << "," << likelihood.GetMeanI2N() << "," << likelihood.GetMeanOccI() << endl;
+        occfile << likelihood << endl;
+      }
+
+    parmfile.close();
+    occfile.close();
+
+    // Wrap up
+    map<string, float> acceptance = mcmc.GetAcceptance();
+
+    for(map<string, float>::const_iterator it = acceptance.begin();
+        it != acceptance.end(); ++it)
+      {
+        cout << it->first << ": " << it->second << "\n";
+      }
 
 
   return EXIT_SUCCESS;

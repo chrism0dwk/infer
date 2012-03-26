@@ -32,6 +32,7 @@
 #include <cusparse.h>
 
 #include <map>
+#include <ostream>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
@@ -53,9 +54,11 @@ using EpiRisk::Parameters;
 class GpuLikelihood
 {
 public:
+  explicit
   GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
       DistMatrixImporter& distMatrix, const size_t nSpecies, const float obsTime,
       const bool occultsOnlyDC = true);
+  explicit
   GpuLikelihood(const GpuLikelihood& other);
   virtual
   ~GpuLikelihood();
@@ -134,6 +137,8 @@ public:
   GetSumSusceptibilityPow(float* result) const;
   void
   LazyAddInfecTime(const int idx, const float inTime);
+
+  friend std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
 private:
   // Data import
@@ -221,10 +226,10 @@ private:
   int integralBuffSize_;
 
   // Parameters
-  Parameter& epsilon_;
-  Parameter& gamma1_;
-  Parameter& gamma2_;
-  Parameter& delta_;
+  float* epsilon_;
+  float* gamma1_;
+  float* gamma2_;
+  float* delta_;
   boost::ptr_vector<float> xi_;
   boost::ptr_vector<float> psi_;
   boost::ptr_vector<float> zeta_;
@@ -244,5 +249,7 @@ private:
   cusparseMatDescr_t crsDescr_;
 
 };
+
+std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
 #endif /* GPULIKELIHOOD_HPP_ */
