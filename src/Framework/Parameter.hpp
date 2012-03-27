@@ -187,16 +187,22 @@ namespace EpiRisk
   class ParameterSerializer
   {
   public:
-    ParameterSerializer(ParameterSerializerList& params, std::ostream& os) : params_(params)
+    ParameterSerializer(ParameterSerializerList& params) : params_(params)
+    {
+
+    }
+
+    void
+    Header(std::ostream& os)
     {
       ParameterSerializerList::const_iterator it = params_.begin();
-      os << it->GetTag();
-      ++it;
-      while(it != params_.end())
-        {
-          os << "," << it->GetTag();
-          ++it;
-        }
+            os << it->GetTag();
+            ++it;
+            while(it != params_.end())
+              {
+                os << "," << it->GetTag();
+                ++it;
+              }
     }
 
     friend std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);

@@ -37,7 +37,7 @@ namespace EpiRisk
     ++it;
     while (it != paramSerializer.params_.end())
       {
-        os << "," << it->GetTag();
+        os << "," << it->GetValue();
         ++it;
       }
     return os;

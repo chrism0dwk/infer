@@ -369,7 +369,7 @@ main(int argc, char* argv[])
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
   Mcmc mcmc(likelihood, atoi(argv[7]));
-  mcmc.setNumIUpdates(0);
+  mcmc.setNumIUpdates(200);
 
   UpdateBlock txDelta;
     txDelta.add(epsilon);
@@ -404,7 +404,7 @@ main(int argc, char* argv[])
     txSuscep.add(zeta[2]);
     SusceptibilityMRW* updateSuscep = mcmc.NewSusceptibilityMRW("txSuscep",txSuscep, txPhi, 300);
 
-    AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
+   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
 
     //// Output ////
@@ -437,7 +437,9 @@ main(int argc, char* argv[])
     outputparms.push_back(&phi[0]);  outputparms.push_back(&phi[1]);
     outputparms.push_back(&phi[2]);  outputparms.push_back(&delta);
 
-    ParameterSerializer parmSerializer(outputparms, parmfile);
+    ParameterSerializer parmSerializer(outputparms);
+    parmSerializer.Header(parmfile);
+    parmfile << ",meanI2N,meanOccI\n";
 
     // Run the chain
     cout << "Running MCMC" << endl;

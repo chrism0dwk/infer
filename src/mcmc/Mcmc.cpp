@@ -39,8 +39,8 @@
 using namespace EpiRisk;
 
 // Constants
-const double a = 0.05;//0.015;
-const double b = 0.2;//0.8;
+const double a = 0.05; //0.015;
+const double b = 0.2; //0.8;
 const double tuneI = 2.0;
 
 inline
@@ -48,7 +48,7 @@ double
 timeinseconds(const timeval a, const timeval b)
 {
   timeval result;
-  timersub(&b,&a,&result);
+  timersub(&b, &a, &result);
   return result.tv_sec + result.tv_usec / 1000000.0;
 }
 
@@ -87,11 +87,10 @@ gaussianTailPdf(const double x, const double mean, const double var)
   return gsl_ran_gaussian_tail_pdf(x - mean, -mean, sqrt(var));
 }
 
-
-
 Mcmc::Mcmc(GpuLikelihood& likelihood, const size_t randomSeed) :
-  likelihood_(likelihood), random_(NULL), numIUpdates_(0), timeCalc_(0.0), timeUpdate_(0.0),
-      numCalc_(0), numUpdate_(0)
+    likelihood_(likelihood), random_(NULL), numIUpdates_(0), timeCalc_(0.0), timeUpdate_(
+        0.0), numCalc_(0), numUpdate_(0), acceptMove_(0), callsMove_(0), acceptAdd_(
+        0), callsAdd_(0), acceptDel_(0), callsDel_(0)
 {
 
   random_ = new Random(randomSeed);
@@ -102,13 +101,12 @@ Mcmc::~Mcmc()
   delete random_;
 }
 
-
 //! Pushes an updater onto the MCMC stack
 SingleSiteLogMRW*
 Mcmc::NewSingleSiteLogMRW(Parameter& param, const double tuning)
 {
-  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.GetTag(), param,
-      tuning, *random_, likelihood_);
+  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.GetTag(), param, tuning,
+      *random_, likelihood_);
   updateStack_.push_back(update);
 
   return update;
@@ -167,8 +165,8 @@ SusceptibilityMRW*
 Mcmc::NewSusceptibilityMRW(const string tag, UpdateBlock& params,
     UpdateBlock& powers, const size_t burnin)
 {
-  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, powers,
-      burnin, *random_, likelihood_);
+  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, powers, burnin,
+      *random_, likelihood_);
   updateStack_.push_back(update);
 
   return update;
@@ -185,7 +183,6 @@ Mcmc::NewInfectivityMRW(const string tag, UpdateBlock& params,
 
   return update;
 }
-
 
 //! Pushes a SellkeSerializer onto the MCMC stack
 SellkeSerializer*
@@ -204,9 +201,6 @@ Mcmc::setNumIUpdates(const size_t n)
   numIUpdates_ = n;
 }
 
-
-
-
 bool
 Mcmc::UpdateI()
 {
@@ -217,8 +211,8 @@ Mcmc::UpdateI()
 
 #ifndef NDEBUG
   if (mpirank_ == 0)
-    cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
-        << newI << endl;
+  cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
+  << newI << endl;
 #endif
 
   float piCur = likelihood_.GetCurrentValue();
@@ -235,8 +229,7 @@ Mcmc::UpdateI()
       piCur += log(1 - extremecdf(oldIN, a, b));
     }
 
-  double qRatio = log(extremecdf(oldIN, a, b) / extremecdf(
-      newIN, a, b));
+  double qRatio = log(extremecdf(oldIN, a, b) / extremecdf(newIN, a, b));
 
   double accept = piCan - piCur + qRatio;
 
@@ -244,7 +237,7 @@ Mcmc::UpdateI()
     {
 #ifndef NDEBUG
       if (mpirank_ == 0)
-        cerr << "ACCEPT" << endl;
+      cerr << "ACCEPT" << endl;
 #endif
       // Update the infection
       likelihood_.Accept();
@@ -254,7 +247,7 @@ Mcmc::UpdateI()
     {
 #ifndef NDEBUG
       if (mpirank_ == 0)
-        cerr << "REJECT" << endl;
+      cerr << "REJECT" << endl;
 #endif
       likelihood_.Reject();
       return false;
@@ -275,15 +268,17 @@ Mcmc::AddI()
 
 #ifndef NDEBUG
   if (mpirank_ == 0)
-    cerr << "Adding '" << it->getId() << "' at " << newI << endl;
+  cerr << "Adding '" << it->getId() << "' at " << newI << endl;
 #endif
 
   double logPiCur = likelihood_.GetCurrentValue();
 
-  double logPiCan = likelihood_.UpdateI(index, inProp) + log(1.0 - extremecdf(inProp, a, b));
-  double qRatio = log((1.0 / (likelihood_.GetNumOccults() + 1))
-      / ((1.0 / numSusceptible) * gaussianTailPdf(inProp, -1.0 / b, 1.0 / (a
-          * b * b))));
+  double logPiCan = likelihood_.UpdateI(index, inProp)
+      + log(1.0 - extremecdf(inProp, a, b));
+  double qRatio = log(
+      (1.0 / (likelihood_.GetNumOccults() + 1))
+          / ((1.0 / numSusceptible)
+              * gaussianTailPdf(inProp, -1.0 / b, 1.0 / (a * b * b))));
 
   double accept = logPiCan - logPiCur + qRatio;
 
@@ -291,7 +286,7 @@ Mcmc::AddI()
   if (log(random_->uniform()) < accept)
     {
 #ifndef NDEBUG
-        cerr << "ACCEPT" << endl;
+      cerr << "ACCEPT" << endl;
 #endif
       likelihood_.Accept();
       return true;
@@ -299,9 +294,9 @@ Mcmc::AddI()
   else
     {
 #ifndef NDEBUG
-        cerr << "REJECT" << endl;
+      cerr << "REJECT" << endl;
 #endif
-     likelihood_.Reject();
+      likelihood_.Reject();
       return false;
     }
 }
@@ -313,9 +308,9 @@ Mcmc::DeleteI()
     {
 #ifndef NDEBUG
       if (mpirank_ == 0)
-        cerr << __FUNCTION__ << endl;
+      cerr << __FUNCTION__ << endl;
       if (mpirank_ == 0)
-        cerr << "Occults empty. Not deleting" << endl;
+      cerr << "Occults empty. Not deleting" << endl;
 #endif
       return false;
     }
@@ -325,16 +320,19 @@ Mcmc::DeleteI()
   size_t toRemove = random_->integer(likelihood_.GetNumOccults());
 
   float inTime = likelihood_.GetIN(likelihood_.GetNumKnownInfecs() + toRemove);
-  float logPiCur = likelihood_.GetCurrentValue() + log(1 - extremecdf(inTime, a, b));
+  float logPiCur = likelihood_.GetCurrentValue()
+      + log(1 - extremecdf(inTime, a, b));
 
 #ifndef NDEBUG
   if (mpirank_ == 0)
-    cerr << "Deleting '" << it->getId() << "'" << endl;
+  cerr << "Deleting '" << it->getId() << "'" << endl;
 #endif
 
   float logPiCan = likelihood_.DeleteI(toRemove);
-  double qRatio = log((1.0 / (numSusceptible + 1) * gaussianTailPdf(inTime,
-      -1.0 / b, 1.0 / (a * b * b))) / (1.0 / likelihood_.GetNumOccults()));
+  double qRatio = log(
+      (1.0 / (numSusceptible + 1)
+          * gaussianTailPdf(inTime, -1.0 / b, 1.0 / (a * b * b)))
+          / (1.0 / likelihood_.GetNumOccults()));
 
   // Perform accept/reject step.
   double accept = logPiCan - logPiCur + qRatio;
@@ -343,7 +341,7 @@ Mcmc::DeleteI()
     {
 #ifndef NDEBUG
       if (mpirank_ == 0)
-        cerr << "ACCEPT" << endl;
+      cerr << "ACCEPT" << endl;
 #endif
       likelihood_.Accept();
       return true;
@@ -352,7 +350,7 @@ Mcmc::DeleteI()
     {
 #ifndef NDEBUG
       if (mpirank_ == 0)
-        cerr << "REJECT" << endl;
+      cerr << "REJECT" << endl;
 #endif
       likelihood_.Reject();
       return false;
@@ -368,56 +366,64 @@ Mcmc::Update()
   try
     {
 
-      for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin(); it
-      != updateStack_.end(); ++it)
-        it->Update();
+      for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
+          it != updateStack_.end(); ++it)
+        {
+          cerr << "Updating " << it->GetTag() << endl;
+          it->Update();
+        }
 
-          for (size_t infec = 0; infec < numIUpdates_; ++infec)
+      for (size_t infec = 0; infec < numIUpdates_; ++infec)
+        {
+          size_t pickMove = random_->integer(1);
+          switch (pickMove)
             {
-              size_t pickMove = random_->integer(1);
-              switch (pickMove)
-                {
-              case 0:
-                acceptMove_ += UpdateI();
-                callsMove_++;
-                break;
-              case 1:
-                acceptAdd_ += AddI();
-                callsAdd_++;
-                break;
-              case 2:
-                acceptDel_ += DeleteI();
-                callsDel_++;
-                break;
-              default:
-                throw logic_error("Unknown move!");
-                }
+          case 0:
+            cerr << "Moving" << endl;
+            acceptMove_ += UpdateI();
+            callsMove_++;
+            break;
+          case 1:
+            cerr << "Adding" << endl;
+            acceptAdd_ += AddI();
+            callsAdd_++;
+            break;
+          case 2:
+            cerr << "Deleting" << endl;
+            acceptDel_ += DeleteI();
+            callsDel_++;
+            break;
+          default:
+            throw logic_error("Unknown move!");
             }
+          cerr << "Likelihood: " << likelihood_.GetValue() << endl;
+        }
+
     }
   catch (logic_error& e)
     {
       cerr << "Logic Error occurred: " << e.what() << endl;
     }
   catch (exception& e)
-  {
-      cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << ": " << e.what() << endl;
-  }
+    {
+      cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << ": "
+          << e.what() << endl;
+    }
 }
-
 
 map<string, float>
 Mcmc::GetAcceptance() const
 {
   map<string, float> acceptance;
-  for (boost::ptr_list<McmcUpdate>::const_iterator it = updateStack_.begin(); it
-      != updateStack_.end(); ++it)
+  for (boost::ptr_list<McmcUpdate>::const_iterator it = updateStack_.begin();
+      it != updateStack_.end(); ++it)
     {
       acceptance[it->GetTag()] = it->GetAcceptance();
     }
 
-  acceptance["UpdateI"] = (float)acceptMove_ / (float)callsMove_;
-  acceptance["AddI"] = (float)acceptAdd_ / (float)callsAdd_;
-  acceptance["DelI"] = (float)acceptDel_ / (float)callsDel_;
+  acceptance["UpdateI"] = (float) acceptMove_ / (float) callsMove_;
+  acceptance["AddI"] = (float) acceptAdd_ / (float) callsAdd_;
+  acceptance["DelI"] = (float) acceptDel_ / (float) callsDel_;
 
   return acceptance;
 }
@@ -425,11 +431,15 @@ Mcmc::GetAcceptance() const
 void
 Mcmc::ResetAcceptance()
 {
-  for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin(); it
-    != updateStack_.end(); ++it) it->ResetAcceptance();
+  for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
+      it != updateStack_.end(); ++it)
+    it->ResetAcceptance();
 
-  acceptMove_ = 0; callsMove_ = 0;
-  acceptDel_ = 0;  callsDel_ = 0;
-  acceptAdd_ = 0;  callsAdd_ = 0;
+  acceptMove_ = 0;
+  callsMove_ = 0;
+  acceptDel_ = 0;
+  callsDel_ = 0;
+  acceptAdd_ = 0;
+  callsAdd_ = 0;
 }
 

@@ -71,6 +71,8 @@ namespace EpiRisk
     IsInfecDC(const size_t index) const;
     float
     GetIN(const size_t index) const;
+    float
+    GetValue() const;
   private:
     GpuLikelihood* likelihood_;
     GpuLikelihood* proposal_;

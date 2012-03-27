@@ -33,11 +33,15 @@ namespace EpiRisk
     : likelihood_(&likelihood)
   {
     proposal_ = new GpuLikelihood(*likelihood_);
+
+    likelihood_->FullCalculate();
+    proposal_->FullCalculate();
   }
 
   void
   McmcLikelihood::Accept()
   {
+    std::cerr << "ACCEPT" << std::endl;
     *likelihood_ = *proposal_;
   }
 
@@ -95,6 +99,7 @@ namespace EpiRisk
   void
   McmcLikelihood::Reject()
   {
+    std::cerr << "REJECT" << std::endl;
     *proposal_ = *likelihood_;
   }
 
@@ -141,4 +146,9 @@ namespace EpiRisk
     return index >= likelihood_->GetNumKnownInfecs() and index < likelihood_->GetMaxInfecs();
   }
 
+  float
+  McmcLikelihood::GetValue() const
+  {
+    return likelihood_->GetLogLikelihood();
+  }
 } /* namespace EpiRisk */

@@ -55,7 +55,8 @@ GpuLikelihood::LoadPopulation(PopDataImporter& importer)
           covars.cattle = record.data.cattle;
           covars.pigs = record.data.pigs;
           covars.sheep = record.data.sheep;
-          idMap_.insert(make_pair(covars.id, idx)); idx++;
+          idMap_.insert(make_pair(covars.id, idx));
+          idx++;
           hostPopulation_.push_back(covars);
         }
     }
@@ -64,10 +65,10 @@ GpuLikelihood::LoadPopulation(PopDataImporter& importer)
       // Continue -- this is harmless condition
     }
   catch (...)
-  {
+    {
       importer.close();
       throw;
-  }
+    }
 
   importer.close();
   const_cast<size_t &>(popSize_) = hostPopulation_.size();
@@ -76,121 +77,134 @@ GpuLikelihood::LoadPopulation(PopDataImporter& importer)
 
 }
 
-
 void
 GpuLikelihood::LoadEpidemic(EpiDataImporter& importer)
 {
-    maxInfecs_ = 0;
+  maxInfecs_ = 0;
 
-    importer.open();
-    try
-      {
-        while (1)
-          {
-            EpiDataImporter::Record record = importer.next();
-            map<string, size_t>::const_iterator map = idMap_.find(record.id);
-            if (map == idMap_.end())
-              throw range_error(
-                  "Key in epidemic data not found in population data");
-
-            Population::iterator ref = hostPopulation_.begin() + map->second;
-            // Check type
-            if(record.data.I == EpiRisk::POSINF) ref->status = DC;
-            else ref->status = IP;
-
-            // Check data integrity
-            if (record.data.N > record.data.R) {
-                cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
-                record.data.N = record.data.R;
-            }
-            if (record.data.R < record.data.I and record.data.I != EpiRisk::POSINF)
-              {
-                cerr << "WARNING: Individual " << record.id << " has I > R!  Setting I = R-7\n";
-                record.data.I = record.data.R - 7;
-              }
-
-            ref->I = record.data.I; ref->N = record.data.N; ref->R = record.data.R;
-
-            ref->R = min(ref->R, obsTime_);
-            ref->N = min(ref->N, ref->R);
-            ref->I = min(ref->I, ref->N);
-
-            maxInfecs_++;
-          }
-      }
-    catch (EpiRisk::fileEOF& e)
-      {
-        return;
-      }
-    catch (...)
+  importer.open();
+  try
     {
-        throw;
+      while (1)
+        {
+          EpiDataImporter::Record record = importer.next();
+          map<string, size_t>::const_iterator map = idMap_.find(record.id);
+          if (map == idMap_.end())
+            throw range_error(
+                "Key in epidemic data not found in population data");
+
+          Population::iterator ref = hostPopulation_.begin() + map->second;
+          // Check type
+          if (record.data.I == EpiRisk::POSINF)
+            ref->status = DC;
+          else
+            ref->status = IP;
+
+          // Check data integrity
+          if (record.data.N > record.data.R)
+            {
+              cerr << "Individual " << record.id
+                  << " has N > R.  Setting N = R\n";
+              record.data.N = record.data.R;
+            }
+          if (record.data.R < record.data.I
+              and record.data.I != EpiRisk::POSINF)
+            {
+              cerr << "WARNING: Individual " << record.id
+                  << " has I > R!  Setting I = R-7\n";
+              record.data.I = record.data.R - 7;
+            }
+
+          ref->I = record.data.I;
+          ref->N = record.data.N;
+          ref->R = record.data.R;
+
+          ref->R = min(ref->R, obsTime_);
+          ref->N = min(ref->N, ref->R);
+          ref->I = min(ref->I, ref->N);
+
+          maxInfecs_++;
+        }
+    }
+  catch (EpiRisk::fileEOF& e)
+    {
+      return;
+    }
+  catch (...)
+    {
+      throw;
     }
 
-    importer.close();
+  importer.close();
 
 }
-
-
 
 void
 GpuLikelihood::SortPopulation()
 {
   // Sort individuals by disease status (IPs -> DCs -> SUSCs)
-   sort(hostPopulation_.begin(), hostPopulation_.end(), CompareByStatus());
-   Covars cmp; cmp.status = DC;
-   Population::iterator topOfIPs = lower_bound(hostPopulation_.begin(), hostPopulation_.end(), cmp, CompareByStatus());
-   numKnownInfecs_ = topOfIPs - hostPopulation_.begin();
-   sort(hostPopulation_.begin(), topOfIPs, CompareByI());
+  sort(hostPopulation_.begin(), hostPopulation_.end(), CompareByStatus());
+  Covars cmp;
+  cmp.status = DC;
+  Population::iterator topOfIPs = lower_bound(hostPopulation_.begin(),
+      hostPopulation_.end(), cmp, CompareByStatus());
+  numKnownInfecs_ = topOfIPs - hostPopulation_.begin();
+  sort(hostPopulation_.begin(), topOfIPs, CompareByI());
 
-   std::cout << "Population size: " << popSize_ << "\n";
-   std::cout << "Num infecs: " << numKnownInfecs_ << "\n";
-   std::cout << "Max infecs: " << maxInfecs_ << "\n";
+  std::cout << "Population size: " << popSize_ << "\n";
+  std::cout << "Num infecs: " << numKnownInfecs_ << "\n";
+  std::cout << "Max infecs: " << maxInfecs_ << "\n";
 
-   // Rebuild population ID index
-   idMap_.clear();
-   Population::const_iterator it = hostPopulation_.begin();
-   for(size_t i=0; i<hostPopulation_.size(); i++)
-     {
-       idMap_.insert(make_pair(it->id,i));
-       it++;
-     }
+  // Rebuild population ID index
+  idMap_.clear();
+  Population::const_iterator it = hostPopulation_.begin();
+  for (size_t i = 0; i < hostPopulation_.size(); i++)
+    {
+      idMap_.insert(make_pair(it->id, i));
+      it++;
+    }
+
 }
-
 
 void
 GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
 {
-  ublas::mapped_matrix<float>* Dimport = new ublas::mapped_matrix<float>(maxInfecs_, hostPopulation_.size());
-  try {
+  ublas::mapped_matrix<float>* Dimport = new ublas::mapped_matrix<float>(
+      maxInfecs_, hostPopulation_.size());
+  try
+    {
       importer.open();
-      while(1)
+      while (1)
         {
           DistMatrixImporter::Record record = importer.next();
-          map<string,size_t>::const_iterator i = idMap_.find(record.id);
-          map<string,size_t>::const_iterator j = idMap_.find(record.data.j);
-          if(i == idMap_.end() or j == idMap_.end())
+          map<string, size_t>::const_iterator i = idMap_.find(record.id);
+          map<string, size_t>::const_iterator j = idMap_.find(record.data.j);
+          if (i == idMap_.end() or j == idMap_.end())
             throw range_error("Key pair not found in population");
           if (i != j)
-            Dimport->operator()(i->second, j->second) = record.data.distance*record.data.distance;
+            Dimport->operator()(i->second, j->second) = record.data.distance
+                * record.data.distance;
         }
-  }
+    }
   catch (EpiRisk::fileEOF& e)
-  {
+    {
       cout << "Imported " << Dimport->nnz() << " distance elements" << endl;
-  }
+    }
   catch (exception& e)
-  {
+    {
       throw e;
-  }
+    }
 
   // Set up distance matrix
   dnnz_ = Dimport->nnz();
-  ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(*Dimport);
+  ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(
+      *Dimport);
   int* rowPtr = new int[D->index1_data().size()];
-  for(size_t i=0; i<D->index1_data().size(); ++i) rowPtr[i] = D->index1_data()[i];
+  for (size_t i = 0; i < D->index1_data().size(); ++i)
+    rowPtr[i] = D->index1_data()[i];
   int* colInd = new int[D->index2_data().size()];
-  for(size_t i=0; i<D->index2_data().size(); ++i) colInd[i] = D->index2_data()[i];
+  for (size_t i = 0; i < D->index2_data().size(); ++i)
+    colInd[i] = D->index2_data()[i];
   SetDistance(D->value_data().begin(), rowPtr, colInd);
   delete[] rowPtr;
   delete[] colInd;
@@ -199,16 +213,20 @@ GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
 }
 
 void
-GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2,
-    Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta)
+GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1,
+    Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
+    Parameters& phi, Parameter& delta)
 {
   epsilon_ = epsilon.GetValuePtr();
   gamma1_ = gamma1.GetValuePtr();
   gamma2_ = gamma2.GetValuePtr();
   delta_ = delta.GetValuePtr();
 
-  xi_.clear(); psi_.clear(); zeta_.clear(); phi_.clear();
-  for(size_t p=0; p<numSpecies_; ++p)
+  xi_.clear();
+  psi_.clear();
+  zeta_.clear();
+  phi_.clear();
+  for (size_t p = 0; p < numSpecies_; ++p)
     {
       xi_.push_back(xi[p].GetValuePtr());
       psi_.push_back(psi[p].GetValuePtr());
@@ -218,8 +236,6 @@ GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& g
 
   RefreshParameters();
 }
-
-
 
 size_t
 GpuLikelihood::GetNumInfecs() const
@@ -254,23 +270,19 @@ GpuLikelihood::GetNumOccults() const
 std::ostream&
 operator <<(std::ostream& out, const GpuLikelihood& likelihood)
 {
-  float* infecTimes = new float[likelihood.GetNumInfecs()];
-  float* notifyTimes = new float[likelihood.GetNumInfecs()];
+  thrust::host_vector<float> infecTimes(likelihood.GetNumInfecs());
+  thrust::host_vector<float> notifyTimes(likelihood.GetNumInfecs());
   thrust::device_ptr<float> eventPtr(likelihood.devEventTimes_);
 
-  thrust::copy(eventPtr, eventPtr + likelihood.GetNumInfecs(), infecTimes);
-  thrust::copy(eventPtr + likelihood.eventTimesPitch_, eventPtr + likelihood.eventTimesPitch_ + likelihood.GetNumInfecs(), notifyTimes);
+  infecTimes.assign(eventPtr, eventPtr + likelihood.GetNumInfecs());
+  notifyTimes.assign(eventPtr + likelihood.eventTimesPitch_,
+      eventPtr + likelihood.eventTimesPitch_ + likelihood.GetNumInfecs());
 
-  map<string, size_t>::const_iterator it = likelihood.idMap_.begin();
-  if (notifyTimes[it->second] - infecTimes[it->second] == 0)
-    out << it->first << ":" << infecTimes[it->second];
-  ++it;
-  while(it != likelihood.idMap_.end())
-    {
-      if (notifyTimes[it->second] - infecTimes[it->second] == 0)
-       out << "," << it->first << ":" << infecTimes[it->second];
-      ++it;
-    }
+  out << likelihood.hostPopulation_[likelihood.hostInfecIdx_[0]].id << ":"
+      << infecTimes[likelihood.hostInfecIdx_[0]];
+  for (size_t i = 1; i < likelihood.GetNumInfecs(); ++i)
+    out << "," << likelihood.hostPopulation_[likelihood.hostInfecIdx_[i]].id
+        << ":" << infecTimes[likelihood.hostInfecIdx_[i]];
 
   return out;
 }
