@@ -61,6 +61,13 @@ public:
   PointerVector(PointerVector& other)
   { content_ = other.content_; }
 
+  const PointerVector&
+  operator=(const PointerVector& other)
+  {
+    content_ = other.content_;
+    return *this;
+  }
+
   void
   push_back(T* x)
   { content_.push_back(x); }
@@ -219,6 +226,7 @@ private:
   size_t maxInfecs_;
   thrust::host_vector<unsigned int> hostInfecIdx_;
   thrust::device_vector<unsigned int> devInfecIdx_;
+  thrust::host_vector<unsigned int> hostSuscOccults_;
   const size_t numSpecies_;
   float logLikelihood_;
   const float obsTime_;

@@ -273,7 +273,7 @@ Mcmc::AddI()
 
   double logPiCur = likelihood_.GetCurrentValue();
 
-  double logPiCan = likelihood_.UpdateI(index, inProp)
+  double logPiCan = likelihood_.AddI(index, inProp)
       + log(1.0 - extremecdf(inProp, a, b));
   double qRatio = log(
       (1.0 / (likelihood_.GetNumOccults() + 1))
@@ -369,45 +369,50 @@ Mcmc::Update()
       for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
           it != updateStack_.end(); ++it)
         {
-          cerr << "Updating " << it->GetTag() << endl;
           it->Update();
         }
 
       for (size_t infec = 0; infec < numIUpdates_; ++infec)
         {
-          size_t pickMove = random_->integer(1);
+          size_t pickMove = random_->integer(3);
           switch (pickMove)
             {
           case 0:
-            cerr << "Moving" << endl;
             acceptMove_ += UpdateI();
             callsMove_++;
             break;
           case 1:
-            cerr << "Adding" << endl;
             acceptAdd_ += AddI();
             callsAdd_++;
             break;
           case 2:
-            cerr << "Deleting" << endl;
             acceptDel_ += DeleteI();
             callsDel_++;
             break;
           default:
             throw logic_error("Unknown move!");
             }
-          cerr << "Likelihood: " << likelihood_.GetValue() << endl;
+
+          float update = likelihood_.GetValue();
+          float full = likelihood_.Propose(); likelihood_.Reject();
+          cerr << "Likelihood: " << update << endl;
+          cerr << "Full likelihood: " << full << endl;
+
+          if (fabs(1.0f - update/full) > 1e-5) cerr << "***WARNING*** likelihood inconsistency!" << endl;
+
         }
 
     }
   catch (logic_error& e)
     {
       cerr << "Logic Error occurred: " << e.what() << endl;
+      throw e;
     }
   catch (exception& e)
     {
       cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << ": "
           << e.what() << endl;
+      throw e;
     }
 }
 

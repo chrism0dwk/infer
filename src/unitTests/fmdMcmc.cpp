@@ -445,6 +445,7 @@ main(int argc, char* argv[])
     cout << "Running MCMC" << endl;
     for(size_t k=0; k<atoi(argv[6]); ++k)
       {
+        if(k % 100 == 0) cout << "Iteration " << k << endl;
         mcmc.Update();
 
         parmfile << parmSerializer << "," << likelihood.GetMeanI2N() << "," << likelihood.GetMeanOccI() << endl;

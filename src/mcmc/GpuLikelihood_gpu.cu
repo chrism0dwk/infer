@@ -810,6 +810,8 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
   devInfecIdx_ = other.devInfecIdx_;
   hostInfecIdx_ = other.hostInfecIdx_;
 
+  hostSuscOccults_ = other.hostSuscOccults_;
+
   // Allocate and copy likelihood components;
   devProduct_ = other.devProduct_;
   devIntegral_ = other.devIntegral_;
@@ -850,8 +852,8 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
 const GpuLikelihood&
 GpuLikelihood::operator=(const GpuLikelihood& other)
 {
-  timeval start, end;
-  gettimeofday(&start, NULL);
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
   // Copy animal powers
   checkCudaError(
       cudaMemcpy2DAsync(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
@@ -871,6 +873,12 @@ GpuLikelihood::operator=(const GpuLikelihood& other)
   // Infection index
   devInfecIdx_ = other.devInfecIdx_;
   hostInfecIdx_ = other.hostInfecIdx_;
+
+  // Internals
+  I1Idx_ = other.I1Idx_;
+  I1Time_ = other.I1Time_;
+  sumI_ = other.sumI_;
+  hostSuscOccults_ = other.hostSuscOccults_;
 
   // copy product vector
   devProduct_ = other.devProduct_;
@@ -894,9 +902,9 @@ GpuLikelihood::operator=(const GpuLikelihood& other)
   lp_ = other.lp_;
   logLikelihood_ = other.logLikelihood_;
 
-  gettimeofday(&end, NULL);
-  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-      << timeinseconds(start, end) << std::endl;
+//  gettimeofday(&end, NULL);
+//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+//      << timeinseconds(start, end) << std::endl;
 
   return *this;
 }
@@ -1179,8 +1187,8 @@ void
 GpuLikelihood::FullCalculate()
 {
 
-  timeval start, end;
-  gettimeofday(&start, NULL);
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
   RefreshParameters();
   CalcInfectivityPow();
   CalcInfectivity();
@@ -1193,11 +1201,11 @@ GpuLikelihood::FullCalculate()
   CalcBgIntegral();
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
-  gettimeofday(&end, NULL);
-  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-      << timeinseconds(start, end) << std::endl;
-  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-      << std::endl;
+//  gettimeofday(&end, NULL);
+//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+//      << timeinseconds(start, end) << std::endl;
+//  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
+//      << std::endl;
 
 }
 
@@ -1229,13 +1237,18 @@ GpuLikelihood::UpdateInfectionTime(const unsigned int idx, const float inTime)
   // Require to know number of cols per row -- probably store in host mem.
   // Also, may be optimal to use a much lower THREADSPERBLOCK than the app-wide setting.
 
-  timeval start, end;
-  gettimeofday(&start, NULL);
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
+
+  if(idx >= hostInfecIdx_.size())
+    throw std::range_error("Invalid idx in GpuLikelihood::UpdateInfectionTime");
+
+  int i = hostInfecIdx_[idx];
 
   thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
-  float newTime = *(eventTimesPtr + eventTimesPitch_ + idx) - inTime;
+  float newTime = *(eventTimesPtr + eventTimesPitch_ + i) - inTime;
 
-  int blocksPerGrid = (hostDRowPtr_[idx + 1] - hostDRowPtr_[idx]
+  int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i]
       + THREADSPERBLOCK - 1) / THREADSPERBLOCK + 1;
 _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       devDRowPtr_, devDColInd_, devDVal_,
@@ -1247,10 +1260,10 @@ _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*s
       devIntegral_.begin() + blocksPerGrid) * *gamma1_;
 
   // If a new I1 is created by moving a non-I1 infection time, zero out I1
-  if (newTime < I1Time_ and idx != I1Idx_)
+  if (newTime < I1Time_ and i != I1Idx_)
     devProduct_[I1Idx_] = *epsilon_;
 
-  devProduct_[idx] = 0.0f; // Zero out product entry for idx.
+  devProduct_[i] = 0.0f; // Zero out product entry for idx.
 _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime, devDRowPtr_,
       devDColInd_, devDVal_, devEventTimes_, eventTimesPitch_,
       devSusceptibility_, devInfectivity_, *epsilon_, *gamma1_, *gamma2_,
@@ -1258,7 +1271,7 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
         checkCudaError(cudaGetLastError());
 
   // Make the change to the population
-  eventTimesPtr[idx] = newTime;
+  eventTimesPtr[i] = newTime;
 
   UpdateI1();
   CalcBgIntegral();
@@ -1269,37 +1282,40 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
 
-  gettimeofday(&end, NULL);
-  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-      << timeinseconds(start, end) << std::endl;
-  std::cerr.precision(20);
-  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-      << std::endl;
-  std::cerr << "I1: " << I1Idx_ << " at " << I1Time_ << std::endl;
+//  gettimeofday(&end, NULL);
+//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+//      << timeinseconds(start, end) << std::endl;
+//  std::cerr.precision(20);
+//  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
+//      << std::endl;
+//  std::cerr << "I1: " << I1Idx_ << " at " << I1Time_ << std::endl;
 }
 
 void
 GpuLikelihood::AddInfectionTime(const unsigned int idx, const float inTime)
 {
-  // Require to know number of cols per row -- probably store in host mem.
-  // Also, may be optimal to use a much lower THREADSPERBLOCK than the app-wide setting.
+  // idx is the position in the hostSuscOccults vector (ie the idx'th occult)
+  // inTime is the proposed Ni - Ii time
 
-  timeval start, end;
-  gettimeofday(&start, NULL);
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
 
-  if (idx < numKnownInfecs_ or idx >= maxInfecs_)
+  if(idx >= hostSuscOccults_.size())
     throw std::range_error("Invalid idx in GpuLikelihood::AddInfectionTime");
 
-  thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
-  float newTime = *(eventTimesPtr + eventTimesPitch_ + idx) - inTime;
+  unsigned int i = hostSuscOccults_[idx];
 
-  // Ready the product cache to receive pressure
-  devInfecIdx_.push_back(idx);
-  hostInfecIdx_.push_back(idx);
+  thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
+  float newTime = *(eventTimesPtr + eventTimesPitch_ + i) - inTime;
+
+  // Update the indices
+  devInfecIdx_.push_back(i);
+  hostInfecIdx_.push_back(i);
+  hostSuscOccults_.erase(hostSuscOccults_.begin()+idx);
 
   unsigned int addIdx = devInfecIdx_.size() - 1;
 
-  int blocksPerGrid = (hostDRowPtr_[idx + 1] - hostDRowPtr_[idx]
+  int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i]
       + THREADSPERBLOCK - 1) / THREADSPERBLOCK + 1;
 _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       devDRowPtr_, devDColInd_, devDVal_,
@@ -1314,7 +1330,7 @@ _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*size
   if (newTime < I1Time_)
     devProduct_[I1Idx_] = *epsilon_;
 
-  devProduct_[idx] = 0.0f;
+  devProduct_[i] = 0.0f;
 _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime, devDRowPtr_,
       devDColInd_, devDVal_, devEventTimes_, eventTimesPitch_,
       devSusceptibility_, devInfectivity_, *epsilon_, *gamma1_, *gamma2_,
@@ -1322,7 +1338,7 @@ _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
         checkCudaError(cudaGetLastError());
 
   // Make the change to the population
-  eventTimesPtr[idx] = newTime;
+  eventTimesPtr[i] = newTime;
 
   UpdateI1();
   CalcBgIntegral();
@@ -1334,31 +1350,33 @@ _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
 
-  gettimeofday(&end, NULL);
-  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-      << timeinseconds(start, end) << std::endl;
-  std::cerr.precision(20);
-  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-      << std::endl;
+//  gettimeofday(&end, NULL);
+//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+//      << timeinseconds(start, end) << std::endl;
+//  std::cerr.precision(20);
+//  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
+//      << std::endl;
 }
 
 void
 GpuLikelihood::DeleteInfectionTime(const unsigned int idx)
 {
-  // Require to know number of cols per row -- probably store in host mem.
-  // Also, may be optimal to use a much lower THREADSPERBLOCK than the app-wide setting.
+  // Delete the idx'th occult ( = idx+numKnownInfecs_ infective)
 
-  timeval start, end;
-  gettimeofday(&start, NULL);
+//  timeval start, end;
+//  gettimeofday(&start, NULL);
 
   // Range check
-  if (idx < numKnownInfecs_ or idx >= devInfecIdx_.size())
+  if (idx >= devInfecIdx_.size() - numKnownInfecs_)
     throw std::range_error("Invalid idx in GpuLikelihood::DeleteInfectionTime");
 
+  // Identify occult to delete
+  unsigned int i = hostInfecIdx_[idx+numKnownInfecs_];
+
   thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
-  unsigned int i = hostInfecIdx_[idx];
+
   float notification = eventTimesPtr[i + eventTimesPitch_];
-  devIntegral_.assign(devIntegral_.size(), 0.0f);
+  devIntegral_.assign(devIntegral_.size(), 0.0f);  // Shouldn't need this
 
   int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
       - 1) / THREADSPERBLOCK + 1;
@@ -1381,8 +1399,9 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
   eventTimesPtr[i] = notification;
 
   devProduct_[i] = 1.0f;
-  devInfecIdx_.erase(devInfecIdx_.begin() + idx);
-  hostInfecIdx_.erase(hostInfecIdx_.begin() + idx);
+  devInfecIdx_.erase(devInfecIdx_.begin() + numKnownInfecs_ + idx);
+  hostInfecIdx_.erase(hostInfecIdx_.begin() + numKnownInfecs_ + idx);
+  hostSuscOccults_.push_back(i);
 
   UpdateI1();
   CalcBgIntegral();
@@ -1394,25 +1413,25 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
 
   logLikelihood_ = lp_ - (integral_ + bgIntegral_);
 
-  gettimeofday(&end, NULL);
-  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-      << timeinseconds(start, end) << std::endl;
-  std::cerr.precision(20);
-  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-      << std::endl;
+//  gettimeofday(&end, NULL);
+//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+//      << timeinseconds(start, end) << std::endl;
+//  std::cerr.precision(20);
+//  std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
+//      << std::endl;
 }
 
 float
 GpuLikelihood::GetIN(const size_t index)
 {
-  float res;
-  thrust::device_ptr<float> resptr(&res);
+  int i = hostInfecIdx_[index];
+  thrust::device_vector<float> res(1);
   thrust::device_ptr<float> et(devEventTimes_);
-  thrust::transform(et + hostInfecIdx_[index] + eventTimesPitch_,
-      et + hostInfecIdx_[index] + 1 + eventTimesPitch_, et + hostInfecIdx_[index], resptr,
+  thrust::transform(et + eventTimesPitch_ + i,
+      et + eventTimesPitch_ + i + 1 , et + i, &res[0],
       thrust::minus<float>());
 
-  return res;
+  return res[0];
 }
 
 float

@@ -41,7 +41,6 @@ namespace EpiRisk
   void
   McmcLikelihood::Accept()
   {
-    std::cerr << "ACCEPT" << std::endl;
     *likelihood_ = *proposal_;
   }
 
@@ -99,7 +98,6 @@ namespace EpiRisk
   void
   McmcLikelihood::Reject()
   {
-    std::cerr << "REJECT" << std::endl;
     *proposal_ = *likelihood_;
   }
 

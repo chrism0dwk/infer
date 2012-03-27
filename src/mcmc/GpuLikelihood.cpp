@@ -151,6 +151,9 @@ GpuLikelihood::SortPopulation()
   numKnownInfecs_ = topOfIPs - hostPopulation_.begin();
   sort(hostPopulation_.begin(), topOfIPs, CompareByI());
 
+  // Set up occult susceptible vector
+  for(size_t i=numKnownInfecs_; i<maxInfecs_; ++i) hostSuscOccults_.push_back(i);
+
   std::cout << "Population size: " << popSize_ << "\n";
   std::cout << "Num infecs: " << numKnownInfecs_ << "\n";
   std::cout << "Max infecs: " << maxInfecs_ << "\n";
@@ -258,7 +261,7 @@ GpuLikelihood::GetMaxInfecs() const
 size_t
 GpuLikelihood::GetNumPossibleOccults() const
 {
-  return maxInfecs_ - hostInfecIdx_.size();
+  return hostSuscOccults_.size();
 }
 
 size_t
