@@ -26,6 +26,7 @@
 #include <math.h>
 #include <list>
 #include <stdexcept>
+#include <algorithm>
 #include <string>
 #include <gsl/gsl_math.h>
 
