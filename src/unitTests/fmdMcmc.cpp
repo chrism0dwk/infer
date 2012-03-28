@@ -369,7 +369,7 @@ main(int argc, char* argv[])
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
   Mcmc mcmc(likelihood, atoi(argv[7]));
-  mcmc.setNumIUpdates(50);
+  mcmc.setNumIUpdates(200);
 
   UpdateBlock txDelta;
     txDelta.add(epsilon);
@@ -463,6 +463,14 @@ main(int argc, char* argv[])
       {
         cout << it->first << ": " << it->second << "\n";
       }
+
+    ofstream covfh(covFn.str().c_str());
+    covfh << updateDistance->getCovariance() << "\n";
+    covfh << updatePsi->getCovariance() << "\n";
+    covfh << updatePhi->getCovariance() << "\n";
+    covfh << updateInfec->getCovariance() << "\n";
+    covfh << updateSuscep->getCovariance() << "\n";
+    covfh.close();
 
 
   return EXIT_SUCCESS;
