@@ -698,7 +698,7 @@ indirectedSum(const unsigned int* index, const int size, const float* data)
   int numBlocks = (size + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
   thrust::device_vector<float> output(numBlocks);
 
-_indirectedSum<<<numBlocks, THREADSPERBLOCK>>>(index, size, data, thrust::raw_pointer_cast(&output[0]));
+_indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(index, size, data, thrust::raw_pointer_cast(&output[0]));
     checkCudaError(cudaGetLastError());
   return thrust::reduce(output.begin(), output.end());
 
