@@ -270,6 +270,7 @@ GpuLikelihood::GetNumOccults() const
   return hostInfecIdx_.size() - numKnownInfecs_;
 }
 
+
 std::ostream&
 operator <<(std::ostream& out, const GpuLikelihood& likelihood)
 {

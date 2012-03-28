@@ -28,7 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <gsl/gsl_math.h>
-#include <boost/ptr_container/ptr_set.hpp>
+
 
 #include "types.hpp"
 #include "EpiRiskException.hpp"

@@ -369,7 +369,7 @@ main(int argc, char* argv[])
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
   Mcmc mcmc(likelihood, atoi(argv[7]));
-  mcmc.setNumIUpdates(200);
+  mcmc.setNumIUpdates(50);
 
   UpdateBlock txDelta;
     txDelta.add(epsilon);

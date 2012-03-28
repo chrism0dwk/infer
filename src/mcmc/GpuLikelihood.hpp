@@ -39,7 +39,10 @@
 #include <thrust/device_vector.h>
 
 #include "Data.hpp"
+
+#ifndef __CUDACC__
 #include "Parameter.hpp"
+#endif
 
 // CUDA defines
 #define THREADSPERBLOCK 256

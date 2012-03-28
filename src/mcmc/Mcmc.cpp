@@ -218,7 +218,7 @@ Mcmc::UpdateI()
   float piCur = likelihood_.GetCurrentValue();
   float piCan = likelihood_.UpdateI(index, newIN);
 
-  if (!likelihood_.IsInfecDC(index))
+  if (index < likelihood_.GetNumKnownInfecs())
     { // Known infection
       piCan += log(extremepdf(newIN, a, b));
       piCur += log(extremepdf(oldIN, a, b));
@@ -229,7 +229,7 @@ Mcmc::UpdateI()
       piCur += log(1 - extremecdf(oldIN, a, b));
     }
 
-  double qRatio = log(extremecdf(oldIN, a, b) / extremecdf(newIN, a, b));
+  double qRatio = log(extremepdf(oldIN, a, b) / extremepdf(newIN, a, b));
 
   double accept = piCan - piCur + qRatio;
 

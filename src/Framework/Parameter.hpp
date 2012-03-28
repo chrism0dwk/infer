@@ -213,7 +213,6 @@ namespace EpiRisk
 
   std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);
 
-
 }
 
 #endif /* PARAMETER_HPP_ */
