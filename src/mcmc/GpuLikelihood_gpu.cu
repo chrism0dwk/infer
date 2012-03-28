@@ -684,11 +684,10 @@ _indirectedSum(const unsigned int* index, const int size, const float* data,
   __shared__ float buff[];
   buff[threadIdx.x] = 0.0f;
 
-  if (tid < size)
-    buff[threadIdx.x] = data[index[tid]];
-
-  _shmemReduce(buff);
-
+  if (tid < size) {
+     buff[threadIdx.x] = data[index[tid]];
+     _shmemReduce(buff);
+  }
   if (threadIdx.x == 0)
     output[blockIdx.x] = buff[0];
 }
