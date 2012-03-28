@@ -393,12 +393,12 @@ Mcmc::Update()
             throw logic_error("Unknown move!");
             }
 
-          float update = likelihood_.GetValue();
-          float full = likelihood_.Propose(); likelihood_.Reject();
-          cerr << "Likelihood: " << update << endl;
-          cerr << "Full likelihood: " << full << endl;
-
-          if (fabs(1.0f - update/full) > 1e-5) cerr << "***WARNING*** likelihood inconsistency!" << endl;
+//          float update = likelihood_.GetValue();
+//          float full = likelihood_.Propose(); likelihood_.Reject();
+//          cerr << "Likelihood: " << update << endl;
+//          cerr << "Full likelihood: " << full << endl;
+//
+//          if (fabs(1.0f - update/full) > 1e-5) cerr << "***WARNING*** likelihood inconsistency!" << endl;
 
         }
 
