@@ -36,6 +36,17 @@
 namespace EpiRisk
 {
 
+  bool
+  _checkNotLessThanZero(const UpdateBlock& parms)
+  {
+    int lessThanZero;
+    for(size_t i=0; i<parms.size(); ++i)
+      if(parms[i].getValue() < 0.0) lessThanZero++;
+
+    if(lessThanZero == 0) return true;
+    else return false;
+  }
+
   McmcUpdate::McmcUpdate(const std::string& tag, Random& random, McmcLikelihood& logLikelihood) :
     tag_(tag), random_(random), logLikelihood_(logLikelihood), acceptance_(0), numUpdates_(0)
   {
@@ -399,6 +410,7 @@ namespace EpiRisk
       logvars = random_.mvgauss(*stdCov_);
 
     // Use indep gaussians here
+
     transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
     transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
     transform(0) = R - transform(1) - transform(2);
@@ -418,7 +430,8 @@ namespace EpiRisk
     float qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
     // Accept/reject
-    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio
+        and _checkNotLessThanZero(updateGroup_))
       {
         logLikelihood_.Accept();
         acceptance_++;
@@ -536,7 +549,8 @@ namespace EpiRisk
     double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
     // Accept/reject
-    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio
+        and _checkNotLessThanZero(updateGroup_))
       {
         logLikelihood_.Accept();
         acceptance_++;
