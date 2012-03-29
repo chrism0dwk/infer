@@ -375,7 +375,11 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Calculate constants
-    logLikelihood_.GetSumInfectivityPow(constants_.data());
+    logLikelihood_.GetSumInfectivityPow(&constants_[0]);
+
+    cerr << "INFEC CONSTANTS: ";
+    for(size_t i=0; i<constants_.size(); ++i) cerr << constants_[i] << "\t";
+    cerr << endl;
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
     double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
@@ -495,7 +499,7 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Calculate constants
-    logLikelihood_.GetSumSusceptibilityPow(constants_.data());
+    logLikelihood_.GetSumSusceptibilityPow(&constants_[0]);
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
     float R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
