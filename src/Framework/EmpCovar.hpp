@@ -191,6 +191,24 @@ namespace EpiRisk
         rowCount_++;
       }
       void
+      sample(ublas::vector<double>& theSample)
+      {
+        if(theSample.size() != params_.size())
+          throw std::logic_error("Sample size does not match param size in EmpCovar!");
+
+        for (int i = 0; i < params_.size();++i)
+                  {
+                    double pi = transformFunc_(theSample(i));
+                    sum_(i) += pi;
+                    sumSq_(i, i) += pi*pi;
+                    for (size_t j = 0; j < i; ++j)
+                      {
+                        double pj = transformFunc_(theSample(j));
+                        sumSq_(i, j) += pi * pj;
+                      }
+                  }
+      }
+      void
       print();
 
     };
