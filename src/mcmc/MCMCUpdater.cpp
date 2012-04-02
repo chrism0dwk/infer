@@ -39,7 +39,7 @@ namespace EpiRisk
   bool
   _checkNotLessThanZero(const UpdateBlock& parms)
   {
-    int lessThanZero;
+    int lessThanZero = 0;
     for(size_t i=0; i<parms.size(); ++i)
       if(parms[i].getValue() < 0.0) lessThanZero++;
 
@@ -377,10 +377,6 @@ namespace EpiRisk
     // Calculate constants
     logLikelihood_.GetSumInfectivityPow(&constants_[0]);
 
-    cerr << "INFEC CONSTANTS: ";
-    for(size_t i=0; i<constants_.size(); ++i) cerr << constants_[i] << "\t";
-    cerr << endl;
-
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
     double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
 
@@ -413,18 +409,24 @@ namespace EpiRisk
     else
       logvars = random_.mvgauss(*stdCov_);
 
-    // Use indep gaussians here
-
-    transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
-    transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
+    transform(1) *= exp(logvars(0)); 
+    transform(2) *= exp(logvars(1)); 
     transform(0) = R - transform(1) - transform(2);
+
+    // Reject if we get a neg value
+    if(transform(0) < 0.0f) 
+      {
+	for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
+	++numUpdates_;
+	return;
+      }
 
     // Transform back
     updateGroup_[0].setValue(transform(0) / constants_[0]);
     updateGroup_[1].setValue(transform(1) / (updateGroup_[0].getValue() * constants_[1]));
     updateGroup_[2].setValue(transform(2) / (updateGroup_[0].getValue() * constants_[2]));
 
-    // Calculate candidate posterior
+     // Calculate candidate posterior
     float logPiCan = logLikelihood_.Propose()
         + log(updateGroup_[0].prior())
         + log(updateGroup_[1].prior())
@@ -434,8 +436,7 @@ namespace EpiRisk
     float qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
     // Accept/reject
-    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio
-        and _checkNotLessThanZero(updateGroup_))
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
       {
         logLikelihood_.Accept();
         acceptance_++;
@@ -538,6 +539,15 @@ namespace EpiRisk
     transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
     transform(0) = R - transform(1) - transform(2);
 
+    // Reject if we get a neg value
+    if(transform(0) < 0.0f) 
+      {
+	for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
+	++numUpdates_;
+	return;
+      }
+
+
     // Transform back
     updateGroup_[0].setValue(transform(0) / constants_[0]);
     updateGroup_[1].setValue(transform(1) / (updateGroup_[0].getValue() * constants_[1]));
@@ -553,8 +563,7 @@ namespace EpiRisk
     double qRatio = log(transform(1) / (oldParams[0]*oldParams[1]*constants_[1])) + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
     // Accept/reject
-    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio
-        and _checkNotLessThanZero(updateGroup_))
+    if(log(random_.uniform()) < logPiCan - logPiCur + qRatio)
       {
         logLikelihood_.Accept();
         acceptance_++;
