@@ -371,15 +371,9 @@ namespace EpiRisk
     std::vector<float> oldParams(updateGroup_.size());
     for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i].getValue();
 
-    // Sample posterior
-    empCovar_->sample();
-
     // Calculate constants
     logLikelihood_.GetSumInfectivityPow(&constants_[0]);
 
-    cerr << "INFEC CONSTANTS: ";
-    for(size_t i=0; i<constants_.size(); ++i) cerr << constants_[i] << "\t";
-    cerr << endl;
 
     // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
     double R = updateGroup_[0].getValue()*(constants_[0] + updateGroup_[1].getValue()*constants_[1] + updateGroup_[2].getValue()*constants_[2]);
@@ -395,6 +389,10 @@ namespace EpiRisk
     transform(0) = updateGroup_[0].getValue() * constants_[0];
     transform(1) = updateGroup_[0].getValue() * updateGroup_[1].getValue() * constants_[1];
     transform(2) = updateGroup_[0].getValue() * updateGroup_[2].getValue() * constants_[2];
+
+    // Sample transformed posterior
+    ublas::vector<double> sample = ublas::vector_range<ublas::vector<double> >(transform, ublas::range(1,transform.size()));
+    empCovar_->sample(sample);
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
@@ -495,9 +493,6 @@ namespace EpiRisk
     std::vector<float> oldParams(updateGroup_.size());
     for(size_t i=0; i<updateGroup_.size(); ++i) oldParams[i] = updateGroup_[i].getValue();
 
-    // Sample posterior
-    empCovar_->sample();
-
     // Calculate constants
     logLikelihood_.GetSumSusceptibilityPow(&constants_[0]);
 
@@ -511,10 +506,14 @@ namespace EpiRisk
         + log(updateGroup_[2].prior());
 
     // Make proposal
-    ublas::vector<float> transform(updateGroup_.size());
+    ublas::vector<double> transform(updateGroup_.size());
     transform(0) = updateGroup_[0].getValue() * constants_[0];
     transform(1) = updateGroup_[0].getValue() * updateGroup_[1].getValue() * constants_[1];
     transform(2) = updateGroup_[0].getValue() * updateGroup_[2].getValue() * constants_[2];
+
+    // Sample transformed posterior
+    ublas::vector<double> sample = ublas::vector_range<ublas::vector<double> >(transform, ublas::range(1,transform.size()));
+    empCovar_->sample(sample);
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
