@@ -25,6 +25,7 @@
  */
 
 #include <stdexcept>
+#include <sstream>
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <boost/numeric/ublas/vector_proxy.hpp>
@@ -96,7 +97,9 @@ namespace EpiRisk
               {
                 if (elem <= 0.0)
                   {
-                    throw cholesky_error("Matrix after rounding errors is not positive definite");
+		    std::stringstream s;
+		    s << "Matrix after rounding errors (" << elem << ") is not positive definite";
+		    throw cholesky_error(s.str().c_str());
                   }
                 else
                   {

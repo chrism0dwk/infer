@@ -1258,6 +1258,7 @@ GpuLikelihood::UpdateInfectionTime(const unsigned int idx, const float inTime)
 
   int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i]
       + THREADSPERBLOCK - 1) / THREADSPERBLOCK + 1;
+
 _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       devDRowPtr_, devDColInd_, devDVal_,
       devEventTimes_, eventTimesPitch_, devSusceptibility_,

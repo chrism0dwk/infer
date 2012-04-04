@@ -31,7 +31,7 @@
 
 
 
-#define ADAPTIVESCALE 1.0
+#define ADAPTIVESCALE 2.38*2.38
 
 namespace EpiRisk
 {
@@ -393,6 +393,7 @@ namespace EpiRisk
     ublas::vector<double> sample = ublas::vector_range<ublas::vector<double> >(transform, ublas::range(1,transform.size()));
     empCovar_->sample(sample);
 
+
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
     if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
@@ -404,6 +405,7 @@ namespace EpiRisk
           }
         catch (cholesky_error& e)
           {
+	    cerr << "Cholesky error in " << __PRETTY_FUNCTION__ << ": '" << e.what() << "'" <<  endl;
             logvars = random_.mvgauss(*stdCov_);
           }
       }

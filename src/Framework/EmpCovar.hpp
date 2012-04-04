@@ -207,6 +207,7 @@ namespace EpiRisk
                         sumSq_(i, j) += pi * pj;
                       }
                   }
+	rowCount_++;
       }
       void
       print();
