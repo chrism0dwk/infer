@@ -922,6 +922,10 @@ GpuLikelihood::~GpuLikelihood()
 
       delete covariateCopies_;
     }
+  else
+    {
+      --(*covariateCopies_);
+    }
 
   if (devEventTimes_)
     cudaFree(devEventTimes_);

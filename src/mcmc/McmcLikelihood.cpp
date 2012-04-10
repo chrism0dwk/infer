@@ -38,6 +38,11 @@ namespace EpiRisk
     proposal_->FullCalculate();
   }
 
+  McmcLikelihood::~McmcLikelihood()
+  {
+    delete proposal_;
+  }
+
   void
   McmcLikelihood::Accept()
   {

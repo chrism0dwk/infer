@@ -37,6 +37,8 @@ namespace EpiRisk
   public:
     explicit
     McmcLikelihood(GpuLikelihood& likelihood);
+    virtual
+    ~McmcLikelihood();
     float
     Propose();
     float
