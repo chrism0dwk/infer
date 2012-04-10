@@ -33,11 +33,11 @@ namespace EpiRisk
   {
     ParameterSerializerList::const_iterator it =
         paramSerializer.params_.begin();
-    os << it->GetValue();
+    os << (*it)->GetValue();
     ++it;
     while (it != paramSerializer.params_.end())
       {
-        os << "," << it->GetValue();
+        os << "," << (*it)->GetValue();
         ++it;
       }
     return os;

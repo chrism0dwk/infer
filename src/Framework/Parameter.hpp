@@ -182,7 +182,7 @@ namespace EpiRisk
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
   typedef boost::numeric::ublas::slice ParameterSlice;
 
-  typedef boost::ptr_vector<Parameter> ParameterSerializerList;
+  typedef std::vector<Parameter*> ParameterSerializerList;
 
   class ParameterSerializer
   {
@@ -196,11 +196,11 @@ namespace EpiRisk
     Header(std::ostream& os)
     {
       ParameterSerializerList::const_iterator it = params_.begin();
-            os << it->GetTag();
+            os << (*it)->GetTag();
             ++it;
             while(it != params_.end())
               {
-                os << "," << it->GetTag();
+                os << "," << (*it)->GetTag();
                 ++it;
               }
     }
