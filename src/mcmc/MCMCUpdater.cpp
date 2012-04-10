@@ -28,10 +28,11 @@
 #include <algorithm>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/numeric/ublas/lu.hpp>
 
 
 
-#define ADAPTIVESCALE 2.38*2.38
+#define ADAPTIVESCALE 0.1
 
 namespace EpiRisk
 {
@@ -45,6 +46,33 @@ namespace EpiRisk
 
     if(lessThanZero == 0) return true;
     else return false;
+  }
+
+  int 
+  _determinant_sign(const ublas::permutation_matrix<std::size_t>& pm)
+  {
+    int pm_sign=1;
+    std::size_t size = pm.size();
+    for (std::size_t i = 0; i < size; ++i)
+      if (i != pm(i))
+	pm_sign *= -1.0; // swap_rows would swap a pair of rows here, so we change sign
+    return pm_sign;
+  }
+
+  template<class T>  
+  double 
+  _determinant( const T& mat ) {
+    ublas::matrix<double> m = mat;
+    ublas::permutation_matrix<size_t> pm(m.size1());
+    double det = 1.0;
+    if( ublas::lu_factorize(m,pm) ) {
+      det = 0.0;
+    } else {
+      for(int i = 0; i < m.size1(); i++)
+	det *= m(i,i); // multiply by elements on diagonal
+      det = det * _determinant_sign( pm );
+    }
+    return det;
   }
 
   McmcUpdate::McmcUpdate(const std::string& tag, Random& random, McmcLikelihood& logLikelihood) :
@@ -120,7 +148,7 @@ namespace EpiRisk
 
   AdaptiveMultiMRW::AdaptiveMultiMRW(const std::string& tag,
       UpdateBlock& params, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
-    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), burnin_(burnin)
+    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     // Initialize the standard covariance
@@ -171,6 +199,15 @@ namespace EpiRisk
     // Update empirical covariance
     empCovar_->sample();
 
+    // Adapt adaptscalar
+    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
+      else adaptScalar_ *= min(2.0, accept / 0.234);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
+
     // Calculate current posterior
     float logPiCur = logLikelihood_.GetCurrentValue();
     for (size_t p = 0; p < updateGroup_.size(); ++p)
@@ -182,7 +219,7 @@ namespace EpiRisk
       {
         try
           {
-            vars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+            vars = random_.mvgauss(empCovar_->getCovariance() * adaptScalar_
                 / updateGroup_.size());
           }
         catch (cholesky_error& e)
@@ -211,6 +248,7 @@ namespace EpiRisk
       {
         logLikelihood_.Accept();
         acceptance_++;
+	windowAcceptance_++;
       }
     else
       {
@@ -220,12 +258,13 @@ namespace EpiRisk
       }
 
     ++numUpdates_;
+    ++windowUpdates_;
   }
 
   AdaptiveMultiLogMRW::AdaptiveMultiLogMRW(const std::string& tag,
       UpdateBlock& params, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
     McmcUpdate(tag, random, logLikelihood), updateGroup_(params), burnin_(
-        burnin)
+        burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     // Initialize the standard covariance
@@ -277,6 +316,15 @@ namespace EpiRisk
     // Update empirical covariance
     empCovar_->sample();
 
+    // Adapt adaptscalar
+    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
+      else adaptScalar_ *= min(2.0, accept / 0.234);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
+
     // Calculate current posterior
     float logPiCur = logLikelihood_.GetCurrentValue();
     for (size_t p = 0; p < updateGroup_.size(); ++p)
@@ -288,7 +336,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+            logvars = random_.mvgauss(empCovar_->getCovariance() * adaptScalar_
                 / updateGroup_.size());
           }
         catch (cholesky_error& e)
@@ -320,6 +368,7 @@ namespace EpiRisk
       {
         logLikelihood_.Accept();
         acceptance_++;
+	windowAcceptance_++;
       }
     else
       {
@@ -329,12 +378,13 @@ namespace EpiRisk
       }
 
     ++numUpdates_;
+    ++windowUpdates_;
   }
 
   InfectivityMRW::InfectivityMRW(const string& tag,
       UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
     McmcUpdate(tag, random, logLikelihood), updateGroup_(params), powers_(
-        powers), burnin_(burnin)
+									  powers), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     constants_.resize(3,0.0);
@@ -393,6 +443,14 @@ namespace EpiRisk
     ublas::vector<double> sample = ublas::vector_range<ublas::vector<double> >(transform, ublas::range(1,transform.size()));
     empCovar_->sample(sample);
 
+    // Adapt adaptscalar
+    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
+      else adaptScalar_ *= min(2.0, accept / 0.234);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
 
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
@@ -400,7 +458,9 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+	    Covariance tmp = empCovar_->getCovariance();
+	    //tmp = tmp /  _determinant(tmp);
+            logvars = random_.mvgauss(tmp * adaptScalar_
                 / transformedGroup_.size());
           }
         catch (cholesky_error& e)
@@ -421,6 +481,7 @@ namespace EpiRisk
       {
 	for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
 	++numUpdates_;
+	++windowUpdates_;
 	return;
       }
 
@@ -443,6 +504,7 @@ namespace EpiRisk
       {
         logLikelihood_.Accept();
         acceptance_++;
+	windowAcceptance_++;
       }
     else
       {
@@ -451,18 +513,20 @@ namespace EpiRisk
       }
 
     ++numUpdates_;
+    ++windowUpdates_;
 
   }
 
   InfectivityMRW::Covariance
   InfectivityMRW::getCovariance() const
   {
+    std::cerr << "Adapt scalar = " << adaptScalar_ << std::endl;
     return empCovar_->getCovariance();
   }
 
   SusceptibilityMRW::SusceptibilityMRW(const string& tag,
       UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
-    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), powers_(powers), burnin_(burnin)
+    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), powers_(powers), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     constants_.resize(3,0.0);
@@ -521,6 +585,15 @@ namespace EpiRisk
     ublas::vector<double> sample = ublas::vector_range<ublas::vector<double> >(transform, ublas::range(1,transform.size()));
     empCovar_->sample(sample);
 
+    // Adapt adaptscalar
+    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
+      else adaptScalar_ *= min(2.0, accept / 0.234);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
+
     // Propose as in Haario, Sachs, Tamminen (2001)
     Random::Variates logvars;
     if (random_.uniform() < 0.95 and numUpdates_ > burnin_)
@@ -548,6 +621,7 @@ namespace EpiRisk
       {
 	for(size_t i=0; i<updateGroup_.size(); ++i) updateGroup_[i].setValue(oldParams[i]);
 	++numUpdates_;
+	++windowUpdates_;
 	return;
       }
 
@@ -571,6 +645,7 @@ namespace EpiRisk
       {
         logLikelihood_.Accept();
         acceptance_++;
+	++windowAcceptance_;
       }
     else
       {
@@ -579,6 +654,7 @@ namespace EpiRisk
       }
 
     ++numUpdates_;
+    ++windowAcceptance_;
 
   }
 

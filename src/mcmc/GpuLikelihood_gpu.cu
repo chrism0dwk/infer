@@ -1484,7 +1484,7 @@ GpuLikelihood::GetSumInfectivityPow(float* result) const
   for (size_t k = 0; k < numSpecies_; ++k)
     {
       result[k] = indirectedSum(thrust::raw_pointer_cast(&devInfecIdx_[0]),
-          numKnownInfecs_, devAnimalsInfPow_);
+          numKnownInfecs_, devAnimalsInfPow_+animalsInfPowPitch_*k);
     }
 }
 

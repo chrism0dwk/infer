@@ -110,6 +110,7 @@ namespace EpiRisk
       ublas::vector<double> sum_;
       symmetric_matrix<double> sumSq_;
       CovMatrix covMatrix_;
+      CovMatrix correlation_;
       ublas::vector<double> expectation_;
 
       const UpdateBlock& params_;
@@ -142,6 +143,7 @@ namespace EpiRisk
             for(size_t j = 0; j < params.size(); ++j) sumSq_(i,j) = 0.0;
         }
         covMatrix_ = covariance;
+	correlation_.resize(covMatrix_.size1());
 
 
         // Add a parameter row
@@ -160,6 +162,15 @@ namespace EpiRisk
         kronecker();
         covMatrix_ = sumSq_ / denominator - covMatrix_;
         return covMatrix_;
+      }
+      const CovMatrix&
+      getCorrelation()
+      {
+	getCovariance();
+	for (int i=0; i < covMatrix_.size1(); ++i)
+	  for(int j=0; j <= i; ++j)
+	    correlation_(i,j) = covMatrix_(i,j) / (covMatrix_(i,i) * covMatrix_(j,j));
+	return correlation_;
       }
       void
       printInnerds()

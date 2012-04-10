@@ -117,6 +117,9 @@ namespace EpiRisk
   private:
     UpdateBlock& updateGroup_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<Identity>* empCovar_;
     EmpCovar<Identity>::CovMatrix* stdCov_;
   };
@@ -138,6 +141,9 @@ namespace EpiRisk
   private:
     UpdateBlock& updateGroup_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };
@@ -159,6 +165,9 @@ namespace EpiRisk
     UpdateBlock transformedGroup_;
     std::vector<double> constants_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
 
@@ -182,6 +191,9 @@ namespace EpiRisk
     UpdateBlock powers_;
     std::vector<float> constants_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
 
@@ -206,6 +218,9 @@ namespace EpiRisk
     UpdateBlock powers_;
     std::vector<float> constants_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
 
