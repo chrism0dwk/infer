@@ -111,6 +111,8 @@ public:
   const GpuLikelihood&
   operator=(const GpuLikelihood& other);
   void
+  InfecCopy(const GpuLikelihood& other);
+  void
   LoadPopulation(PopDataImporter& filename);
   void
   LoadEpidemic(EpiDataImporter& importer);

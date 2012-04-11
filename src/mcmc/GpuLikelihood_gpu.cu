@@ -908,6 +908,35 @@ GpuLikelihood::operator=(const GpuLikelihood& other)
   return *this;
 }
 
+void
+GpuLikelihood::InfecCopy(const GpuLikelihood& other)
+{
+
+  // copy event times
+  checkCudaError(
+      cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),maxInfecs_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+
+  // Infection index
+  devInfecIdx_ = other.devInfecIdx_;
+  hostInfecIdx_ = other.hostInfecIdx_;
+
+  // Internals
+  I1Idx_ = other.I1Idx_;
+  I1Time_ = other.I1Time_;
+  sumI_ = other.sumI_;
+  hostSuscOccults_ = other.hostSuscOccults_;
+
+  // copy product vector
+  devProduct_ = other.devProduct_;
+  devIntegral_ = other.devIntegral_;
+
+  // Likelihood components
+  integral_ = other.integral_;
+  bgIntegral_ = other.bgIntegral_;
+  lp_ = other.lp_;
+  logLikelihood_ = other.logLikelihood_;
+}
+
 GpuLikelihood::~GpuLikelihood()
 {
   if (*covariateCopies_ == 1) // We're the last copy to be destroyed

@@ -78,6 +78,13 @@ namespace EpiRisk
   private:
     GpuLikelihood* likelihood_;
     GpuLikelihood* proposal_;
+    enum move_t
+    {
+      PARAMETER=0,
+      INFECTIME,
+      ADD,
+      DELETE
+    } lastMove_;
   };
 
 } /* namespace EpiRisk */

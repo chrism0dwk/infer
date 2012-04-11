@@ -30,7 +30,7 @@ namespace EpiRisk
 {
 
   McmcLikelihood::McmcLikelihood(GpuLikelihood& likelihood)
-    : likelihood_(&likelihood)
+    : likelihood_(&likelihood), lastMove_(PARAMETER)
   {
     proposal_ = new GpuLikelihood(*likelihood_);
 
@@ -46,12 +46,18 @@ namespace EpiRisk
   void
   McmcLikelihood::Accept()
   {
-    *likelihood_ = *proposal_;
+    if (lastMove_ == PARAMETER)
+      *likelihood_ = *proposal_;
+    else
+      likelihood_->InfecCopy(*proposal_);
+
+    lastMove_ = PARAMETER;
   }
 
   float
   McmcLikelihood::AddI(size_t idx, float inTime)
   {
+    lastMove_ = ADD;
     proposal_->AddInfectionTime(idx, inTime);
     return proposal_->GetLogLikelihood();
   }
@@ -59,6 +65,7 @@ namespace EpiRisk
   float
   McmcLikelihood::DeleteI(size_t idx)
   {
+    lastMove_ = DELETE;
     proposal_->DeleteInfectionTime(idx);
     return proposal_->GetLogLikelihood();
   }
@@ -96,6 +103,7 @@ namespace EpiRisk
   float
   McmcLikelihood::Propose()
   {
+    lastMove_ = PARAMETER;
     proposal_->FullCalculate();
     return proposal_->GetLogLikelihood();
   }
@@ -103,12 +111,16 @@ namespace EpiRisk
   void
   McmcLikelihood::Reject()
   {
-    *proposal_ = *likelihood_;
+    if (lastMove_ == PARAMETER)
+      *proposal_ = *likelihood_;
+    else
+      proposal_->InfecCopy(*likelihood_);
   }
 
   float
   McmcLikelihood::UpdateI(size_t idx, float inTime)
   {
+    lastMove_ = INFECTIME;
     proposal_->UpdateInfectionTime(idx, inTime);
     return proposal_->GetLogLikelihood();
   }
