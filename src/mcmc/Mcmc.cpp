@@ -163,9 +163,9 @@ Mcmc::NewSpeciesMRW(const string tag, UpdateBlock& params,
 //! Pushes an SusceptibilityMRW updater onto the MCMC stack
 SusceptibilityMRW*
 Mcmc::NewSusceptibilityMRW(const string tag, UpdateBlock& params,
-    UpdateBlock& powers, const size_t burnin)
+    const size_t burnin)
 {
-  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, powers, burnin,
+  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, burnin,
       *random_, likelihood_);
   updateStack_.push_back(update);
 
@@ -175,9 +175,9 @@ Mcmc::NewSusceptibilityMRW(const string tag, UpdateBlock& params,
 //! Pushes an InfectivityMRW updater onto the MCMC stack
 InfectivityMRW*
 Mcmc::NewInfectivityMRW(const string tag, UpdateBlock& params,
-    UpdateBlock& powers, const size_t burnin)
+    const size_t burnin)
 {
-  InfectivityMRW* update = new InfectivityMRW(tag, params, powers, burnin,
+  InfectivityMRW* update = new InfectivityMRW(tag, params, burnin,
       *random_, likelihood_);
   updateStack_.push_back(update);
 

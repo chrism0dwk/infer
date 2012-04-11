@@ -120,9 +120,9 @@ namespace EpiRisk
     SpeciesMRW*
     NewSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha, const size_t burnin = 1000);
     InfectivityMRW*
-    NewInfectivityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    NewInfectivityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SusceptibilityMRW*
-    NewSusceptibilityMRW(const string tag, UpdateBlock& params, UpdateBlock& powers, const size_t burnin = 1000);
+    NewSusceptibilityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SellkeSerializer*
     NewSellkeSerializer(const string filename);
     void

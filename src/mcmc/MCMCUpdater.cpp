@@ -382,9 +382,8 @@ namespace EpiRisk
   }
 
   InfectivityMRW::InfectivityMRW(const string& tag,
-      UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
-    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), powers_(
-									  powers), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
+      UpdateBlock& params, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
+    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     constants_.resize(3,0.0);
@@ -525,8 +524,8 @@ namespace EpiRisk
   }
 
   SusceptibilityMRW::SusceptibilityMRW(const string& tag,
-      UpdateBlock& params, UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
-    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), powers_(powers), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
+      UpdateBlock& params, size_t burnin, Random& random, McmcLikelihood& logLikelihood) :
+    McmcUpdate(tag, random, logLikelihood), updateGroup_(params), burnin_(burnin), adaptScalar_(ADAPTIVESCALE),windowUpdates_(0), windowAcceptance_(0)
   {
 
     constants_.resize(3,0.0);

@@ -179,7 +179,7 @@ namespace EpiRisk
   public:
     typedef EmpCovar<LogTransform>::CovMatrix Covariance;
     InfectivityMRW(const std::string& tag, UpdateBlock& params,
-        UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
     ~InfectivityMRW();
     void
     Update();
@@ -188,7 +188,6 @@ namespace EpiRisk
   private:
     UpdateBlock& updateGroup_;
     UpdateBlock transformedGroup_;
-    UpdateBlock powers_;
     std::vector<float> constants_;
     size_t burnin_;
     double adaptScalar_;
@@ -206,7 +205,7 @@ namespace EpiRisk
   public:
     typedef EmpCovar<LogTransform>::CovMatrix Covariance;
     SusceptibilityMRW(const std::string& tag, UpdateBlock& params,
-        UpdateBlock& powers, size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
     ~SusceptibilityMRW();
     void
     Update();
@@ -215,7 +214,6 @@ namespace EpiRisk
   private:
     UpdateBlock& updateGroup_;
     UpdateBlock transformedGroup_;
-    UpdateBlock powers_;
     std::vector<float> constants_;
     size_t burnin_;
     double adaptScalar_;

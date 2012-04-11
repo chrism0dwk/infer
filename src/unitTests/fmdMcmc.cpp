@@ -396,13 +396,13 @@ main(int argc, char* argv[])
     txInfec.add(gamma1);
     txInfec.add(xi[1]);
     txInfec.add(xi[2]);
-    InfectivityMRW* updateInfec = mcmc.NewInfectivityMRW("txInfec",txInfec, txPsi, 300);
+    InfectivityMRW* updateInfec = mcmc.NewInfectivityMRW("txInfec",txInfec, 300);
 
     UpdateBlock txSuscep;
     txSuscep.add(gamma1);
     txSuscep.add(zeta[1]);
     txSuscep.add(zeta[2]);
-    SusceptibilityMRW* updateSuscep = mcmc.NewSusceptibilityMRW("txSuscep",txSuscep, txPhi, 300);
+    SusceptibilityMRW* updateSuscep = mcmc.NewSusceptibilityMRW("txSuscep",txSuscep, 300);
 
    // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
