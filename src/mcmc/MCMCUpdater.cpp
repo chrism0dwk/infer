@@ -599,7 +599,7 @@ namespace EpiRisk
       {
         try
           {
-            logvars = random_.mvgauss(empCovar_->getCovariance() * ADAPTIVESCALE
+            logvars = random_.mvgauss(empCovar_->getCovariance() * adaptScalar_
                 / transformedGroup_.size());
           }
         catch (cholesky_error& e)
