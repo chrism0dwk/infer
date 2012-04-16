@@ -60,7 +60,7 @@ private:
   std::string msg_;
 };
 
-#define checkCudaError(err)  __checkCudaError(err, __FILE__, __LINE__)
+#define checkCudaError(err) __checkCudaError(err, __FILE__, __LINE__)
 
 void
 __checkCudaError(const cudaError_t err, const char* file, const int line)

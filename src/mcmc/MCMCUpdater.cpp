@@ -653,7 +653,7 @@ namespace EpiRisk
       }
 
     ++numUpdates_;
-    ++windowAcceptance_;
+    ++windowUpdates_;
 
   }
 

@@ -57,7 +57,7 @@ if rv != 0:
     sys.exit(1)
 
 # get libtool version
-fd = os.popen("glibtool --version")
+fd = os.popen("libtool --version")
 libtool_version = fd.readline()
 # this loop supresses the broken pipe errors
 # you get by not reading all the data

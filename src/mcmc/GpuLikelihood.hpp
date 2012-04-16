@@ -50,7 +50,7 @@ namespace EpiRisk {
 #endif
 
 // CUDA defines
-#define THREADSPERBLOCK 256
+#define THREADSPERBLOCK 64
 
 // Model defines
 #define NUMEVENTS 3
