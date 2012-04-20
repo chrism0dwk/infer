@@ -77,6 +77,12 @@ namespace EpiRisk
   }
 
   float
+  McmcLikelihood::GetInfectionPart() const
+  {
+    return likelihood_->InfectionPart();
+  }
+
+  float
   McmcLikelihood::GetMeanI2N() const
   {
     return likelihood_->GetMeanI2N();

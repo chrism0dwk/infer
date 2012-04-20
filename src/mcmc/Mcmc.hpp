@@ -60,6 +60,8 @@ namespace EpiRisk
   class SpeciesMRW;
   class SusceptibilityMRW;
   class InfectivityMRW;
+  class InfectionTimeGammaScale;
+  class InfectionTimeUpdate;
   class SellkeSerializer;
 
 
@@ -77,16 +79,7 @@ namespace EpiRisk
     ofstream mcmcOutput_;
     ofstream stdout_;
 
-    size_t numIUpdates_;
     double timeCalc_,timeUpdate_;
-    size_t numCalc_,numUpdate_;
-
-    // Acceptance for Add, Delete, and Move
-    size_t acceptAdd_, callsAdd_;
-    size_t acceptDel_, callsDel_;
-    size_t acceptMove_, callsMove_;
-
-
 
     // Likelihood functions
     float Propose();
@@ -123,12 +116,14 @@ namespace EpiRisk
     NewInfectivityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SusceptibilityMRW*
     NewSusceptibilityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
+    InfectionTimeGammaScale*
+    NewInfectionTimeGammaScale(const string tag, Parameter& param, const float tuning);
+    InfectionTimeUpdate*
+    NewInfectionTimeUpdate(const string tag, Parameter& a, Parameter& b, const size_t reps);
     SellkeSerializer*
     NewSellkeSerializer(const string filename);
-    void
-    setNumIUpdates(const size_t n);
 
-    map<string, float>
+    std::map<std::string, float>
     GetAcceptance() const;
     void
     ResetAcceptance();

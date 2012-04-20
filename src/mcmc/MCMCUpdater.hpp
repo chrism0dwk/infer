@@ -72,7 +72,7 @@ namespace EpiRisk
 
     //! Returns the MH acceptance probability
     virtual
-    float
+    std::map<string, float>
     GetAcceptance() const;
     virtual
     void
@@ -221,6 +221,52 @@ namespace EpiRisk
     size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
+
+  //! InfectionTimeGammaScale performs centred updating of a gamma infectious period scale parameters
+  class InfectionTimeGammaScale : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeGammaScale(const std::string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeGammaScale();
+    void
+    Update();
+  private:
+    Parameter& param_;
+    float tuning_;
+  };
+
+
+  //! InfectionTimeUpdate performs an update or rj move
+  class InfectionTimeUpdate : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeUpdate(const std::string& tag, Parameter& a, Parameter& b, const size_t reps, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeUpdate();
+    void
+    Update();
+    std::map<std::string, float>
+    GetAcceptance() const;
+    void
+    ResetAcceptance();
+  private:
+    Parameter& a_;
+    Parameter& b_;
+    ublas::vector<float> calls_;
+    ublas::vector<float> accept_;
+    size_t reps_;
+    bool
+    UpdateI();
+    bool
+    AddI();
+    bool
+    DeleteI();
 
   };
 

@@ -218,12 +218,14 @@ GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
 void
 GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1,
     Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
-    Parameters& phi, Parameter& delta)
+    Parameters& phi, Parameter& delta, Parameter& a, Parameter& b)
 {
   epsilon_ = epsilon.GetValuePtr();
   gamma1_ = gamma1.GetValuePtr();
   gamma2_ = gamma2.GetValuePtr();
   delta_ = delta.GetValuePtr();
+  a_ = a.GetValuePtr();
+  b_ = b.GetValuePtr();
 
   xi_.clear();
   psi_.clear();

@@ -29,6 +29,8 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/numeric/ublas/lu.hpp>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 
 
@@ -75,6 +77,41 @@ namespace EpiRisk
     return det;
   }
 
+  inline
+  double
+  extremepdf(const double x, const double a, const double b)
+  {
+    return a * b * exp(a + b * x - a * exp(b * x));
+  }
+
+  inline
+  double
+  extremecdf(const double x, const double a, const double b)
+  {
+    return 1 - exp(-a * (exp(b * x) - 1));
+  }
+
+  inline
+  double
+  gammacdf(const double x, const double a, const double b)
+  {
+    return gsl_cdf_gamma_P(x, a, 1.0 / b);
+  }
+
+  inline
+  double
+  gammapdf(const double x, const double a, const double b)
+  {
+    return gsl_ran_gamma_pdf(x, a, 1.0 / b);
+  }
+
+  inline
+  double
+  gaussianTailPdf(const double x, const double mean, const double var)
+  {
+    return gsl_ran_gaussian_tail_pdf(x - mean, -mean, sqrt(var));
+  }
+
   McmcUpdate::McmcUpdate(const std::string& tag, Random& random, McmcLikelihood& logLikelihood) :
     tag_(tag), random_(random), logLikelihood_(logLikelihood), acceptance_(0), numUpdates_(0)
   {
@@ -84,10 +121,12 @@ namespace EpiRisk
   {
   }
 
-  float
+  std::map<std::string, float>
   McmcUpdate::GetAcceptance() const
   {
-    return (float) acceptance_ / (float) numUpdates_;
+    std::map<std::string, float> accepts;
+    accepts.insert(std::make_pair(tag_, (float) acceptance_ / (float) numUpdates_));
+    return accepts;
   }
 
   void
@@ -776,6 +815,262 @@ namespace EpiRisk
   SpeciesMRW::getCovariance() const
   {
     return empCovar_->getCovariance();
+  }
+
+
+  InfectionTimeGammaScale::InfectionTimeGammaScale(const string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood)
+    : McmcUpdate(tag, random, logLikelihood), param_(param), tuning_(tuning)
+  {
+
+  }
+  InfectionTimeGammaScale::~InfectionTimeGammaScale()
+  {
+
+  }
+  void
+  InfectionTimeGammaScale::Update()
+  {
+    double oldValue = param_;
+
+    // Calculate current posterior
+    double logPiCur =  logLikelihood_.GetInfectionPart() + log(param_.prior());
+
+    // Proposal via log random walk
+    param_ *= exp(random_.gaussian(0, tuning_));
+
+    // Calculate candidate posterior
+    float logPiCan = logLikelihood_.GetInfectionPart() + log(param_.prior());
+
+    // q-ratio
+    float qratio = param_ / oldValue;
+
+    // Accept or reject
+    if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
+      {
+        acceptance_++;
+      }
+    else
+      {
+        param_ = oldValue;
+      }
+
+    numUpdates_++;
+  }
+
+  InfectionTimeUpdate::InfectionTimeUpdate(const std::string& tag, Parameter& a, Parameter& b, const size_t reps, Random& random, McmcLikelihood& logLikelihood)
+    : a_(a), b_(b), reps_(reps), McmcUpdate(tag, random, logLikelihood)
+  {
+    calls_.resize(3);
+    accept_.resize(3);
+    std::fill(calls_.begin(), calls_.end(), 0.0f);
+    std::fill(accept_.begin(), accept_.end(), 0.0f);
+  }
+
+  InfectionTimeUpdate::~InfectionTimeUpdate()
+  {
+
+  }
+
+  void
+  InfectionTimeUpdate::Update()
+  {
+    for (size_t infec = 0; infec < reps_; ++infec)
+      {
+        size_t pickMove = random_.integer(3);
+        switch (pickMove)
+          {
+        case 0:
+          accept_[pickMove] += UpdateI();
+          break;
+        case 1:
+          accept_[pickMove] += AddI();
+          break;
+        case 2:
+          accept_[pickMove] += DeleteI();
+          break;
+        default:
+          throw logic_error("Unknown move!");
+          }
+        calls_[pickMove]++;
+      }
+  }
+
+  bool
+  InfectionTimeUpdate::UpdateI()
+  {
+    size_t index = random_.integer(logLikelihood_.GetNumInfecs());
+    double newIN = random_.gamma(a_, b_); // Independence sampler
+    double oldIN = logLikelihood_.GetIN(index);
+
+  #ifndef NDEBUG
+    if (mpirank_ == 0)
+    cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
+    << newI << endl;
+  #endif
+
+    float piCur = logLikelihood_.GetCurrentValue();
+    float piCan = logLikelihood_.UpdateI(index, newIN);
+
+    if (index < logLikelihood_.GetNumKnownInfecs())
+      { // Known infection
+        piCan += log(gammapdf(newIN, a_, b_));
+        piCur += log(gammapdf(oldIN, a_, b_));
+      }
+    else
+      { // Occult
+        piCan += log(1 - gammacdf(newIN, a_, b_));
+        piCur += log(1 - gammacdf(oldIN, a_, b_));
+      }
+
+    double qRatio = log(gammapdf(oldIN, a_, b_) / gammapdf(newIN, a_, b_));
+
+    double accept = piCan - piCur + qRatio;
+
+    if (log(random_.uniform()) < accept)
+      {
+  #ifndef NDEBUG
+        if (mpirank_ == 0)
+        cerr << "ACCEPT" << endl;
+  #endif
+        // Update the infection
+        logLikelihood_.Accept();
+        return true;
+      }
+    else
+      {
+  #ifndef NDEBUG
+        if (mpirank_ == 0)
+        cerr << "REJECT" << endl;
+  #endif
+        logLikelihood_.Reject();
+        return false;
+      }
+  }
+
+  bool
+  InfectionTimeUpdate::AddI()
+  {
+    size_t numSusceptible = logLikelihood_.GetNumPossibleOccults();
+
+    if (numSusceptible == 0)
+      return false;
+
+    size_t index = random_.integer(numSusceptible);
+
+    double inProp = random_.gaussianTail(-(1.0 / b_), 1.0 / (a_ * b_ * b_));
+
+  #ifndef NDEBUG
+    if (mpirank_ == 0)
+    cerr << "Adding '" << it->getId() << "' at " << newI << endl;
+  #endif
+
+    double logPiCur = logLikelihood_.GetCurrentValue();
+
+    double logPiCan = logLikelihood_.AddI(index, inProp)
+        + log(1.0 - gammacdf(inProp, a_, b_));
+    double qRatio = log(
+        (1.0 / (logLikelihood_.GetNumOccults() + 1))
+            / ((1.0 / numSusceptible)
+                * gaussianTailPdf(inProp, -1.0 / b_, 1.0 / (a_ * b_ * b_))));
+
+    double accept = logPiCan - logPiCur + qRatio;
+
+    // Perform accept/reject step.
+    if (log(random_.uniform()) < accept)
+      {
+  #ifndef NDEBUG
+        cerr << "ACCEPT" << endl;
+  #endif
+        logLikelihood_.Accept();
+        return true;
+      }
+    else
+      {
+  #ifndef NDEBUG
+        cerr << "REJECT" << endl;
+  #endif
+        logLikelihood_.Reject();
+        return false;
+      }
+  }
+
+  bool
+  InfectionTimeUpdate::DeleteI()
+  {
+    if (logLikelihood_.GetNumOccults() == 0)
+      {
+  #ifndef NDEBUG
+        if (mpirank_ == 0)
+        cerr << __FUNCTION__ << endl;
+        if (mpirank_ == 0)
+        cerr << "Occults empty. Not deleting" << endl;
+  #endif
+        return false;
+      }
+
+    size_t numSusceptible = logLikelihood_.GetNumPossibleOccults();
+
+    size_t toRemove = random_.integer(logLikelihood_.GetNumOccults());
+
+    float inTime = logLikelihood_.GetIN(logLikelihood_.GetNumKnownInfecs() + toRemove);
+    float logPiCur = logLikelihood_.GetCurrentValue()
+        + log(1 - gammacdf(inTime, a_, b_));
+
+  #ifndef NDEBUG
+    if (mpirank_ == 0)
+    cerr << "Deleting '" << it->getId() << "'" << endl;
+  #endif
+
+    float logPiCan = logLikelihood_.DeleteI(toRemove);
+    double qRatio = log(
+        (1.0 / (numSusceptible + 1)
+            * gaussianTailPdf(inTime, -1.0 / b_, 1.0 / (a_ * b_ * b_)))
+            / (1.0 / logLikelihood_.GetNumOccults()));
+
+    // Perform accept/reject step.
+    double accept = logPiCan - logPiCur + qRatio;
+
+    if (log(random_.uniform()) < accept)
+      {
+  #ifndef NDEBUG
+        if (mpirank_ == 0)
+        cerr << "ACCEPT" << endl;
+  #endif
+        logLikelihood_.Accept();
+        return true;
+      }
+    else
+      {
+  #ifndef NDEBUG
+        if (mpirank_ == 0)
+        cerr << "REJECT" << endl;
+  #endif
+        logLikelihood_.Reject();
+        return false;
+      }
+  }
+
+  std::map<std::string, float>
+  InfectionTimeUpdate::GetAcceptance() const
+  {
+    std::map<std::string, float> rv;
+
+    float* accept = new float[3];
+    for(size_t i=0; i<calls_.size(); ++i)
+        accept[i] = accept_[i] / calls_[i];
+
+    rv.insert(make_pair(tag_+":moveInfec", accept[0]));
+    rv.insert(make_pair(tag_+":addInfec", accept[1]));
+    rv.insert(make_pair(tag_+":delInfec", accept[2]));
+
+    return rv;
+  }
+
+  void
+  InfectionTimeUpdate::ResetAcceptance()
+  {
+    std::fill(accept_.begin(), accept_.end(), 0.0f);
+    std::fill(calls_.begin(), accept_.end(), 0.0f);
   }
 
 

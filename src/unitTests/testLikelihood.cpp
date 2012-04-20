@@ -150,8 +150,10 @@ int main(int argc, char* argv[])
   phi[1] = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
   phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
   Parameter delta(1.14985, GammaPrior(1, 1), "delta");
+  Parameter a(4.0, GammaPrior(1,1), "a");
+  Parameter b(0.25, GammaPrior(1,1), "b");
 
-  likelihood->SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta);
+  likelihood->SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta, a, b);
 
   // Calculate
   likelihood->FullCalculate();

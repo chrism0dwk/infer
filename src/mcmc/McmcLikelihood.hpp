@@ -50,6 +50,8 @@ namespace EpiRisk
     float
     GetCurrentValue() const;
     float
+    GetInfectionPart() const;
+    float
     GetMeanI2N() const;
     float
     GetMeanOccI() const;

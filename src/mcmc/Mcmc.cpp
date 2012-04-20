@@ -59,38 +59,11 @@ onlineMean(const double x, const double xbar, const double n)
   return xbar + (x - xbar) / n;
 }
 
-inline
-double
-extremepdf(const double x, const double a, const double b)
-{
-  return a * b * exp(a + b * x - a * exp(b * x));
-}
 
-inline
-double
-extremecdf(const double x, const double a, const double b)
-{
-  return 1 - exp(-a * (exp(b * x) - 1));
-}
-
-inline
-double
-gammacdf(const double x, const double a, const double b)
-{
-  return gsl_cdf_gamma_P(x, a, 1.0 / b);
-}
-
-inline
-double
-gaussianTailPdf(const double x, const double mean, const double var)
-{
-  return gsl_ran_gaussian_tail_pdf(x - mean, -mean, sqrt(var));
-}
 
 Mcmc::Mcmc(GpuLikelihood& likelihood, const size_t randomSeed) :
-    likelihood_(likelihood), random_(NULL), numIUpdates_(0), timeCalc_(0.0), timeUpdate_(
-        0.0), numCalc_(0), numUpdate_(0), acceptMove_(0), callsMove_(0), acceptAdd_(
-        0), callsAdd_(0), acceptDel_(0), callsDel_(0)
+    likelihood_(likelihood), random_(NULL), timeCalc_(0.0), timeUpdate_(
+        0.0)
 {
 
   random_ = new Random(randomSeed);
@@ -184,6 +157,26 @@ Mcmc::NewInfectivityMRW(const string tag, UpdateBlock& params,
   return update;
 }
 
+//! Pushes an infectious period scale updater onto the MCMC stack
+InfectionTimeGammaScale*
+Mcmc::NewInfectionTimeGammaScale(const string tag, Parameter& param, const float tuning)
+{
+  InfectionTimeGammaScale* update = new InfectionTimeGammaScale(tag, param, tuning, *random_, likelihood_);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
+//! Pushes an infection time updater on the the MCMC stack
+InfectionTimeUpdate*
+Mcmc::NewInfectionTimeUpdate(const string tag, Parameter& a, Parameter& b, const size_t reps)
+{
+  InfectionTimeUpdate* update = new InfectionTimeUpdate(tag, a, b, reps, *random_, likelihood_);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
 //! Pushes a SellkeSerializer onto the MCMC stack
 SellkeSerializer*
 Mcmc::NewSellkeSerializer(const string filename)
@@ -194,169 +187,7 @@ Mcmc::NewSellkeSerializer(const string filename)
   return update;
 }
 
-//! Sets the number of infection time (and occult) updates per sweep of the MCMC
-void
-Mcmc::setNumIUpdates(const size_t n)
-{
-  numIUpdates_ = n;
-}
-
-bool
-Mcmc::UpdateI()
-{
-
-  size_t index = random_->integer(likelihood_.GetNumInfecs());
-  double newIN = random_->extreme(a, b); // Independence sampler
-  double oldIN = likelihood_.GetIN(index);
-
-#ifndef NDEBUG
-  if (mpirank_ == 0)
-  cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
-  << newI << endl;
-#endif
-
-  float piCur = likelihood_.GetCurrentValue();
-  float piCan = likelihood_.UpdateI(index, newIN);
-
-  if (index < likelihood_.GetNumKnownInfecs())
-    { // Known infection
-      piCan += log(extremepdf(newIN, a, b));
-      piCur += log(extremepdf(oldIN, a, b));
-    }
-  else
-    { // Occult
-      piCan += log(1 - extremecdf(newIN, a, b));
-      piCur += log(1 - extremecdf(oldIN, a, b));
-    }
-
-  double qRatio = log(extremepdf(oldIN, a, b) / extremepdf(newIN, a, b));
-
-  double accept = piCan - piCur + qRatio;
-
-  if (log(random_->uniform()) < accept)
-    {
-#ifndef NDEBUG
-      if (mpirank_ == 0)
-      cerr << "ACCEPT" << endl;
-#endif
-      // Update the infection
-      likelihood_.Accept();
-      return true;
-    }
-  else
-    {
-#ifndef NDEBUG
-      if (mpirank_ == 0)
-      cerr << "REJECT" << endl;
-#endif
-      likelihood_.Reject();
-      return false;
-    }
-}
-
-bool
-Mcmc::AddI()
-{
-  size_t numSusceptible = likelihood_.GetNumPossibleOccults();
-
-  if (numSusceptible == 0)
-    return false;
-
-  size_t index = random_->integer(numSusceptible);
-
-  double inProp = random_->gaussianTail(-(1.0 / b), 1.0 / (a * b * b));
-
-#ifndef NDEBUG
-  if (mpirank_ == 0)
-  cerr << "Adding '" << it->getId() << "' at " << newI << endl;
-#endif
-
-  double logPiCur = likelihood_.GetCurrentValue();
-
-  double logPiCan = likelihood_.AddI(index, inProp)
-      + log(1.0 - extremecdf(inProp, a, b));
-  double qRatio = log(
-      (1.0 / (likelihood_.GetNumOccults() + 1))
-          / ((1.0 / numSusceptible)
-              * gaussianTailPdf(inProp, -1.0 / b, 1.0 / (a * b * b))));
-
-  double accept = logPiCan - logPiCur + qRatio;
-
-  // Perform accept/reject step.
-  if (log(random_->uniform()) < accept)
-    {
-#ifndef NDEBUG
-      cerr << "ACCEPT" << endl;
-#endif
-      likelihood_.Accept();
-      return true;
-    }
-  else
-    {
-#ifndef NDEBUG
-      cerr << "REJECT" << endl;
-#endif
-      likelihood_.Reject();
-      return false;
-    }
-}
-
-bool
-Mcmc::DeleteI()
-{
-  if (likelihood_.GetNumOccults() == 0)
-    {
-#ifndef NDEBUG
-      if (mpirank_ == 0)
-      cerr << __FUNCTION__ << endl;
-      if (mpirank_ == 0)
-      cerr << "Occults empty. Not deleting" << endl;
-#endif
-      return false;
-    }
-
-  size_t numSusceptible = likelihood_.GetNumPossibleOccults();
-
-  size_t toRemove = random_->integer(likelihood_.GetNumOccults());
-
-  float inTime = likelihood_.GetIN(likelihood_.GetNumKnownInfecs() + toRemove);
-  float logPiCur = likelihood_.GetCurrentValue()
-      + log(1 - extremecdf(inTime, a, b));
-
-#ifndef NDEBUG
-  if (mpirank_ == 0)
-  cerr << "Deleting '" << it->getId() << "'" << endl;
-#endif
-
-  float logPiCan = likelihood_.DeleteI(toRemove);
-  double qRatio = log(
-      (1.0 / (numSusceptible + 1)
-          * gaussianTailPdf(inTime, -1.0 / b, 1.0 / (a * b * b)))
-          / (1.0 / likelihood_.GetNumOccults()));
-
-  // Perform accept/reject step.
-  double accept = logPiCan - logPiCur + qRatio;
-
-  if (log(random_->uniform()) < accept)
-    {
-#ifndef NDEBUG
-      if (mpirank_ == 0)
-      cerr << "ACCEPT" << endl;
-#endif
-      likelihood_.Accept();
-      return true;
-    }
-  else
-    {
-#ifndef NDEBUG
-      if (mpirank_ == 0)
-      cerr << "REJECT" << endl;
-#endif
-      likelihood_.Reject();
-      return false;
-    }
-}
-
+//! Performs a parameter sweep
 void
 Mcmc::Update()
 {
@@ -371,37 +202,6 @@ Mcmc::Update()
         {
           it->Update();
         }
-
-      for (size_t infec = 0; infec < numIUpdates_; ++infec)
-        {
-          size_t pickMove = random_->integer(3);
-          switch (pickMove)
-            {
-          case 0:
-            acceptMove_ += UpdateI();
-            callsMove_++;
-            break;
-          case 1:
-            acceptAdd_ += AddI();
-            callsAdd_++;
-            break;
-          case 2:
-            acceptDel_ += DeleteI();
-            callsDel_++;
-            break;
-          default:
-            throw logic_error("Unknown move!");
-            }
-
-//          float update = likelihood_.GetValue();
-//          float full = likelihood_.Propose(); likelihood_.Reject();
-//          cerr << "Likelihood: " << update << endl;
-//          cerr << "Full likelihood: " << full << endl;
-//
-//          if (fabs(1.0f - update/full) > 1e-5) cerr << "***WARNING*** likelihood inconsistency!" << endl;
-
-        }
-
     }
   catch (logic_error& e)
     {
@@ -423,12 +223,9 @@ Mcmc::GetAcceptance() const
   for (boost::ptr_list<McmcUpdate>::const_iterator it = updateStack_.begin();
       it != updateStack_.end(); ++it)
     {
-      acceptance[it->GetTag()] = it->GetAcceptance();
+      map<string, float> tmp = it->GetAcceptance();
+      acceptance.insert(tmp.begin(), tmp.end());
     }
-
-  acceptance["UpdateI"] = (float) acceptMove_ / (float) callsMove_;
-  acceptance["AddI"] = (float) acceptAdd_ / (float) callsAdd_;
-  acceptance["DelI"] = (float) acceptDel_ / (float) callsDel_;
 
   return acceptance;
 }
@@ -439,12 +236,5 @@ Mcmc::ResetAcceptance()
   for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
       it != updateStack_.end(); ++it)
     it->ResetAcceptance();
-
-  acceptMove_ = 0;
-  callsMove_ = 0;
-  acceptDel_ = 0;
-  callsDel_ = 0;
-  acceptAdd_ = 0;
-  callsAdd_ = 0;
 }
 

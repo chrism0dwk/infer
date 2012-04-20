@@ -128,7 +128,7 @@ public:
   SetDistance(const float* data, const int* rowptr, const int* colind);
   void
   SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2, Parameters& xi,
-      Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta);
+      Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta, Parameter& a, Parameter& b);
   void
   RefreshParameters();
   size_t
@@ -167,8 +167,8 @@ public:
   FullCalculate();
   void
   Calculate();
-  void
-  NewCalculate();
+  float
+  InfectionPart();
   float
   GetIN(const size_t index);
   float
@@ -279,6 +279,9 @@ private:
   float* gamma1_;
   float* gamma2_;
   float* delta_;
+  float* a_;
+  float* b_;
+
   PointerVector<float> xi_;
   PointerVector<float> psi_;
   PointerVector<float> zeta_;
