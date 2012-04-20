@@ -1375,7 +1375,7 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
   }
   else
     {
-      bgIntegral_ += newTime - eventTimesPtr[i];
+      bgIntegral_ += *epsilon_ * (newTime - eventTimesPtr[i]);
       eventTimesPtr[i] = newTime;
     }
 
@@ -1453,7 +1453,7 @@ _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
   }
   else
     {
-      bgIntegral_ += newTime - Ni;
+      bgIntegral_ += *epsilon_ * (newTime - Ni);
       eventTimesPtr[i] = newTime;
     }
 
@@ -1525,7 +1525,7 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
   }
   else
     {
-      bgIntegral_ += notification - eventTimesPtr[i];
+      bgIntegral_ += *epsilon_ * (notification - eventTimesPtr[i]);
       eventTimesPtr[i] = notification;
     }
 
