@@ -39,9 +39,7 @@
 using namespace EpiRisk;
 
 // Constants
-const double a = 0.05; //0.015;
-const double b = 0.2; //0.8;
-const double tuneI = 2.0;
+const double tuneI = 2.5;
 
 inline
 double
