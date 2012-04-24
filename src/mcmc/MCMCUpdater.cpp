@@ -902,12 +902,6 @@ namespace EpiRisk
     double newIN = random_.gamma(a_, b_); // Independence sampler
     double oldIN = logLikelihood_.GetIN(index);
 
-  #ifndef NDEBUG
-    if (mpirank_ == 0)
-    cerr << "Moving '" << it->getId() << "' from " << it->getI() << " to "
-    << newI << endl;
-  #endif
-
     float piCur = logLikelihood_.GetCurrentValue();
     float piCan = logLikelihood_.UpdateI(index, newIN);
 
@@ -929,7 +923,6 @@ namespace EpiRisk
     if (log(random_.uniform()) < accept)
       {
   #ifndef NDEBUG
-        if (mpirank_ == 0)
         cerr << "ACCEPT" << endl;
   #endif
         // Update the infection
@@ -939,7 +932,6 @@ namespace EpiRisk
     else
       {
   #ifndef NDEBUG
-        if (mpirank_ == 0)
         cerr << "REJECT" << endl;
   #endif
         logLikelihood_.Reject();
@@ -958,11 +950,6 @@ namespace EpiRisk
     size_t index = random_.integer(numSusceptible);
 
     double inProp = random_.gaussianTail(-(1.0 / b_), 1.0 / (a_ * b_ * b_));
-
-  #ifndef NDEBUG
-    if (mpirank_ == 0)
-    cerr << "Adding '" << it->getId() << "' at " << newI << endl;
-  #endif
 
     double logPiCur = logLikelihood_.GetCurrentValue();
 
@@ -1000,9 +987,7 @@ namespace EpiRisk
     if (logLikelihood_.GetNumOccults() == 0)
       {
   #ifndef NDEBUG
-        if (mpirank_ == 0)
         cerr << __FUNCTION__ << endl;
-        if (mpirank_ == 0)
         cerr << "Occults empty. Not deleting" << endl;
   #endif
         return false;
@@ -1016,11 +1001,6 @@ namespace EpiRisk
     float logPiCur = logLikelihood_.GetCurrentValue()
         + log(1 - gammacdf(inTime, a_, b_));
 
-  #ifndef NDEBUG
-    if (mpirank_ == 0)
-    cerr << "Deleting '" << it->getId() << "'" << endl;
-  #endif
-
     float logPiCan = logLikelihood_.DeleteI(toRemove);
     double qRatio = log(
         (1.0 / (numSusceptible + 1)
@@ -1033,7 +1013,6 @@ namespace EpiRisk
     if (log(random_.uniform()) < accept)
       {
   #ifndef NDEBUG
-        if (mpirank_ == 0)
         cerr << "ACCEPT" << endl;
   #endif
         logLikelihood_.Accept();
@@ -1042,7 +1021,6 @@ namespace EpiRisk
     else
       {
   #ifndef NDEBUG
-        if (mpirank_ == 0)
         cerr << "REJECT" << endl;
   #endif
         logLikelihood_.Reject();
