@@ -10,6 +10,7 @@ cmake_minimum_required(VERSION 2.8)
 
 find_package(CUDA REQUIRED)
 find_package(Boost 1.47.0 REQUIRED)
+find_package(GSL REQUIRED)
 
 set(CMAKE_MODULE_PATH ${brandenburg_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
 
