@@ -691,7 +691,7 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
       float Ii = eventTimes[i];
       float Ni = eventTimes[eventTimesPitch + i];
       float d = Ni - Ii;
-      buff[threadIdx.x] = log(pow(a, b) * pow(d, a - 1) * exp(-d * b));
+      buff[threadIdx.x] = log(pow(b, a) * pow(d, a - 1) * exp(-d * b));
     }
 
   _shmemReduce(buff);

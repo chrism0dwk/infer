@@ -842,8 +842,11 @@ namespace EpiRisk
     float logPiCan = logLikelihood_.GetInfectionPart() + log(param_.prior());
 
     // q-ratio
-    float qratio = param_ / oldValue;
+    float qratio = logf(param_ / oldValue);
 
+    cerr << "logPiCan: " << logPiCan << endl;
+    cerr << "logPiCur: " << logPiCur << endl;
+    cerr << "qratio: " << qratio << endl;
     // Accept or reject
     if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
       {
@@ -876,7 +879,7 @@ namespace EpiRisk
   {
     for (size_t infec = 0; infec < reps_; ++infec)
       {
-        size_t pickMove = random_.integer(3);
+        size_t pickMove = random_.integer(1);
         switch (pickMove)
           {
         case 0:

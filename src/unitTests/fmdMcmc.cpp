@@ -364,7 +364,7 @@ main(int argc, char* argv[])
   phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
   Parameter delta(1.14985, GammaPrior(1, 1), "delta");
   Parameter a(4.0, GammaPrior(1,1), "a");
-  Parameter b(0.3, GammaPrior(1,1), "b");
+  Parameter b(0.3, GammaPrior(2.4,8), "b");
 
   likelihood.SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta,a,b);
 
@@ -410,6 +410,8 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
+    InfectionTimeGammaScale* updateB = mcmc.NewInfectionTimeGammaScale("b", b, 0.1);
+
     //// Output ////
 
     // Make output directory
@@ -439,6 +441,7 @@ main(int argc, char* argv[])
     outputparms.push_back(&zeta[1]); outputparms.push_back(&zeta[2]);
     outputparms.push_back(&phi[0]);  outputparms.push_back(&phi[1]);
     outputparms.push_back(&phi[2]);  outputparms.push_back(&delta);
+    outputparms.push_back(&b);
 
     ParameterSerializer parmSerializer(outputparms);
     parmSerializer.Header(parmfile);

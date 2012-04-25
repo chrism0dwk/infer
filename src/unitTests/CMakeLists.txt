@@ -4,4 +4,4 @@ include_directories(${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/Framework ${CMAK
 
 set(fmdMcmc_SOURCES fmdMcmc.cpp)
 add_executable(fmdMcmc ${fmdMcmc_SOURCES})
-target_link_libraries(fmdMcmc random data stlstrtok parameter mcmc gpulikelihood)
+target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood)
