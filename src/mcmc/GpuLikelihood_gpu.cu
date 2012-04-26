@@ -691,10 +691,10 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
       float Ii = eventTimes[i];
       float Ni = eventTimes[eventTimesPitch + i];
       float d = Ni - Ii;
-      buff[threadIdx.x] = log(pow(b, a) * pow(d, a - 1) * exp(-d * b));
+      buff[threadIdx.x] = logf(powf(b, a) * powf(d, a - 1) * expf(-d * b));
     }
 
-  _shmemReduce(buff);
+  //_shmemReduce(buff);
 
   if (threadIdx.x == 0)
     reductionBuff[blockIdx.x] = buff[0];
@@ -1304,11 +1304,13 @@ GpuLikelihood::Calculate()
 float
 GpuLikelihood::InfectionPart()
 {
-  int blocksPerGrid = (GetNumKnownInfecs() + THREADSPERBLOCK - 1)
-      / THREADSPERBLOCK;
+  int blocksPerGrid = (GetNumKnownInfecs() + 1 - 1)
+      / 1;
 
-  _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),
+  cudaDeviceSynchronize();
+  _knownInfectionsLikelihood<<<blocksPerGrid, 1, 1*sizeof(float)>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),
     GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, *a_, *b_, thrust::raw_pointer_cast(&devIntegral_[0]));
+  cudaDeviceSynchronize();
 
   float loglikelihood = 0.0f;
 

@@ -123,6 +123,8 @@ GpuLikelihood::LoadEpidemic(EpiDataImporter& importer)
           ref->N = min(ref->N, ref->R);
           ref->I = min(ref->I, ref->N);
 
+          if(ref->status == IP and ref->I == ref->N) ref->I = ref->N - 14.0f;
+
           maxInfecs_++;
         }
     }
