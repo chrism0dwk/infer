@@ -14,7 +14,7 @@ find_package(CUDA REQUIRED)
 find_package(Boost 1.47.0 REQUIRED)
 find_package(GSL REQUIRED)
 
-
+set(LIBS ${LIBS} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
 
 configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h @ONLY)
 

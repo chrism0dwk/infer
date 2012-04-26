@@ -1,6 +1,7 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-include_directories(${CMAKE_SOURCE_DIR}/src/Framework ${CMAKE_SOURCE_DIR}/src/data ${CUDA_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/src/Framework
+${CMAKE_SOURCE_DIR}/src/data ${CUDA_INCLUDE_DIRS} ${GSL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 link_directories(${CMAKE_ARCHIVE_DIR}/src/Framework)
 
 include(FindCUDA)
