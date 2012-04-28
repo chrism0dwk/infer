@@ -36,6 +36,10 @@
 
 #define ADAPTIVESCALE 0.1
 
+#define INFECPROP_A 2.0
+#define INFECPROP_B 0.15
+
+
 namespace EpiRisk
 {
 
@@ -902,7 +906,7 @@ namespace EpiRisk
   InfectionTimeUpdate::UpdateI()
   {
     size_t index = random_.integer(logLikelihood_.GetNumInfecs());
-    double newIN = random_.gamma(a_, b_); // Independence sampler
+    double newIN = random_.gamma(INFECPROP_A, 1.0/INFECPROP_B); // Independence sampler
     double oldIN = logLikelihood_.GetIN(index);
 
     float piCur = logLikelihood_.GetCurrentValue();
@@ -919,7 +923,7 @@ namespace EpiRisk
         piCur += log(1 - gammacdf(oldIN, a_, b_));
       }
 
-    double qRatio = log(gammapdf(oldIN, a_, b_) / gammapdf(newIN, a_, b_));
+    double qRatio = log(gammapdf(oldIN, INFECPROP_A, 1.0/INFECPROP_B) / gammapdf(newIN, INFECPROP_A, 1.0/INFECPROP_B));
 
     double accept = piCan - piCur + qRatio;
 
@@ -952,16 +956,17 @@ namespace EpiRisk
 
     size_t index = random_.integer(numSusceptible);
 
-    double inProp = random_.gaussianTail(-(1.0 / b_), 1.0 / (a_ * b_ * b_));
+    double inProp = random_.gamma(INFECPROP_A,1.0/INFECPROP_B);
 
     double logPiCur = logLikelihood_.GetCurrentValue();
 
     double logPiCan = logLikelihood_.AddI(index, inProp)
         + log(1.0 - gammacdf(inProp, a_, b_));
+
     double qRatio = log(
         (1.0 / (logLikelihood_.GetNumOccults() + 1))
             / ((1.0 / numSusceptible)
-                * gaussianTailPdf(inProp, -1.0 / b_, 1.0 / (a_ * b_ * b_))));
+                * gammapdf(inProp, INFECPROP_A, 1.0 / INFECPROP_B)));
 
     double accept = logPiCan - logPiCur + qRatio;
 
@@ -1007,7 +1012,7 @@ namespace EpiRisk
     float logPiCan = logLikelihood_.DeleteI(toRemove);
     double qRatio = log(
         (1.0 / (numSusceptible + 1)
-            * gaussianTailPdf(inTime, -1.0 / b_, 1.0 / (a_ * b_ * b_)))
+            * gammapdf(inTime, INFECPROP_A, 1.0 / INFECPROP_B))
             / (1.0 / logLikelihood_.GetNumOccults()));
 
     // Perform accept/reject step.
