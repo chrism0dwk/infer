@@ -410,7 +410,7 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
-    InfectionTimeGammaScale* updateB = mcmc.NewInfectionTimeGammaScale("b", b, 0.1);
+    InfectionTimeGammaScale* updateB = mcmc.NewInfectionTimeGammaScale("b", b, 0.03);
 
     //// Output ////
 

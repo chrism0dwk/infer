@@ -879,7 +879,7 @@ namespace EpiRisk
   {
     for (size_t infec = 0; infec < reps_; ++infec)
       {
-        size_t pickMove = random_.integer(1);
+        size_t pickMove = random_.integer(3);
         switch (pickMove)
           {
         case 0:
