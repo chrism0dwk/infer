@@ -906,7 +906,7 @@ namespace EpiRisk
   InfectionTimeUpdate::UpdateI()
   {
     size_t index = random_.integer(logLikelihood_.GetNumInfecs());
-    double newIN = random_.gamma(INFECPROP_A, 1.0/INFECPROP_B); // Independence sampler
+    double newIN = random_.gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
     double oldIN = logLikelihood_.GetIN(index);
 
     float piCur = logLikelihood_.GetCurrentValue();
@@ -923,7 +923,7 @@ namespace EpiRisk
         piCur += log(1 - gammacdf(oldIN, a_, b_));
       }
 
-    double qRatio = log(gammapdf(oldIN, INFECPROP_A, 1.0/INFECPROP_B) / gammapdf(newIN, INFECPROP_A, 1.0/INFECPROP_B));
+    double qRatio = log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
 
     double accept = piCan - piCur + qRatio;
 
@@ -956,7 +956,7 @@ namespace EpiRisk
 
     size_t index = random_.integer(numSusceptible);
 
-    double inProp = random_.gamma(INFECPROP_A,1.0/INFECPROP_B);
+    double inProp = random_.gamma(INFECPROP_A,INFECPROP_B);
 
     double logPiCur = logLikelihood_.GetCurrentValue();
 
@@ -966,7 +966,7 @@ namespace EpiRisk
     double qRatio = log(
         (1.0 / (logLikelihood_.GetNumOccults() + 1))
             / ((1.0 / numSusceptible)
-                * gammapdf(inProp, INFECPROP_A, 1.0 / INFECPROP_B)));
+                * gammapdf(inProp, INFECPROP_A, INFECPROP_B)));
 
     double accept = logPiCan - logPiCur + qRatio;
 
@@ -1012,7 +1012,7 @@ namespace EpiRisk
     float logPiCan = logLikelihood_.DeleteI(toRemove);
     double qRatio = log(
         (1.0 / (numSusceptible + 1)
-            * gammapdf(inTime, INFECPROP_A, 1.0 / INFECPROP_B))
+            * gammapdf(inTime, INFECPROP_A, INFECPROP_B))
             / (1.0 / logLikelihood_.GetNumOccults()));
 
     // Perform accept/reject step.
