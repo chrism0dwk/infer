@@ -35,6 +35,7 @@
 
 
 #define ADAPTIVESCALE 0.1
+#define TUNEIN 1.0
 
 #define INFECPROP_A 2.0
 #define INFECPROP_B 0.15
@@ -906,8 +907,9 @@ namespace EpiRisk
   InfectionTimeUpdate::UpdateI()
   {
     size_t index = random_.integer(logLikelihood_.GetNumInfecs());
-    double newIN = random_.gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
+    //double newIN = random_.gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
     double oldIN = logLikelihood_.GetIN(index);
+    double newIN = oldIN * exp(random_.gaussian(0.0f,TUNEIN));
 
     float piCur = logLikelihood_.GetCurrentValue();
     float piCan = logLikelihood_.UpdateI(index, newIN);
@@ -923,7 +925,9 @@ namespace EpiRisk
         piCur += log(1 - gammacdf(oldIN, a_, b_));
       }
 
-    double qRatio = log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
+    double qRatio = log(newIN / oldIN);
+
+    //log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
 
     double accept = piCan - piCur + qRatio;
 

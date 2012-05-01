@@ -287,10 +287,10 @@ operator <<(std::ostream& out, const GpuLikelihood& likelihood)
       eventPtr + likelihood.eventTimesPitch_ + likelihood.GetNumInfecs());
 
   out << likelihood.hostPopulation_[likelihood.hostInfecIdx_[0]].id << ":"
-      << infecTimes[likelihood.hostInfecIdx_[0]];
+      << notifyTimes[likelihood.hostInfecIdx_[0]] - infecTimes[likelihood.hostInfecIdx_[0]];
   for (size_t i = 1; i < likelihood.GetNumInfecs(); ++i)
     out << "," << likelihood.hostPopulation_[likelihood.hostInfecIdx_[i]].id
-        << ":" << infecTimes[likelihood.hostInfecIdx_[i]];
+        << ":" << notifyTimes[likelihood.hostInfecIdx_[i]] - infecTimes[likelihood.hostInfecIdx_[i]];
 
   return out;
 }
