@@ -226,13 +226,13 @@ namespace EpiRisk
 
 
   //! InfectionTimeGammaScale performs centred updating of a gamma infectious period scale parameters
-  class InfectionTimeGammaScale : public McmcUpdate
+  class InfectionTimeGammaCentred : public McmcUpdate
   {
   public:
     explicit
-    InfectionTimeGammaScale(const std::string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood);
+    InfectionTimeGammaCentred(const std::string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood);
     virtual
-    ~InfectionTimeGammaScale();
+    ~InfectionTimeGammaCentred();
     void
     Update();
   private:
@@ -240,6 +240,21 @@ namespace EpiRisk
     float tuning_;
   };
 
+  //! InfectionTimeGammaNC performed partially non-centred updating of a gamma infectious period scale parameter
+  class InfectionTimeGammaNC : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeGammaNC(const std::string& tag, Parameter& param, const float tuning, const float ncProp, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeGammaNC();
+    void
+    Update();
+  private:
+    Parameter& param_;
+    float tuning_;
+    float ncProp_;
+  };
 
   //! InfectionTimeUpdate performs an update or rj move
   class InfectionTimeUpdate : public McmcUpdate

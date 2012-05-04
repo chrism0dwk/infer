@@ -17,7 +17,7 @@ else()
 endif()
 
 cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES})
-target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
+target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY})
 
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})

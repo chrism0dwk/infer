@@ -60,7 +60,8 @@ namespace EpiRisk
   class SpeciesMRW;
   class SusceptibilityMRW;
   class InfectivityMRW;
-  class InfectionTimeGammaScale;
+  class InfectionTimeGammaCentred;
+  class InfectionTimeGammaNC;
   class InfectionTimeUpdate;
   class SellkeSerializer;
 
@@ -116,8 +117,10 @@ namespace EpiRisk
     NewInfectivityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
     SusceptibilityMRW*
     NewSusceptibilityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
-    InfectionTimeGammaScale*
-    NewInfectionTimeGammaScale(const string tag, Parameter& param, const float tuning);
+    InfectionTimeGammaCentred*
+    NewInfectionTimeGammaCentred(const string tag, Parameter& param, const float tuning);
+    InfectionTimeGammaNC*
+    NewInfectionTimeGammaNC(const string tag, Parameter& param, const float tuning, const float ncProp);
     InfectionTimeUpdate*
     NewInfectionTimeUpdate(const string tag, Parameter& a, Parameter& b, const size_t reps);
     SellkeSerializer*

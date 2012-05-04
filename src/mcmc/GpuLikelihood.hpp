@@ -30,6 +30,7 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cusparse.h>
+#include <curand.h>
 
 #include <map>
 #include <ostream>
@@ -185,6 +186,8 @@ public:
   GetSumSusceptibilityPow(float* result) const;
   void
   LazyAddInfecTime(const int idx, const float inTime);
+  void
+  NonCentreInfecTimes(const float factor, const float prob);
 
   friend std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
@@ -259,7 +262,7 @@ private:
   int* hostDRowPtr_;
   size_t dnnz_; //CRS
 #ifdef __CUDACC__
-
+  curandGenerator_t cuRand_;
 #endif
 
   size_t animalsInfPowPitch_, animalsSuscPowPitch_;
@@ -273,6 +276,7 @@ private:
   thrust::device_vector<float> devProduct_;
   thrust::device_vector<float> devIntegral_;
   int integralBuffSize_;
+
 
   // Parameters
   float* epsilon_;

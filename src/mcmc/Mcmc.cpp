@@ -156,10 +156,20 @@ Mcmc::NewInfectivityMRW(const string tag, UpdateBlock& params,
 }
 
 //! Pushes an infectious period scale updater onto the MCMC stack
-InfectionTimeGammaScale*
-Mcmc::NewInfectionTimeGammaScale(const string tag, Parameter& param, const float tuning)
+InfectionTimeGammaCentred*
+Mcmc::NewInfectionTimeGammaCentred(const string tag, Parameter& param, const float tuning)
 {
-  InfectionTimeGammaScale* update = new InfectionTimeGammaScale(tag, param, tuning, *random_, likelihood_);
+  InfectionTimeGammaCentred* update = new InfectionTimeGammaCentred(tag, param, tuning, *random_, likelihood_);
+  updateStack_.push_back(update);
+
+  return update;
+}
+
+//! Pushes a non-centred infectious period scale updater onto the MCMC stack
+InfectionTimeGammaNC*
+Mcmc::NewInfectionTimeGammaNC(const string tag, Parameter& param, const float tuning, const float ncProp)
+{
+  InfectionTimeGammaNC* update = new InfectionTimeGammaNC(tag, param, tuning, ncProp, *random_, likelihood_);
   updateStack_.push_back(update);
 
   return update;

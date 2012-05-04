@@ -19,6 +19,10 @@
 #include <thrust/find.h>
 #include <gsl/gsl_cdf.h>
 
+#ifndef __CUDACC__
+#define __CUDACC__
+#endif
+
 #include "GpuLikelihood.hpp"
 
 // Constants
@@ -700,6 +704,23 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
     reductionBuff[blockIdx.x] = buff[0];
 }
 
+
+__global__
+void
+_nonCentreInfecTimes(const unsigned int* index, const int size, float* infecTimes, const float factor, const float* toCentre, const float prop)
+{
+  int tid = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if(tid < size)
+    {
+      if(toCentre[tid] < prop)
+        {
+          unsigned int i = index[tid];
+          infecTimes[i] = infecTimes[i]*factor;
+        }
+    }
+}
+
 __global__
 void
 _indirectedSum(const unsigned int* index, const int size, const float* data,
@@ -788,6 +809,17 @@ GpuLikelihood::GpuLikelihood(PopDataImporter& population,
   cusparseSetMatType(crsDescr_, CUSPARSE_MATRIX_TYPE_GENERAL);
   cusparseSetMatIndexBase(crsDescr_, CUSPARSE_INDEX_BASE_ZERO);
 
+  curandStatus_t curandStatus = curandCreateGenerator(&cuRand_, CURAND_RNG_PSEUDO_DEFAULT);
+  if(curandStatus != CURAND_STATUS_SUCCESS)
+    {
+      throw std::runtime_error("CURAND init failed");
+    }
+  curandStatus = curandSetPseudoRandomGeneratorSeed(cuRand_, 0ULL);
+  if(curandStatus != CURAND_STATUS_SUCCESS)
+    {
+      throw std::runtime_error("Setting CURAND seed failed");
+    }
+
 }
 
 // Copy constructor
@@ -801,7 +833,7 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
         other.devDRowPtr_), devDColInd_(other.devDColInd_), hostDRowPtr_(
         other.hostDRowPtr_), dnnz_(other.dnnz_), integralBuffSize_(
         other.integralBuffSize_), epsilon_(other.epsilon_), gamma1_(
-        other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_), a_(other.a_), b_(other.b_)
+        other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_), a_(other.a_), b_(other.b_), cuRand_(other.cuRand_)
 {
   timeval start, end;
   gettimeofday(&start, NULL);
@@ -1634,5 +1666,22 @@ GpuLikelihood::GetMeanOccI() const
           GetNumOccults(), devEventTimes_ + eventTimesPitch_);
       return (sumN - sumI) / GetNumOccults();
     }
+}
+
+
+void
+GpuLikelihood::NonCentreInfecTimes(const float factor, const float prob)
+{
+  int dimGrid((GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
+
+  // Generate random numbers
+  curandStatus_t status = curandGenerateUniform(cuRand_, thrust::raw_pointer_cast(&devIntegral_[0]), GetNumInfecs());
+  if(status != CURAND_STATUS_SUCCESS)
+    {
+      throw std::runtime_error("curandGenerateUniform failed");
+    }
+
+  // Update the infection times
+  _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]), GetNumInfecs(), devEventTimes_, factor, thrust::raw_pointer_cast(&devIntegral_[0]), prob);
 }
 

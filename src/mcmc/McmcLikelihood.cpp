@@ -77,9 +77,10 @@ namespace EpiRisk
   }
 
   float
-  McmcLikelihood::GetInfectionPart() const
+  McmcLikelihood::GetInfectionPart(const bool proposal) const
   {
-    return likelihood_->InfectionPart();
+    if(proposal) return proposal_->InfectionPart();
+    else return likelihood_->InfectionPart();
   }
 
   float
@@ -171,5 +172,10 @@ namespace EpiRisk
   McmcLikelihood::GetValue() const
   {
     return likelihood_->GetLogLikelihood();
+  }
+  void
+  McmcLikelihood::NonCentreInfecTimes(const float factor, const float prob)
+  {
+    proposal_->NonCentreInfecTimes(factor, prob);
   }
 } /* namespace EpiRisk */

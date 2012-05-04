@@ -50,7 +50,7 @@ namespace EpiRisk
     float
     GetCurrentValue() const;
     float
-    GetInfectionPart() const;
+    GetInfectionPart(const bool proposal = false) const;
     float
     GetMeanI2N() const;
     float
@@ -77,6 +77,8 @@ namespace EpiRisk
     GetIN(const size_t index) const;
     float
     GetValue() const;
+    void
+    NonCentreInfecTimes(const float factor, const float prob);
   private:
     GpuLikelihood* likelihood_;
     GpuLikelihood* proposal_;

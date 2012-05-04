@@ -823,17 +823,17 @@ namespace EpiRisk
   }
 
 
-  InfectionTimeGammaScale::InfectionTimeGammaScale(const string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood)
+  InfectionTimeGammaCentred::InfectionTimeGammaCentred(const string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood)
     : McmcUpdate(tag, random, logLikelihood), param_(param), tuning_(tuning)
   {
 
   }
-  InfectionTimeGammaScale::~InfectionTimeGammaScale()
+  InfectionTimeGammaCentred::~InfectionTimeGammaCentred()
   {
 
   }
   void
-  InfectionTimeGammaScale::Update()
+  InfectionTimeGammaCentred::Update()
   {
     double oldValue = param_;
 
@@ -864,6 +864,55 @@ namespace EpiRisk
 
     numUpdates_++;
   }
+
+  InfectionTimeGammaNC::InfectionTimeGammaNC(const std::string& tag, Parameter& param, const float tuning, const float ncProp, Random& random, McmcLikelihood& logLikelihood)
+   : tuning_(tuning), ncProp_(ncProp_), param_(param), McmcUpdate(tag, random, logLikelihood)
+    {
+
+    }
+
+  InfectionTimeGammaNC::~InfectionTimeGammaNC()
+  {
+
+  }
+
+  void
+  InfectionTimeGammaNC::Update()
+  {
+    double oldValue = param_;
+
+    // Calculate current posterior
+    double logPiCur =  logLikelihood_.GetCurrentValue() + logLikelihood_.GetInfectionPart() + log(param_.prior());
+
+    // Proposal via log random walk
+    param_ *= exp(random_.gaussian(0, tuning_));
+
+    // Perform the non-centering
+    logLikelihood_.NonCentreInfecTimes(oldValue/param_, ncProp_);
+
+    // Calculate candidate posterior
+    float logPiCan = logLikelihood_.Propose() + logLikelihood_.GetInfectionPart(true) + log(param_.prior());
+
+    // q-ratio
+    float qratio = logf(param_ / oldValue);
+
+    cerr << "logPiCan: " << logPiCan << endl;
+    cerr << "logPiCur: " << logPiCur << endl;
+    cerr << "qratio: " << qratio << endl;
+    // Accept or reject
+    if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
+      {
+        acceptance_++;
+      }
+    else
+      {
+        param_ = oldValue;
+      }
+
+    numUpdates_++;
+  }
+
+
 
   InfectionTimeUpdate::InfectionTimeUpdate(const std::string& tag, Parameter& a, Parameter& b, const size_t reps, Random& random, McmcLikelihood& logLikelihood)
     : a_(a), b_(b), reps_(reps), McmcUpdate(tag, random, logLikelihood)
