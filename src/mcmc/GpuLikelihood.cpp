@@ -186,9 +186,17 @@ GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
           map<string, size_t>::const_iterator j = idMap_.find(record.data.j);
           if (i == idMap_.end() or j == idMap_.end())
             throw range_error("Key pair not found in population");
-          if (i != j)
-            Dimport->operator()(i->second, j->second) = record.data.distance
-                * record.data.distance;
+
+          if (i != j and i->second<maxInfecs_ /* Don't require distances with i known susc */)
+            try {
+                Dimport->operator()(i->second, j->second) = record.data.distance
+                    * record.data.distance;
+            }
+          catch(std::exception& e)
+          {
+              cerr << "Inserting distance |" << i->second << " - " << j->second << "| = " << record.data.distance*record.data.distance << " failed" << endl;
+              throw e;
+          }
         }
     }
   catch (EpiRisk::fileEOF& e)

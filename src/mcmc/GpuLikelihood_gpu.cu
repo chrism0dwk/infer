@@ -688,6 +688,7 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
   __shared__ float buff[];
 
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  buff[threadIdx.x] = 0.0f;
 
   if (tid < knownInfecs)
     {
@@ -698,7 +699,37 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
       buff[threadIdx.x] = logf(powf(b, a) * powf(d, a - 1) * expf(-d * b));
     }
 
-  //_shmemReduce(buff);
+  _shmemReduce(buff);
+
+  if (threadIdx.x == 0)
+    reductionBuff[blockIdx.x] = buff[0];
+}
+
+__global__
+void
+_knownInfectionsLikelihoodPNC(const unsigned int* infecIdx, const unsigned int knownInfecs,
+    const float* eventTimes, const int eventTimesPitch, const float a,
+    const float oldGamma, const float newGamma, const float* rns, const float prob, float* reductionBuff)
+{
+  extern
+  __shared__ float buff[];
+
+
+  int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  buff[threadIdx.x] = 0.0f;
+
+  if (tid < knownInfecs)
+    {
+      if(rns[tid] >= prob) {
+          int i = infecIdx[tid];
+          float Ii = eventTimes[i];
+          float Ni = eventTimes[eventTimesPitch + i];
+          float d = Ni - Ii;
+          buff[threadIdx.x] = a*(logf(newGamma) - logf(oldGamma)) - (d * (newGamma - oldGamma));
+      }
+    }
+
+  _shmemReduce(buff);
 
   if (threadIdx.x == 0)
     reductionBuff[blockIdx.x] = buff[0];
@@ -707,7 +738,7 @@ _knownInfectionsLikelihood(const unsigned int* infecIdx, const unsigned int know
 
 __global__
 void
-_nonCentreInfecTimes(const unsigned int* index, const int size, float* infecTimes, const float factor, const float* toCentre, const float prop)
+_nonCentreInfecTimes(const unsigned int* index, const int size, float* eventTimes, int eventTimesPitch, const float factor, const float* toCentre, const float prop)
 {
   int tid = threadIdx.x + blockIdx.x*blockDim.x;
 
@@ -716,7 +747,9 @@ _nonCentreInfecTimes(const unsigned int* index, const int size, float* infecTime
       if(toCentre[tid] < prop)
         {
           unsigned int i = index[tid];
-          infecTimes[i] = infecTimes[i]*factor;
+          float notification = eventTimes[i + eventTimesPitch];
+          float infection = eventTimes[i];
+          eventTimes[i] = notification - (notification - infection)*factor;
         }
     }
 }
@@ -1011,7 +1044,7 @@ GpuLikelihood::~GpuLikelihood()
       delete[] hostDRowPtr_;
       cublasDestroy(cudaBLAS_);
       cusparseDestroy(cudaSparse_);
-
+      curandDestroyGenerator(cuRand_);
       delete covariateCopies_;
     }
   else
@@ -1336,13 +1369,11 @@ GpuLikelihood::Calculate()
 float
 GpuLikelihood::InfectionPart()
 {
-  int blocksPerGrid = (GetNumKnownInfecs() + 1 - 1)
-      / 1;
+  int blocksPerGrid = (GetNumKnownInfecs() + THREADSPERBLOCK - 1)
+      / THREADSPERBLOCK;
 
-  cudaDeviceSynchronize();
-  _knownInfectionsLikelihood<<<blocksPerGrid, 1, 1*sizeof(float)>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),
+  _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),
     GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, *a_, *b_, thrust::raw_pointer_cast(&devIntegral_[0]));
-  cudaDeviceSynchronize();
 
   float loglikelihood = 0.0f;
 
@@ -1351,7 +1382,7 @@ GpuLikelihood::InfectionPart()
       float Ii, Ni;
       checkCudaError(cudaMemcpy(&Ii, devEventTimes_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
       checkCudaError(cudaMemcpy(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
-      loglikelihood += log(gsl_cdf_gamma_Q(Ni-Ii, (double)*a_, (double)*b_));
+      loglikelihood += log(gsl_cdf_gamma_Q(Ni-Ii, (double)*a_, 1.0/(double)*b_));
     }
 
   loglikelihood += thrust::reduce(devIntegral_.begin(), devIntegral_.begin() + blocksPerGrid);
@@ -1669,19 +1700,42 @@ GpuLikelihood::GetMeanOccI() const
 }
 
 
-void
-GpuLikelihood::NonCentreInfecTimes(const float factor, const float prob)
+float
+GpuLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob)
 {
-  int dimGrid((GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
 
   // Generate random numbers
-  curandStatus_t status = curandGenerateUniform(cuRand_, thrust::raw_pointer_cast(&devIntegral_[0]), GetNumInfecs());
+  thrust::device_vector<float> seeds(GetNumKnownInfecs());
+  curandStatus_t status = curandGenerateUniform(cuRand_, thrust::raw_pointer_cast(&seeds[0]), GetNumKnownInfecs());
   if(status != CURAND_STATUS_SUCCESS)
     {
       throw std::runtime_error("curandGenerateUniform failed");
     }
 
-  // Update the infection times
-  _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]), GetNumInfecs(), devEventTimes_, factor, thrust::raw_pointer_cast(&devIntegral_[0]), prob);
+  float logLikDiff = 0.0f;
+
+  int dimGrid((GetNumKnownInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
+
+   // Update the infection times
+  _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]), GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, oldGamma/newGamma, thrust::raw_pointer_cast(&seeds[0]), prob);
+
+  // Do known bit -- GPU in parallel with CPU
+  _knownInfectionsLikelihoodPNC<<<dimGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(raw_pointer_cast(&devInfecIdx_[0]), GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, *a_, oldGamma, newGamma,
+      thrust::raw_pointer_cast(&seeds[0]), prob, thrust::raw_pointer_cast(&devIntegral_[0]));
+  checkCudaError(cudaGetLastError());
+
+  for(size_t i=GetNumKnownInfecs(); i<GetNumInfecs(); ++i)
+    {
+      float Ii, Ni;
+      checkCudaError(cudaMemcpyAsync(&Ii, devEventTimes_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+      checkCudaError(cudaMemcpyAsync(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+      cudaDeviceSynchronize();
+      logLikDiff += logf(gsl_cdf_gamma_Q(Ni-Ii, *a_, 1.0/newGamma)) - logf(gsl_cdf_gamma_Q(Ni-Ii, *a_, 1.0/oldGamma));
+    }
+
+  logLikDiff += thrust::reduce(devIntegral_.begin(), devIntegral_.begin() + dimGrid);
+
+  return logLikDiff;
 }
+
 

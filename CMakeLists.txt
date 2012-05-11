@@ -1,14 +1,28 @@
 #CMake top level file for project 'Brandenburg'
 project(brandenburg)
 
+cmake_minimum_required(VERSION 2.8)
+set(CMAKE_MODULE_PATH ${brandenburg_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
+
+
+### VERSION INFO ###
 set(PACKAGE_NAME brandenburg)
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 6)
-set(VERSION_PATCH 10)
 
-cmake_minimum_required(VERSION 2.8)
+# Get Git version
+find_package(Git)
 
-set(CMAKE_MODULE_PATH ${brandenburg_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
+exec_program(${GIT_EXECUTABLE} 
+			 ${CMAKE_CURRENT_SOURCE_DIR} 
+			 ARGS "log -1 --oneline" 
+			 OUTPUT_VARIABLE GITCOMMIT )
+			 
+string( REGEX REPLACE "^([^ ]+).*" "\\1" VERSION_PATCH "${GITCOMMIT}")
+
+####################
+
+
 
 find_package(CUDA REQUIRED)
 find_package(Boost 1.47.0 REQUIRED)

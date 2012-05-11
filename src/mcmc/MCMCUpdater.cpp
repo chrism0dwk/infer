@@ -35,7 +35,7 @@
 
 
 #define ADAPTIVESCALE 0.1
-#define TUNEIN 1.0
+#define TUNEIN 2.5
 
 #define INFECPROP_A 2.0
 #define INFECPROP_B 0.15
@@ -866,7 +866,7 @@ namespace EpiRisk
   }
 
   InfectionTimeGammaNC::InfectionTimeGammaNC(const std::string& tag, Parameter& param, const float tuning, const float ncProp, Random& random, McmcLikelihood& logLikelihood)
-   : tuning_(tuning), ncProp_(ncProp_), param_(param), McmcUpdate(tag, random, logLikelihood)
+   : tuning_(tuning), ncProp_(ncProp), param_(param), McmcUpdate(tag, random, logLikelihood)
     {
 
     }
@@ -882,16 +882,16 @@ namespace EpiRisk
     double oldValue = param_;
 
     // Calculate current posterior
-    double logPiCur =  logLikelihood_.GetCurrentValue() + logLikelihood_.GetInfectionPart() + log(param_.prior());
+    double logPiCur =  logLikelihood_.GetCurrentValue() + log(param_.prior());
 
     // Proposal via log random walk
     param_ *= exp(random_.gaussian(0, tuning_));
 
     // Perform the non-centering
-    logLikelihood_.NonCentreInfecTimes(oldValue/param_, ncProp_);
+    float infecPartDiff = logLikelihood_.NonCentreInfecTimes(oldValue, param_, ncProp_);
 
     // Calculate candidate posterior
-    float logPiCan = logLikelihood_.Propose() + logLikelihood_.GetInfectionPart(true) + log(param_.prior());
+    float logPiCan = logLikelihood_.Propose() + log(param_.prior());
 
     // q-ratio
     float qratio = logf(param_ / oldValue);
@@ -900,13 +900,15 @@ namespace EpiRisk
     cerr << "logPiCur: " << logPiCur << endl;
     cerr << "qratio: " << qratio << endl;
     // Accept or reject
-    if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
+    if (log(random_.uniform()) < logPiCan - logPiCur + infecPartDiff + qratio)
       {
         acceptance_++;
+        logLikelihood_.Accept();
       }
     else
       {
         param_ = oldValue;
+        logLikelihood_.Reject();
       }
 
     numUpdates_++;

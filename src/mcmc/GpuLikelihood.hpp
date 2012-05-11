@@ -186,8 +186,8 @@ public:
   GetSumSusceptibilityPow(float* result) const;
   void
   LazyAddInfecTime(const int idx, const float inTime);
-  void
-  NonCentreInfecTimes(const float factor, const float prob);
+  float
+  NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
 
   friend std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
@@ -261,9 +261,7 @@ private:
   int* devDColInd_;
   int* hostDRowPtr_;
   size_t dnnz_; //CRS
-#ifdef __CUDACC__
   curandGenerator_t cuRand_;
-#endif
 
   size_t animalsInfPowPitch_, animalsSuscPowPitch_;
   float* devAnimalsInfPow_;

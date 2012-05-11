@@ -173,9 +173,9 @@ namespace EpiRisk
   {
     return likelihood_->GetLogLikelihood();
   }
-  void
-  McmcLikelihood::NonCentreInfecTimes(const float factor, const float prob)
+  float
+  McmcLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob)
   {
-    proposal_->NonCentreInfecTimes(factor, prob);
+    return proposal_->NonCentreInfecTimes(oldGamma, newGamma, prob);
   }
 } /* namespace EpiRisk */

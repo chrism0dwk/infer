@@ -77,8 +77,9 @@ namespace EpiRisk
     GetIN(const size_t index) const;
     float
     GetValue() const;
-    void
-    NonCentreInfecTimes(const float factor, const float prob);
+    float
+    NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
+
   private:
     GpuLikelihood* likelihood_;
     GpuLikelihood* proposal_;
