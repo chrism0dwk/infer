@@ -754,6 +754,25 @@ _nonCentreInfecTimes(const unsigned int* index, const int size, float* eventTime
     }
 }
 
+
+__global__
+void
+_collectInfectiousPeriods(const unsigned int* index,
+                          const int size,
+                          const float* eventTimes,
+                          const int eventTimesPitch,
+                          float* output)
+{
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+  if(tid < size)
+    {
+      int i = index[tid];
+      float infecPeriod = eventTimes[eventTimesPitch + i] - eventTimes[i];
+      output[tid] = infecPeriod;
+    }
+}
+
 __global__
 void
 _indirectedSum(const unsigned int* index, const int size, const float* data,
@@ -1738,4 +1757,27 @@ GpuLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma, c
   return logLikDiff;
 }
 
+
+std::ostream&
+operator <<(std::ostream& out, const GpuLikelihood& likelihood)
+{
+
+  thrust::device_vector<float> devOutputVec(likelihood.GetNumInfecs());
+  int blocksPerGrid((likelihood.GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
+  _collectInfectiousPeriods<<<blocksPerGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&likelihood.devInfecIdx_[0]),
+                                                                likelihood.GetNumInfecs(),
+                                                                likelihood.devEventTimes_,
+                                                                likelihood.eventTimesPitch_,
+                                                                thrust::raw_pointer_cast(&devOutputVec[0]));
+
+  thrust::host_vector<float> outputVec = devOutputVec;
+
+  out << likelihood.hostPopulation_[likelihood.hostInfecIdx_[0]].id << ":"
+         << outputVec[0];
+    for (size_t i = 1; i < likelihood.GetNumInfecs(); ++i)
+      out << "," << likelihood.hostPopulation_[likelihood.hostInfecIdx_[i]].id
+          << ":" << outputVec[i];
+
+  return out;
+}
 
