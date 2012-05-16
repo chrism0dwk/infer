@@ -244,10 +244,11 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Adapt adaptscalar
-    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+    if (windowUpdates_ % 50 == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
-      else adaptScalar_ *= min(2.0, accept / 0.234);
+      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      if(accept < 0.234) adaptScalar_ *= exp(-deltan);
+      else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
       windowAcceptance_ = 0;
     }
@@ -361,10 +362,11 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Adapt adaptscalar
-    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+    if (windowUpdates_ % 50 == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
-      else adaptScalar_ *= min(2.0, accept / 0.234);
+      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      if(accept < 0.234) adaptScalar_ *= exp(-deltan);
+      else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
       windowAcceptance_ = 0;
     }
@@ -487,10 +489,11 @@ namespace EpiRisk
     empCovar_->sample(sample);
 
     // Adapt adaptscalar
-    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+    if (windowUpdates_ % 50 == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
-      else adaptScalar_ *= min(2.0, accept / 0.234);
+      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      if(accept < 0.234) adaptScalar_ *= exp(-deltan);
+      else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
       windowAcceptance_ = 0;
     }
@@ -628,10 +631,11 @@ namespace EpiRisk
     empCovar_->sample(sample);
 
     // Adapt adaptscalar
-    if (numUpdates_ > burnin_ and numUpdates_ < 25000 and windowUpdates_ % 100 == 0 ) {
+    if (windowUpdates_ % 50 == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      if(accept < 0.234) adaptScalar_ *= max(0.5, accept / 0.234);
-      else adaptScalar_ *= min(2.0, accept / 0.234);
+      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      if(accept < 0.234) adaptScalar_ *= exp(-deltan);
+      else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
       windowAcceptance_ = 0;
     }
