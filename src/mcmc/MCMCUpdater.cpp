@@ -563,7 +563,6 @@ namespace EpiRisk
   InfectivityMRW::Covariance
   InfectivityMRW::getCovariance() const
   {
-    std::cerr << "Adapt scalar = " << adaptScalar_ << std::endl;
     return empCovar_->getCovariance();
   }
 
@@ -849,9 +848,6 @@ namespace EpiRisk
     // q-ratio
     float qratio = logf(param_ / oldValue);
 
-    cerr << "logPiCan: " << logPiCan << endl;
-    cerr << "logPiCur: " << logPiCur << endl;
-    cerr << "qratio: " << qratio << endl;
     // Accept or reject
     if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
       {
@@ -896,9 +892,7 @@ namespace EpiRisk
     // q-ratio
     float qratio = logf(param_ / oldValue);
 
-    cerr << "logPiCan: " << logPiCan << endl;
-    cerr << "logPiCur: " << logPiCur << endl;
-    cerr << "qratio: " << qratio << endl;
+
     // Accept or reject
     if (log(random_.uniform()) < logPiCan - logPiCur + infecPartDiff + qratio)
       {

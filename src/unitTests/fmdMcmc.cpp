@@ -320,10 +320,10 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 8)
+  if (argc != 9)
     {
       cerr
-          << "Usage: fmdMcmc <pop file> <epi file> <dist matrix> <output folder> <obs time> <num iterations> <seed>"
+          << "Usage: fmdMcmc <pop file> <epi file> <dist matrix> <output folder> <obs time> <num iterations> <seed> <nc percentage>"
           << endl;
       return EXIT_FAILURE;
     }
@@ -371,7 +371,8 @@ main(int argc, char* argv[])
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
   Mcmc mcmc(likelihood, atoi(argv[7]));
-
+  
+  float ncratio = atof(argv[8])/10.0;
 
   UpdateBlock txDelta;
     txDelta.add(epsilon);
@@ -410,7 +411,8 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
-    InfectionTimeGammaNC* updateB = mcmc.NewInfectionTimeGammaNC("b", b, 0.007,0.3);
+    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.003); 
+    InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
 
     //// Output ////
 
