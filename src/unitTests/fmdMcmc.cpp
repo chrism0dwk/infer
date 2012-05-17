@@ -411,7 +411,7 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
-    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.003); 
+    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
     InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
 
     //// Output ////

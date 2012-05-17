@@ -34,7 +34,8 @@
 
 
 
-#define ADAPTIVESCALE 0.1
+#define ADAPTIVESCALE 1.0
+#define WINDOWSIZE 100
 #define TUNEIN 2.5
 
 #define INFECPROP_A 2.0
@@ -244,9 +245,9 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Adapt adaptscalar
-    if (windowUpdates_ % 50 == 0 ) {
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
       if(accept < 0.234) adaptScalar_ *= exp(-deltan);
       else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
@@ -362,9 +363,9 @@ namespace EpiRisk
     empCovar_->sample();
 
     // Adapt adaptscalar
-    if (windowUpdates_ % 50 == 0 ) {
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
       if(accept < 0.234) adaptScalar_ *= exp(-deltan);
       else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
@@ -489,9 +490,9 @@ namespace EpiRisk
     empCovar_->sample(sample);
 
     // Adapt adaptscalar
-    if (windowUpdates_ % 50 == 0 ) {
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
       if(accept < 0.234) adaptScalar_ *= exp(-deltan);
       else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
@@ -631,9 +632,9 @@ namespace EpiRisk
     empCovar_->sample(sample);
 
     // Adapt adaptscalar
-    if (windowUpdates_ % 50 == 0 ) {
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
       double accept = (double)windowAcceptance_ / (double)windowUpdates_;
-      float deltan = min(0.01, 1.0 / sqrtf(numUpdates_));
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
       if(accept < 0.234) adaptScalar_ *= exp(-deltan);
       else adaptScalar_ *= exp(deltan);
       windowUpdates_ = 0;
@@ -827,7 +828,7 @@ namespace EpiRisk
 
 
   InfectionTimeGammaCentred::InfectionTimeGammaCentred(const string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood)
-    : McmcUpdate(tag, random, logLikelihood), param_(param), tuning_(tuning)
+    : McmcUpdate(tag, random, logLikelihood), param_(param), tuning_(ADAPTIVESCALE), windowUpdates_(0), windowAcceptance_(0)
   {
 
   }
@@ -843,6 +844,16 @@ namespace EpiRisk
     // Calculate current posterior
     double logPiCur =  logLikelihood_.GetInfectionPart() + log(param_.prior());
 
+    // Adapt adaptscalar
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
+      if(accept < 0.44) tuning_ *= exp(-deltan);
+      else tuning_ *= exp(deltan);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
+
     // Proposal via log random walk
     param_ *= exp(random_.gaussian(0, tuning_));
 
@@ -856,6 +867,7 @@ namespace EpiRisk
     if (log(random_.uniform()) < logPiCan - logPiCur + qratio)
       {
         acceptance_++;
+        windowAcceptance_++;
       }
     else
       {
@@ -863,10 +875,11 @@ namespace EpiRisk
       }
 
     numUpdates_++;
+    windowUpdates_++;
   }
 
   InfectionTimeGammaNC::InfectionTimeGammaNC(const std::string& tag, Parameter& param, const float tuning, const float ncProp, Random& random, McmcLikelihood& logLikelihood)
-   : tuning_(tuning), ncProp_(ncProp), param_(param), McmcUpdate(tag, random, logLikelihood)
+   : ncProp_(ncProp), param_(param), McmcUpdate(tag, random, logLikelihood), tuning_(ADAPTIVESCALE), windowUpdates_(0), windowAcceptance_(0)
     {
 
     }
@@ -883,6 +896,16 @@ namespace EpiRisk
 
     // Calculate current posterior
     double logPiCur =  logLikelihood_.GetCurrentValue() + log(param_.prior());
+
+    // Adapt adaptscalar
+    if (windowUpdates_ % WINDOWSIZE == 0 ) {
+      double accept = (double)windowAcceptance_ / (double)windowUpdates_;
+      float deltan = min(0.5, 1.0 / sqrtf(numUpdates_/WINDOWSIZE));
+      if(accept < 0.44) tuning_ *= exp(-deltan);
+      else tuning_ *= exp(deltan);
+      windowUpdates_ = 0;
+      windowAcceptance_ = 0;
+    }
 
     // Proposal via log random walk
     param_ *= exp(random_.gaussian(0, tuning_));
@@ -901,6 +924,7 @@ namespace EpiRisk
     if (log(random_.uniform()) < logPiCan - logPiCur + infecPartDiff + qratio)
       {
         acceptance_++;
+        windowAcceptance_++;
         logLikelihood_.Accept();
       }
     else
@@ -910,6 +934,7 @@ namespace EpiRisk
       }
 
     numUpdates_++;
+    windowUpdates_++;
   }
 
 

@@ -238,6 +238,8 @@ namespace EpiRisk
   private:
     Parameter& param_;
     float tuning_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
   };
 
   //! InfectionTimeGammaNC performed partially non-centred updating of a gamma infectious period scale parameter
@@ -254,6 +256,8 @@ namespace EpiRisk
     Parameter& param_;
     float tuning_;
     float ncProp_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
   };
 
   //! InfectionTimeUpdate performs an update or rj move
