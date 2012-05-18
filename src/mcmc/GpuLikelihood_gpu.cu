@@ -126,7 +126,7 @@ __device__ float
 _h(const float t)
 {
   // Returns the step 'h' function
-  return t < 4.0f ? 0.0f : 1.0f;  // Care that this doesn't cause branch divergence
+  return t > 4.0f;
 }
 
 __device__ float
@@ -232,7 +232,7 @@ _calcIntegral(const unsigned int* infecIdx, const int infecSize, int* DRowPtr,
           // Integrated infection pressure
           float Ij = eventTimes[DColInd[jj]];
           float betaij = _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-          betaij += gamma2 * (fminf(Ri, Ij) - fminf(Ni, Ij));
+          betaij += gamma2 * (_H(fminf(Ri, Ij) - Ii) - _H(fminf(Ni, Ij) - Ii));
 
           // Apply distance kernel and suscep
           betaij *= delta / (delta * delta + D[jj]);
@@ -293,7 +293,7 @@ _calcProduct(const unsigned int* infecIdx, const int infecSize,
               if (Ii < Ij and Ij <= Ni)
                 idxOnj += _h(Ij - Ii);
               else if (Ni < Ij and Ij <= Ri)
-                idxOnj += gamma2;
+                idxOnj += gamma2 * _h(Ij - Ii);
               threadProdCache[threadIdx.x] += idxOnj * infectivity[i] * delta
                   / (delta * delta + D[ii]);
             }
@@ -359,6 +359,7 @@ _updateInfectionTimeIntegral(const unsigned int idx,
 
       float Ii = eventTimes[i];
       float Ni = eventTimes[i + eventTimesPitch];
+      float Ri = eventTimes[i + eventTimesPitch * 2];
 
       float Ij = eventTimes[j];
       float Nj = eventTimes[j + eventTimesPitch];
@@ -369,9 +370,9 @@ _updateInfectionTimeIntegral(const unsigned int idx,
         {
           // Recalculate pressure from j on idx
           jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime))
-              + gamma2 * (fminf(Rj, newTime) - fminf(Nj, newTime)); // New pressure
+              + gamma2 * (_H(fminf(Rj, newTime) - Ij) - _H(fminf(Nj, newTime) - Ij)); // New pressure
           jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij))
-              + gamma2 * (fminf(Rj, Ii) - fminf(Nj, Ii)); // Old pressure
+              + gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij)); // Old pressure
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
           jOnIdx *= infectivity[j];
@@ -380,6 +381,8 @@ _updateInfectionTimeIntegral(const unsigned int idx,
       // Recalculate pressure from idx on j
       float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij));
       IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij));
+      IdxOnj += gamma2 * _H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime);
+      IdxOnj -= gamma2 * _H(fminf(Ri, Ij) - Ii     ) - _H(fminf(Ni, Ij) - Ii     );
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -425,13 +428,17 @@ _updateInfectionTimeProduct(const unsigned int idx,
 
           float Ii = eventTimes[i];
           float Ni = eventTimes[i + eventTimesPitch];
-
+          float Ri = eventTimes[i + eventTimesPitch * 2];
           float Rj = eventTimes[j + eventTimesPitch * 2];
 
           // Adjust product cache from idx on others
           float idxOnj = 0.0f;
           if (Ii < Ij and Ij <= Ni)
             idxOnj -= _h(Ij - Ii);
+          else if (Ni < Ij and Ij <= Ri) {
+            idxOnj -= gamma2 * _h(Ij - Ii);
+            idxOnj += gamma2 * _h(Ij - newTime);
+          }
           if (newTime < Ij and Ij <= Ni)
             idxOnj += _h(Ij - newTime);
 
@@ -444,7 +451,7 @@ _updateInfectionTimeProduct(const unsigned int idx,
           if (Ij < newTime and newTime <= Nj)
             jOnIdx = _h(newTime - Ij);
           else if (Nj < newTime and newTime <= Rj)
-            jOnIdx = gamma2;
+            jOnIdx = gamma2 * _h(newTime - Ij);
 
           jOnIdx *= susceptibility[i] * infectivity[j] * delta
               / (delta * delta + D[begin + tid]);
@@ -496,9 +503,9 @@ _addInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
         {
           // Calculate pressure from j on idx
           jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii));
-          jOnIdx -= gamma2 * (fminf(Rj, Ii) - fminf(Nj, Ii));
+          jOnIdx -= gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij));
           jOnIdx += _H(fminf(Nj, newTime) - fminf(Ij, newTime));
-          jOnIdx += gamma2 * (fminf(Rj, newTime) - fminf(Nj, newTime));
+          jOnIdx += gamma2 * (_H(fminf(Rj, newTime) - Ij) - _H(fminf(Nj, newTime) - Ij));
 
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
@@ -507,7 +514,7 @@ _addInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
 
       // Add pressure from idx on j
       float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij));
-      IdxOnj += gamma2 * (fminf(Ri, Ij) - fminf(Ni, Ij));
+      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -558,9 +565,9 @@ _delInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
         {
           // Recalculate pressure from j on idx
           jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij))
-              + gamma2 * (fminf(Rj, Ii) - fminf(Nj, Ii)); // Old pressure
+              + gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij)); // Old pressure
           jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni))
-              + gamma2 * (fminf(Rj, Ni) - fminf(Nj, Ni)); // New pressure
+              + gamma2 * (_H(fminf(Rj, Ni) - Ij) - _H(fminf(Nj, Ni) - Ij)); // New pressure
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
           jOnIdx *= infectivity[j];
@@ -569,7 +576,7 @@ _delInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
       // Subtract pressure from idx on j
       float IdxOnj = 0.0f;
       IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-      IdxOnj -= gamma2 * (fminf(Ri, Ij) - fminf(Ni, Ij));
+      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii) - _H(fminf(Ni, Ij) - Ii));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -622,7 +629,7 @@ _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           if (newTime < Ij and Ij <= Ni)
             idxOnj += _h(Ij - newTime);
           else if (Ni < Ij and Ij <= Ri)
-            idxOnj += gamma2;
+            idxOnj += gamma2 * _h(Ij - newTime);
 
           idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + D[begin + tid]);
@@ -633,7 +640,7 @@ _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           if (Ij < newTime and newTime <= Nj)
             jOnIdx = _h(newTime - Ij);
           else if (Nj < newTime and newTime <= Rj)
-            jOnIdx = gamma2;
+            jOnIdx = gamma2 * _h(newTime - Ij);
 
           jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * delta
               / (delta * delta + D[begin + tid]);
@@ -683,7 +690,7 @@ _delInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           if (Ii < Ij and Ij <= Ni)
             idxOnj -= _h(Ij - Ii);
           else if (Ni < Ij and Ij <= Ri)
-            idxOnj -= gamma2;
+            idxOnj -= gamma2 * _h(Ij - Ii);
 
           idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + D[begin + tid]);
