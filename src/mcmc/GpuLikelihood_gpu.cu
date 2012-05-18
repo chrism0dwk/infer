@@ -381,8 +381,8 @@ _updateInfectionTimeIntegral(const unsigned int idx,
       // Recalculate pressure from idx on j
       float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij));
       IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-      IdxOnj += gamma2 * _H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime);
-      IdxOnj -= gamma2 * _H(fminf(Ri, Ij) - Ii     ) - _H(fminf(Ni, Ij) - Ii     );
+      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime));
+      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii     ) - _H(fminf(Ni, Ij) - Ii     ));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 

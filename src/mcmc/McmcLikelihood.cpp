@@ -129,6 +129,7 @@ namespace EpiRisk
   {
     lastMove_ = INFECTIME;
     proposal_->UpdateInfectionTime(idx, inTime);
+
     return proposal_->GetLogLikelihood();
   }
 
