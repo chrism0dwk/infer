@@ -1,6 +1,6 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-include_directories(${GSL_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
+include_directories(${GSL_INCLUDE_DIR} ${Boost_INCLUDE_DIR})
 link_directories(${GSL_LINK_DIRECTORIES})
 
 set(stlstrtok_SOURCES stlStrTok.cpp)
