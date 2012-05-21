@@ -42,9 +42,13 @@ FmdModel::~FmdModel()
 double
 FmdModel::infectivity(const Individual& i, const double time) const
 {
+
+  if(time - i.getI() < params_.latency) return 0.0;
+
   double infectivity = powf(i.getCovariates().cattle,params_.psi_c) +
                        params_.xi_p*powf(i.getCovariates().pigs,params_.psi_p) +
                        params_.xi_s*powf(i.getCovariates().sheep,params_.psi_s);
+
   return infectivity;
 }
 
@@ -103,11 +107,11 @@ FmdModel::ItoN(const double rn) const
 double
 FmdModel::ItoN(Random& random) const
 {
-  return random.extreme(params_.a,params_.b);
+  return random.gamma(params_.a, params_.b);
 }
 
 double
 FmdModel::NtoR() const
 {
-  return 1.0;
+  return params_.ntor;
 }

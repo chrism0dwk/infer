@@ -101,6 +101,8 @@ struct FmdParameters
   Parameter phi_s;
   Parameter a;
   Parameter b;
+  Parameter latency;
+  Parameter ntor;
 };
 
 

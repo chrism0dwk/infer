@@ -44,7 +44,6 @@ struct Settings
 
   double minTime, maxTime;
   bool simCensoredEvents;
-  double ntor;
 
   double epsilon;
   double gamma1;
@@ -55,6 +54,8 @@ struct Settings
   double zeta_p, zeta_s;
   double phi_c, phi_p, phi_s;
   double a, b;
+  double latency;
+  double ntor;
 
   void
   load(const string& filename)
@@ -75,7 +76,6 @@ struct Settings
     minTime = pt.get<double> ("fmdGillespieSim.options.mintime", 0);
     maxTime = pt.get<double> ("fmdGillespieSim.options.maxtime", (double)POSINF);
     simCensoredEvents = pt.get<bool> ("fmdGillespieSim.options.simcensoredevents", true);
-    ntor = pt.get<double> ("fmdGillespieSim.constants.ntor");
 
     epsilon = pt.get<double> ("fmdGillespieSim.parameters.epsilon");
     gamma1 = pt.get<double> ("fmdGillespieSim.parameters.gamma1");
@@ -93,6 +93,8 @@ struct Settings
     phi_s = pt.get<double> ("fmdGillespieSim.parameters.phi_s");
     a = pt.get<double> ("fmdGillespieSim.parameters.a");
     b = pt.get<double> ("fmdGillespieSim.parameters.b");
+    latency = pt.get<double> ("fmdGillespieSim.options.latency", 0.0);
+    ntor = pt.get<double> ("fmdGillespieSim.options.ntor",1.0);
   }
 
 };
@@ -193,9 +195,10 @@ main(int argc, char* argv[])
   parameters.phi_c = Parameter(settings.phi_c, BetaPrior(2, 2), "phi_c");
   parameters.phi_p = Parameter(settings.phi_p, BetaPrior(2, 2), "phi_p");
   parameters.phi_s = Parameter(settings.phi_s, BetaPrior(2, 2), "phi_s");
+  parameters.latency = Parameter(settings.latency, GammaPrior(1,1), "latency");
   parameters.a = Parameter(settings.a, GammaPrior(1, 1), "a");
   parameters.b = Parameter(settings.b, GammaPrior(1, 1), "b");
-
+  parameters.ntor = Parameter(settings.ntor, GammaPrior(1,1), "ntor");
   FmdModel model(myPopulation, parameters);
   Random random(seed);
 
