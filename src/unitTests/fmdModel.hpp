@@ -117,8 +117,8 @@ public:
   double infectivity(const Individual& i, const double time) const;
   double susceptibility(const Individual& j) const;
 
-  double beta(const Individual& i, const Individual& j) const;
-  double betastar(const Individual& i, const Individual& j) const;
+  double beta(const Individual& i, const Individual& j, const double time) const;
+  double betastar(const Individual& i, const Individual& j, const double time) const;
   double background(const Individual& j) const;
   double ItoN(const double rn) const;
   double ItoN(Random& random) const;

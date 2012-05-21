@@ -321,7 +321,7 @@ namespace EpiRisk
       for (it = pressureCDF_.begin(); it != infectee; it++)
         {
           cumPressure += model_.beta(*(infection->getIndividual()),
-              *(it->second));
+              *(it->second),infection->getTime());
           const_cast<double&> (it->first) += cumPressure;
         }
 
@@ -330,7 +330,7 @@ namespace EpiRisk
       for (it = it; it != pressureCDF_.end(); it++)
         {
           cumPressure += model_.beta(*(infection->getIndividual()),
-              *(it->second));
+              *(it->second), infection->getTime());
           const_cast<double&> (it->first) += cumPressure - myPressure;
         }
 
@@ -364,9 +364,9 @@ namespace EpiRisk
           != pressureCDF_.end(); it++)
         {
           cumPressure += model_.betastar(*(notification->getIndividual()),
-              *(it->second));
+              *(it->second), notification->getTime());
           cumPressure -= model_.beta(*(notification->getIndividual()),
-              *(it->second));
+              *(it->second), notification->getTime());
           const_cast<double&> (it->first) += cumPressure;
         }
 
@@ -387,7 +387,7 @@ namespace EpiRisk
           != pressureCDF_.end(); it++)
         {
           cumPressure -= model_.betastar(*(removal->getIndividual()),
-              *(it->second));
+              *(it->second), removal->getTime());
           const_cast<double&> (it->first) += cumPressure;
         }
 

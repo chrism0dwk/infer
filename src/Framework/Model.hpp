@@ -71,7 +71,7 @@ namespace EpiRisk
      */
     virtual
     double
-    beta(const Individual& i, const Individual& j) const = 0;
+    beta(const Individual& i, const Individual& j, const double time) const = 0;
 
     /*! Returns pressure between Notified and Susceptible
      *
@@ -81,7 +81,7 @@ namespace EpiRisk
      */
     virtual
     double
-    betastar(const Individual& i, const Individual& j) const = 0;
+    betastar(const Individual& i, const Individual& j, const double time) const = 0;
 
     /*! Returns the background pressure on an individual
      *
@@ -106,11 +106,11 @@ namespace EpiRisk
             { // Skip i==j
               if (i->getN() > time)
                 {
-                  sumPressure += beta(*i, *j);
+                  sumPressure += beta(*i, *j, time);
                 }
               else if (i->getR() > time)
                 {
-                  sumPressure += betastar(*i, *j);
+                  sumPressure += betastar(*i, *j, time);
                 }
             }
           ++i;
