@@ -31,6 +31,7 @@
 #include <cublas_v2.h>
 #include <cusparse.h>
 #include <curand.h>
+#include <cudpp.h>
 
 #include <map>
 #include <ostream>
@@ -56,6 +57,17 @@ namespace EpiRisk {
 // Model defines
 #define NUMEVENTS 3
 #define NUMSPECIES 3
+
+
+// Data structures
+
+struct CSRMatrix
+{
+  int* rowPtr;
+  int* colInd;
+  float* val;
+};
+
 
 // Helper classes
 template <typename T>
@@ -126,7 +138,8 @@ public:
   void
   SetSpecies();
   void
-  SetDistance(const float* data, const int* rowptr, const int* colind);
+  SetDistance(const float* data, const int* rowptr,
+      const int* colind);
   void
   SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2, Parameters& xi,
       Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta, Parameter& a, Parameter& b);
@@ -245,10 +258,17 @@ private:
   const float obsTime_;
   float I1Time_;
   unsigned int I1Idx_;
-  float sumI_;
-  float bgIntegral_;
-  float lp_;
-  float integral_;
+
+  struct LikelihoodComponents
+  {
+    float sumI;
+    float bgIntegral;
+    float logProduct;
+    float integral;
+  };
+
+  LikelihoodComponents hostComponents_;
+  LikelihoodComponents* devComponents_;
 
   // GPU data structures
 
@@ -256,9 +276,9 @@ private:
   size_t* covariateCopies_;
   float* devAnimals_;
   size_t animalsPitch_;
-  float* devDVal_;
-  int* devDRowPtr_;
-  int* devDColInd_;
+
+  CSRMatrix devD_;
+
   int* hostDRowPtr_;
   size_t dnnz_; //CRS
   curandGenerator_t cuRand_;
@@ -272,9 +292,15 @@ private:
   float* devSusceptibility_;
   float* devInfectivity_;
   thrust::device_vector<float> devProduct_;
-  thrust::device_vector<float> devIntegral_;
+  thrust::device_vector<float> devWorkspace_;
   int integralBuffSize_;
 
+  // CUDAPP bits and pieces
+  CUDPPHandle cudpp_;
+  CUDPPHandle addReduce_;
+  CUDPPConfiguration addReduceCfg_;
+  CUDPPConfiguration logAddReduceCfg_;
+  LikelihoodComponents* devScalar_;
 
   // Parameters
   float* epsilon_;
