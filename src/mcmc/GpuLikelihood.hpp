@@ -28,6 +28,7 @@
 #define GPULIKELIHOOD_HPP_
 
 #include <cuda_runtime.h>
+#include <cuda.h>
 #include <cublas_v2.h>
 #include <cusparse.h>
 #include <curand.h>
@@ -52,7 +53,7 @@ namespace EpiRisk {
 #endif
 
 // CUDA defines
-#define THREADSPERBLOCK 64
+#define THREADSPERBLOCK 128
 
 // Model defines
 #define NUMEVENTS 3
@@ -205,6 +206,11 @@ public:
   friend std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
 private:
+
+  // Helper methods
+  void
+  ReduceProductVector();
+
   // Data import
   enum DiseaseStatus
   {
@@ -267,8 +273,9 @@ private:
     float integral;
   };
 
-  LikelihoodComponents hostComponents_;
+  LikelihoodComponents* hostComponents_;
   LikelihoodComponents* devComponents_;
+
 
   // GPU data structures
 
@@ -300,7 +307,6 @@ private:
   CUDPPHandle addReduce_;
   CUDPPConfiguration addReduceCfg_;
   CUDPPConfiguration logAddReduceCfg_;
-  LikelihoodComponents* devScalar_;
 
   // Parameters
   float* epsilon_;

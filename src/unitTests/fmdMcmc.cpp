@@ -411,8 +411,8 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
-    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
-    InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
+    //InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
+    //InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
 
     //// Output ////
 
@@ -447,7 +447,7 @@ main(int argc, char* argv[])
 
     ParameterSerializer parmSerializer(outputparms);
     parmSerializer.Header(parmfile);
-    parmfile << ",meanI2N,meanOccI\n";
+    parmfile << ",meanI2N,meanOccI,loglikelihood\n";
 
     // Run the chain
     cout << "Running MCMC" << endl;
@@ -456,8 +456,8 @@ main(int argc, char* argv[])
         if(k % 100 == 0) cout << "Iteration " << k << endl;
         mcmc.Update();
 
-        parmfile << parmSerializer << "," << likelihood.GetMeanI2N() << "," << likelihood.GetMeanOccI() << endl;
-        occfile << likelihood << endl;
+        parmfile << parmSerializer << "," << likelihood.GetMeanI2N() << "," << likelihood.GetMeanOccI() << "," << likelihood.GetLogLikelihood() << "\n";
+        occfile << likelihood << "\n";
       }
 
     parmfile.close();
