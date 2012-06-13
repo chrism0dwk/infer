@@ -958,22 +958,20 @@ namespace EpiRisk
   {
     for (size_t infec = 0; infec < reps_; ++infec)
       {
-        size_t pickMove = random_.integer(3);
-        switch (pickMove)
-          {
-        case 0:
-          accept_[pickMove] += UpdateI();
-          break;
-        case 1:
-          accept_[pickMove] += AddI();
-          break;
-        case 2:
-          accept_[pickMove] += DeleteI();
-          break;
-        default:
-          throw logic_error("Unknown move!");
-          }
-        calls_[pickMove]++;
+        float pickMove = random_.uniform();
+
+        if(pickMove < 0.667) {
+          accept_[0] += UpdateI();
+	  calls_[0]++;
+	}
+        else if (pickMove < 0.833) {
+          accept_[1] += AddI();
+	  calls_[1]++;
+	}
+        else {
+          accept_[2] += DeleteI();
+	  calls_[2]++;
+	}
       }
   }
 
