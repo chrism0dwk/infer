@@ -2,11 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 #AC_PREREQ([2.61])
-AC_INIT(ausei, 0.1, Chris Jewell <chris.jewell@warwick.ac.uk>)
+AC_INIT(infer-ausei, 1.0, Chris Jewell <chrism0dwk@gmail.com>)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE(ausei, 0.1alpha)
+AM_INIT_AUTOMAKE(infer-ausei, 1.0)
 
 # Checks for programs.
 AC_PROG_CXXCPP
