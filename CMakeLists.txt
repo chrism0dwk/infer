@@ -1,14 +1,14 @@
-#CMake top level file for project 'Brandenburg'
-project(brandenburg)
+#CMake top level file for project 'InFER'
+project(infer-fmd)
 
 cmake_minimum_required(VERSION 2.8)
-set(CMAKE_MODULE_PATH ${brandenburg_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH ${infer-fmd_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
 
 
 ### VERSION INFO ###
-set(PACKAGE_NAME brandenburg)
+set(PACKAGE_NAME infer-fmd)
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 6)
+set(VERSION_MINOR 7)
 
 # Get Git version
 find_package(Git)
