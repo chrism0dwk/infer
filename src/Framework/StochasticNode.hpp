@@ -1,5 +1,5 @@
 /*************************************************************************
- *  ./src/mcmc/StochasticNode.hpp
+ *  ./src/Framework/StochasticNode.hpp
  *  Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
  *
  *  This file is part of InFER.
