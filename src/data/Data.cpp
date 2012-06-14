@@ -45,7 +45,7 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <cstdlib>
-#include <limits>
+#include "types.hpp"
 #include "Data.hpp"
 #include "stlStrTok.hpp"
 
@@ -102,12 +102,13 @@ PopDataImporter::next()
   if (tokens.size() != 6) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
-  record.data.x = atof(tokens[1].c_str()) / 1000.0;
-  record.data.y = atof(tokens[2].c_str()) / 1000.0;
-  record.data.horses = atof(tokens[3].c_str());
-  record.data.area = atof(tokens[4].c_str());
-  record.data.vaccdate = atof(tokens[5].c_str());
-  record.data.epi = new EpiRisk::SirDeterministic(record.data.horses,0.25);
+  record.data.x = atof(tokens[1].c_str()) / 1000;
+  record.data.y = atof(tokens[2].c_str()) / 1000;
+  record.data.cattle = atof(tokens[3].c_str());
+  record.data.pigs = atof(tokens[4].c_str());
+  record.data.sheep = atof(tokens[5].c_str());
+  record.data.goats = atof(tokens[6].c_str());
+  record.data.deer = atof(tokens[7].c_str());
 
   return record;
 }
@@ -161,11 +162,23 @@ EpiDataImporter::next()
   getline(dataFile_,row);
 
   stlStrTok(tokens,row,",");
-  if (tokens.size() != 3) throw EpiRisk::fileEOF();
+  if (tokens.size() < 4) throw EpiRisk::fileEOF();
+
   record.id = tokens[0];
-  record.data.I = atof(tokens[1].c_str());
-  record.data.N = POSINF;//atof(tokens[2].c_str());
-  record.data.R = POSINF;//atof(tokens[3].c_str());
+  if(tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;
+  else if(tokens[1] == "") record.data.I = EpiRisk::POSINF;
+  else record.data.I = atof(tokens[1].c_str());
+
+  if(tokens[2] == "Inf") record.data.N = EpiRisk::POSINF;
+  else if(tokens[2] == "") record.data.N = EpiRisk::POSINF;
+  else record.data.N = atof(tokens[2].c_str());
+
+  if(tokens[3] == "Inf") record.data.R = EpiRisk::POSINF;
+  else if(tokens[3] == "") record.data.R = EpiRisk::POSINF;
+  else record.data.R = atof(tokens[3].c_str());
+
+  if(tokens[4] != "IP") record.data.I = EpiRisk::POSINF;
+
   return record;
 }
 
@@ -177,3 +190,68 @@ EpiDataImporter::reset()
   string row;
   getline(dataFile_,row);
 }
+
+
+
+DistMatrixImporter::DistMatrixImporter(const string filename) : filename_(filename)
+{
+
+}
+
+DistMatrixImporter::~DistMatrixImporter()
+{
+  if(matrixFile_.is_open())
+    matrixFile_.close();
+}
+
+void
+DistMatrixImporter::open()
+{
+  matrixFile_.open(filename_.c_str(),ios::in);
+      if(!matrixFile_.is_open()) {
+          throw EpiRisk::data_exception("Cannot open population file for reading");
+      }
+
+  string row;
+  getline(matrixFile_,row);
+}
+
+void
+DistMatrixImporter::close()
+{
+  matrixFile_.close();
+}
+
+DistMatrixImporter::Record
+DistMatrixImporter::next()
+{
+  string row;
+  Record record;
+  vector<string> tokens;
+
+  if(matrixFile_.eof()) throw EpiRisk::fileEOF();
+
+  getline(matrixFile_,row);
+  stlStrTok(tokens,row,",");
+  if (tokens.size() < 2) throw EpiRisk::fileEOF();
+
+  record.id = tokens[0];
+  record.data.i = tokens[0];
+  record.data.j = tokens[1];
+  stringstream s;
+  s << tokens[2];
+  s >> record.data.distance;
+
+  return record;
+}
+
+
+void
+DistMatrixImporter::reset()
+{
+  matrixFile_.seekg(0);
+  string row;
+  getline(matrixFile_,row);
+}
+
+

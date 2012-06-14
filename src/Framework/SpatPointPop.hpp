@@ -73,12 +73,11 @@
 #include "Individual.hpp"
 #include "DataImporter.hpp"
 #include "EpiRiskException.hpp"
+#include "stlStrTok.hpp"
 
 using namespace std;
 using boost::multi_index_container;
 using namespace boost::multi_index;
-
-#define POSINF ( numeric_limits<double>::infinity() )
 
 namespace EpiRisk
 {
@@ -108,16 +107,7 @@ namespace EpiRisk
           indexed_by<
             random_access< tag<bySeq> >,
             hashed_unique< tag<byId>, const_mem_fun<Individual,string,&Individual::getId> >,
-            ordered_non_unique<tag<byI>,composite_key<
-                                          Individual,
-                                          const_mem_fun<Individual,double,&Individual::getI>,
-                                          const_mem_fun<Individual,double,&Individual::getN>
-                                        >,
-                                        composite_key_compare<
-                                          std::less<double>,
-                                          std::greater<double>
-                                        >
-            >
+            ordered_non_unique<tag<byI>, const_mem_fun<Individual,double,&Individual::getI> >
           >
       >  PopulationContainer;
 
@@ -224,23 +214,106 @@ namespace EpiRisk
        */
       bool
       moveInfectionTime(const std::string id, const double newTime);
-      /*! /brief Moves a removal time
+
+      /*! /brief Updates I, N, and R event times
        *
-       * This function moves a removal time
-       * @param id The id of the individual for which to move the removal time
-       * @param newTime the new removal time
+       * @param individual a reference to the individual to update
+       * @param events an Events struct containing the new times
+       * @return whether the operation was successful
+       */
+      bool
+      updateEvents(const Individual& individual,Events events);
+      /*! Adds an occult infection
+       * @param susceptibleIndex the position of the susceptible to add in the susceptibles index.
        */
       bool
       moveRemovalTime(const std::string id, const double newTime);
       //! Clears all infected individuals
       void
-      clear(); // Clears all infected individuals
+      clearInfections()
+      {
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          moveInfectionTime(asI(it),POSINF);
+      }
       /*! \brief Creates a connection graph
        * \param predicate a functor whose operator() method returns true if two individuals are connected
        */
       template<class Predicate>
       void
-      createConnectionGraph(Predicate predicate);
+      createConnectionGraph(Predicate predicate)
+      {
+        size_t counter = 0;
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          {
+            cerr << counter << endl; ++ counter;
+            typename Individual::ConnectionList tmp;
+            for(PopulationIterator jt = population_.begin();
+                jt != it;
+                ++jt)
+              {
+                if (predicate(*it,*jt)) {
+                    const_cast<typename Individual::ConnectionList&>(it->getConnectionList()).push_back(&(*jt));
+                    const_cast<typename Individual::ConnectionList&>(jt->getConnectionList()).push_back(&(*it));
+                }
+              }
+          }
+      }
+
+      void
+      loadConnectionGraph(const string filename)
+      {
+        ifstream confile;
+        confile.open(filename.c_str(),ios::in);
+        if(!confile.is_open()) {
+            throw data_exception("Cannot open specified connections file");
+        }
+
+        string line;
+        getline(confile,line); // Skip CSV header
+
+        while(!confile.eof()) {
+            getline(confile,line);
+            std::vector<std::string> toks;
+            stlStrTok(toks,line,",");
+            if(toks.size() != 2) break;
+            if(toks[0] == toks[1]) continue; // Don't connect to self!
+
+            // Get index of toks[1] in population
+            size_t idx = distance(population_.begin(),asPop(idIndex_.find(toks[1])));
+            const_cast<typename Individual::ConnectionList&>(getById(toks[0]).getConnectionList()).push_back(idx);
+        }
+
+        confile.close();
+        cerr << "Checking connection graph symmetry..." << flush;
+        for(size_t i_idx = 0;
+            i_idx < population_.size();
+            i_idx++)
+          {
+            for(typename Individual::ConnectionList::const_iterator ptr = population_[i_idx].getConnectionList().begin();
+                ptr != population_[i_idx].getConnectionList().end();
+                ptr++)
+              {
+                const Individual& j = population_[*ptr];
+                typename Individual::ConnectionList::const_iterator found = find(j.getConnectionList().begin(), j.getConnectionList().end(), i_idx);
+                if (found == j.getConnectionList().end()) {
+                    //cerr << "WARNING: Symmetrifying pair (" << it->getId() << "," << j.getId() << ")" << endl;
+                    const_cast<typename Individual::ConnectionList&>(j.getConnectionList()).push_back(i_idx);
+                }
+              }
+          }
+        cerr << "Done" << endl;
+        for(PopulationIterator it = population_.begin();
+            it != population_.end();
+            it++)
+          {
+            const_cast<Individual&>(*it).sortConnections();
+          }
+
+      }
       //@}
 
       /// \name Data access methods
@@ -273,7 +346,7 @@ namespace EpiRisk
       numSusceptible();
       /// Returns the current number of infectives (including occults)
       size_t
-      numInfected();
+      numInfected() const;
       /// Returns a const reference to I1
       const Individual&
       I1() const;
@@ -309,6 +382,12 @@ namespace EpiRisk
       {
         return population_.project<byI>(it);
       }
+      /// Converts an Individual to an InfectiveIterator
+      InfectiveIterator
+      asI(const Individual& x)
+      {
+        return infIndex_.iterator_to(x);
+      }
       //@}
 
 
@@ -318,15 +397,30 @@ namespace EpiRisk
       void
       dumpInfected()
       {
+        cerr.precision(15);
         InfectiveIndex& iIndex = population_.get<byI>();
         typename InfectiveIndex::iterator it = iIndex.begin();
-        while(it->getI() < obsTime_) {
+        while(it->getI() <= obsTime_) {
             cerr << it->getId() << "\t"
                 << it->getI() << "\t"
                 << it->getN() << "\t"
                 << it->getR() << endl;
             it++;
         }
+      }
+      /// Dumps the entire population to stderr
+      void
+      dumpPopulation()
+      {
+        for(PopulationIterator popIndex = population_.begin();
+            popIndex != population_.end();
+            popIndex++)
+          {
+            cerr << popIndex->getId() << "\t"
+                << popIndex->getI() << "\t"
+                << popIndex->getN() << "\t"
+                << popIndex->getR() << endl;
+          }
       }
       //@}
 
@@ -493,6 +587,18 @@ namespace EpiRisk
                 throw parse_exception(msg.c_str());
               }
               Events oldEvents = ref->getEvents();
+
+              // Check data integrity
+              if (record.data.N > record.data.R) {
+                  cerr << "Individual " << record.id << " has N > R.  Setting N = R\n";
+                  record.data.N = record.data.R;
+              }
+              if (record.data.R < record.data.I and record.data.I != POSINF)
+                {
+                  cerr << "WARNING: Individual " << record.id << " has I > R!  Setting I = R-7\n";
+                  record.data.I = record.data.R - 7;
+                }
+
               idIndex.modify(ref,modifyEvents(record.data),modifyEvents(oldEvents));
 
             }
@@ -527,7 +633,13 @@ namespace EpiRisk
   const typename Population<Covars>::Individual&
   Population<Covars>::getById(const std::string id) const
   {
-    return *(idIndex_.find(id));
+    typename IdIndex::const_iterator it = idIndex_.find(id);
+    if(it == idIndex_.end())
+      {
+         std::stringstream ss; ss << "ID '" << id << "' not found in population!";
+         throw runtime_error(ss.str().c_str());
+      }
+    return *it;
   }
 
   template<typename Covars>
@@ -553,7 +665,7 @@ namespace EpiRisk
 
   template<typename Covars>
     size_t
-    Population<Covars>::numInfected()
+    Population<Covars>::numInfected() const
     {
       return distance(infIndex_.begin(),infIndex_.lower_bound(obsTime_));
     }
@@ -630,8 +742,16 @@ namespace EpiRisk
         const double newTime)
     {
       double oldTime = it->getI();
+      bool  rv = infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
+      if (rv == false) throw logic_error("Failed to modify infection time!!");
 
-      return infIndex_.modify(it,modifyI(newTime),modifyI(oldTime));
+      for(typename Individual::ConnectionList::const_iterator jt = it->getConnectionList().begin();
+          jt != it->getConnectionList().end();
+          ++jt)
+        {
+          const_cast<Individual&>(population_[*jt]).sortConnections();
+        }
+      return rv;
 
     }
 
@@ -647,15 +767,20 @@ namespace EpiRisk
     }
 
   template<typename Covars>
-    bool
-    Population<Covars>::moveRemovalTime(const std::string id, const double newTime)
-    {
-    typename IdIndex::iterator idIter = idIndex_.find(id);
-    if (idIter == idIndex_.end()) throw data_exception("Id not found");
 
-    double oldTime = idIter->getR();
-    return idIndex_.modify(idIter, modifyR(newTime),modifyR(oldTime));
-    }
+  bool
+  Population<Covars>::updateEvents(const Individual& individual,Events events)
+  {
+    typename InfectiveIndex::iterator ref = infIndex_.iterator_to(individual);
+    Events oldEvents = individual.getEvents();
+    bool rv =  infIndex_.modify(ref,modifyEvents(events),modifyEvents(oldEvents));
+    for(typename Individual::ConnectionList::const_iterator it = individual.getConnectionList().begin();
+        it != individual.getConnectionList().end();
+        it++)
+      const_cast<Individual&>(population_[*it]).sortConnections();
+
+    return rv;
+  }
 
   template<typename Covars>
     double

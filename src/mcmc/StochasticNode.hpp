@@ -63,6 +63,12 @@ namespace EpiRisk
     {
       return new StochasticNode(*this);
     }
+    virtual
+    Parameter&
+    getParameter() const
+    {
+      return *param_;
+    }
     virtual double getValue() const
     {
       return (double)(*param_);
@@ -93,19 +99,19 @@ namespace EpiRisk
       StochasticNode* tmp = new StochasticNode(param);
       updateblock_.push_back(tmp);
     }
-    void add(StochasticNode* node)
+    void add(StochasticNode& node)
     {
-      StochasticNode* tmp = node->clone();
+      StochasticNode* tmp = node.clone();
       updateblock_.push_back(tmp);
     }
-    StochasticNode*
+    StochasticNode&
     operator[](const int idx) const
     {
 #ifndef NDEBUG
       if(idx >= updateblock_.size()) throw std::range_error("idx out of range in UpdateBlock");
 #endif
 
-      return updateblock_[idx];
+      return *(updateblock_[idx]);
     }
     size_t
     size() const

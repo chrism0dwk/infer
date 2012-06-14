@@ -77,15 +77,15 @@ namespace EpiRisk
      * @return The value of \f$f(x)$\f
      */
     virtual
-    double
-    operator()(const double x) = 0;
+    float
+    operator()(const float x) = 0;
 
   };
 
   class UniformPrior : public Prior
   {
-    double
-    operator()(const double x = 0)
+    float
+    operator()(const float x = 0)
     {
       return 1.0;
     }
@@ -105,12 +105,12 @@ namespace EpiRisk
   class Parameter
   {
     std::string tag_;
-    double value_;
+    float value_;
     Prior* prior_;
 
   public:
     Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {};
-    Parameter(const double value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
+    Parameter(const float value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
     {
       prior_ = prior.clone();
     }
@@ -129,7 +129,7 @@ namespace EpiRisk
       return new Parameter();
     }
     const std::string&
-    getTag() const
+    GetTag() const
     {
       return tag_;
     }
@@ -145,7 +145,7 @@ namespace EpiRisk
       return *this;
     }
     Parameter&
-    operator=(const double x)
+    operator=(const float x)
     {
       value_ = x;
       return *this;
@@ -154,45 +154,83 @@ namespace EpiRisk
     ~Parameter() {
       delete prior_;
     };
-    double prior() const
+    float prior() const
     {
       return (*prior_)(value_);
     }
-    operator double () const
+    operator float () const
     {
       return value_;
     }
     Parameter&
-    operator+=(double x)
+    operator+=(float x)
     {
       value_ += x;
       return *this;
     }
     Parameter&
-    operator*=(double x)
+    operator*=(float x)
     {
       value_ *= x;
       return *this;
     }
     Parameter&
-    operator/=(double x)
+    operator/=(float x)
     {
       value_ /= x;
       return *this;
     }
     Parameter&
-    operator-=(double x)
+    operator-=(float x)
     {
       value_ -= x;
       return *this;
     }
+    float*
+    GetValuePtr()
+    {
+      return &value_;
+    }
+    float
+    GetValue() const
+    {
+      return value_;
+    }
   };
-
-
-
 
   typedef boost::numeric::ublas::vector<Parameter> Parameters;
   typedef boost::numeric::ublas::slice ParameterSlice;
+
+  typedef std::vector<Parameter*> ParameterSerializerList;
+
+  class ParameterSerializer
+  {
+  public:
+    ParameterSerializer(ParameterSerializerList& params) : params_(params)
+    {
+
+    }
+
+    void
+    Header(std::ostream& os)
+    {
+      ParameterSerializerList::const_iterator it = params_.begin();
+            os << (*it)->GetTag();
+            ++it;
+            while(it != params_.end())
+              {
+                os << "," << (*it)->GetTag();
+                ++it;
+              }
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);
+
+  private:
+    ParameterSerializerList& params_;
+  };
+
+  std::ostream& operator<<(std::ostream& os, const ParameterSerializer& paramSerializer);
 
 }
 

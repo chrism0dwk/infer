@@ -51,13 +51,12 @@
 #include "Random.hpp"
 #include "EmpCovar.hpp"
 #include "Mcmc.hpp"
-
+#include "McmcLikelihood.hpp"
 
 namespace EpiRisk
 {
 
   // FWD DECLS
-  class Likelihood;
   class Mcmc;
 
   // FUNCTORS
@@ -79,119 +78,248 @@ namespace EpiRisk
     }
   };
 
-
-
   // MCMC UPDATERS
   class McmcUpdate
   {
   public:
-    McmcUpdate(const std::string& tag, Random& rng,
-        Likelihood& logLikelihood, Mcmc* const env );
+    McmcUpdate(const std::string& tag, Random& random, McmcLikelihood& logLikelihood);
     virtual
     ~McmcUpdate();
     virtual
     void
-    update() = 0;
+    Update() = 0;
 
     //! Returns the MH acceptance probability
     virtual
-    double
-    getAcceptance() const;
+    std::map<string, float>
+    GetAcceptance() const;
+    virtual
+    void
+    ResetAcceptance();
     virtual std::string
-    getTag() const;
+    GetTag() const;
 
   protected:
     const std::string tag_;
-    Mcmc* env_;
-    Likelihood& logLikelihood_;
+    McmcLikelihood& logLikelihood_;
     Random& random_;
     size_t acceptance_;
     size_t numUpdates_;
   };
-
-
-  class SingleSiteMRW : public McmcUpdate
-  {
-    Parameter& param_;
-    const double tuning_;
-  public:
-    SingleSiteMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
-    ~SingleSiteMRW();
-    void
-    update();
-  };
-
 
   class SingleSiteLogMRW : public McmcUpdate
   {
     Parameter& param_;
     const double tuning_;
   public:
-    SingleSiteLogMRW(const std::string& tag, Parameter& param, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
+    SingleSiteLogMRW(const std::string& tag, Parameter& param,
+        const double tuning, Random& random, McmcLikelihood& logLikelihood);
     ~SingleSiteLogMRW();
     void
-    update();
+    Update();
   };
 
   //! Adaptive Multisite Linear Random Walk algorithm
   class AdaptiveMultiMRW : public McmcUpdate
-    {
-    public:
-      typedef EmpCovar<Identity>::CovMatrix Covariance;
-      AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
-          Likelihood& logLikelihood, Mcmc* const env  );
-      ~AdaptiveMultiMRW();
-      void
-      setCovariance(EmpCovar<Identity>::CovMatrix& covariance);
-      Covariance
-      getCovariance() const;
-      void
-      update();
-    private:
-      UpdateBlock& updateGroup_;
-      size_t burnin_;
-      EmpCovar<Identity>* empCovar_;
-      EmpCovar<Identity>::CovMatrix* stdCov_;
-    };
-
+  {
+  public:
+    typedef EmpCovar<Identity>::CovMatrix Covariance;
+    AdaptiveMultiMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+    ~AdaptiveMultiMRW();
+    void
+    setCovariance(EmpCovar<Identity>::CovMatrix& covariance);
+    Covariance
+    getCovariance() const;
+    void
+    Update();
+  private:
+    UpdateBlock& updateGroup_;
+    size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+    EmpCovar<Identity>* empCovar_;
+    EmpCovar<Identity>::CovMatrix* stdCov_;
+  };
 
   //! Adaptive Multisite Logarithmic Random Walk algorithm
   class AdaptiveMultiLogMRW : public McmcUpdate
   {
   public:
     typedef EmpCovar<LogTransform>::CovMatrix Covariance;
-    AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params, size_t burnin, Random& rng,
-        Likelihood& logLikelihood, Mcmc* const env  );
+    AdaptiveMultiLogMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
     ~AdaptiveMultiLogMRW();
     void
     setCovariance(EmpCovar<LogTransform>::CovMatrix& covariance);
     Covariance
     getCovariance() const;
     void
-    update();
+    Update();
   private:
     UpdateBlock& updateGroup_;
     size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
     EmpCovar<LogTransform>* empCovar_;
     EmpCovar<LogTransform>::CovMatrix* stdCov_;
   };
 
-
-
-  //! Single site update for within farm epidemic
-  class WithinFarmBetaLogMRW : public McmcUpdate
+  //! Species MRW is a non-centred Multisite update for species inf/susc
+  class SpeciesMRW : public McmcUpdate
   {
   public:
-    WithinFarmBetaLogMRW(Parameter& param,  const double alpha, const double gamma, Population<TestCovars>& pop_, const double tuning, Random& rng, Likelihood& logLikelihood, Mcmc* const env );
-    ~WithinFarmBetaLogMRW();
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    SpeciesMRW(const std::string& tag, UpdateBlock& params,
+        std::vector<double>& constants, size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+    ~SpeciesMRW();
     void
-    update();
+    Update();
+    Covariance
+    getCovariance() const;
+  private:
+    UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
+    std::vector<double> constants_;
+    size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
+  //! InfectivityMRW is a non-centred Multisite update for species infectivity
+  class InfectivityMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    InfectivityMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+    ~InfectivityMRW();
+    void
+    Update();
+    Covariance
+    getCovariance() const;
+  private:
+    UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
+    std::vector<float> constants_;
+    size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
+
+  //! SusceptibilityMRW is a non-centred Multisite update for species inf/susc
+  class SusceptibilityMRW : public McmcUpdate
+  {
+  public:
+    typedef EmpCovar<LogTransform>::CovMatrix Covariance;
+    SusceptibilityMRW(const std::string& tag, UpdateBlock& params,
+        size_t burnin, Random& random, McmcLikelihood& logLikelihood);
+    ~SusceptibilityMRW();
+    void
+    Update();
+    Covariance
+    getCovariance() const;
+  private:
+    UpdateBlock& updateGroup_;
+    UpdateBlock transformedGroup_;
+    std::vector<float> constants_;
+    size_t burnin_;
+    double adaptScalar_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+    EmpCovar<LogTransform>* empCovar_;
+    EmpCovar<LogTransform>::CovMatrix* stdCov_;
+
+  };
+
+
+  //! InfectionTimeGammaScale performs centred updating of a gamma infectious period scale parameters
+  class InfectionTimeGammaCentred : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeGammaCentred(const std::string& tag, Parameter& param, const float tuning, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeGammaCentred();
+    void
+    Update();
   private:
     Parameter& param_;
-    const double tuning_;
-    const double alpha_;
-    const double gamma_;
-    Population<TestCovars>& pop_;
+    float tuning_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+  };
+
+  //! InfectionTimeGammaNC performed partially non-centred updating of a gamma infectious period scale parameter
+  class InfectionTimeGammaNC : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeGammaNC(const std::string& tag, Parameter& param, const float tuning, const float ncProp, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeGammaNC();
+    void
+    Update();
+  private:
+    Parameter& param_;
+    float tuning_;
+    float ncProp_;
+    size_t windowUpdates_;
+    size_t windowAcceptance_;
+  };
+
+  //! InfectionTimeUpdate performs an update or rj move
+  class InfectionTimeUpdate : public McmcUpdate
+  {
+  public:
+    explicit
+    InfectionTimeUpdate(const std::string& tag, Parameter& a, Parameter& b, const size_t reps, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~InfectionTimeUpdate();
+    void
+    Update();
+    std::map<std::string, float>
+    GetAcceptance() const;
+    void
+    ResetAcceptance();
+  private:
+    Parameter& a_;
+    Parameter& b_;
+    ublas::vector<float> calls_;
+    ublas::vector<float> accept_;
+    size_t reps_;
+    bool
+    UpdateI();
+    bool
+    AddI();
+    bool
+    DeleteI();
+
+  };
+
+
+  //! SellkeSerializer writes out integrated infectious pressure for each individual
+  class SellkeSerializer : public McmcUpdate
+  {
+  public:
+    SellkeSerializer(const std::string, Random& random, McmcLikelihood& logLikelihood);
+    virtual
+    ~SellkeSerializer();
+    void
+    Update();
+  private:
+    ofstream outfile_;
   };
 
 }

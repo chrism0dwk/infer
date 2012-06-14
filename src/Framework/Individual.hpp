@@ -46,8 +46,10 @@
 #include <math.h>
 #include <list>
 #include <stdexcept>
+#include <algorithm>
 #include <string>
 #include <gsl/gsl_math.h>
+
 
 #include "types.hpp"
 #include "EpiRiskException.hpp"
@@ -79,6 +81,14 @@ namespace EpiRisk
   template<class Covars>
     class Individual
     {
+    private:
+//    struct CmpConnections
+//    {
+//      bool operator()(const Individual* lhs, const Individual* rhs) const
+//      {
+//        return lhs->getI() < rhs->getI();
+//      }
+//    };
 
     public:
 
@@ -117,12 +127,12 @@ namespace EpiRisk
       };
 
       Individual(string id, Covars& covariates) :
-        contactStart_(GSL_POSINF),known_(false),isDC_(false), hasBeenInfected_(false), infecByContact_(false), nonCentred_(false)
+        contactStart_(POSINF),known_(false),isDC_(false), hasBeenInfected_(false), infecByContact_(false), nonCentred_(false)
       {
         id_ = id;
-        events_.I = GSL_POSINF;
-        events_.N = GSL_POSINF;
-        events_.R = GSL_POSINF;
+        events_.I = POSINF;
+        events_.N = POSINF;
+        events_.R = POSINF;
 
         covariates_ = covariates;
       };
@@ -147,7 +157,7 @@ namespace EpiRisk
       bool
       operator<(Individual rhs) const
       {
-        return this->I_ < rhs.getI();
+        return this->getI() < rhs.getI();
       }
       ;
 
@@ -201,16 +211,24 @@ namespace EpiRisk
         return events_.N;
       }
 
+      void
+      setN(const eventTime_t N)
+      {
+        events_.N = N;
+      }
+
       double
       getR() const
       {
         return events_.R;
       }
+
       void
       setR(const eventTime_t R)
       {
         events_.R = R;
       }
+
       bool
       isSAt(const double& time) const
       {
@@ -279,6 +297,12 @@ namespace EpiRisk
       setConnections(ConnectionList& connections)
       {
         connections_ = connections;
+      }
+
+      void
+      sortConnections()
+      {
+        sort(connections_.begin(),connections_.end());
       }
       // Miscellaneous methods
       bool
@@ -519,7 +543,7 @@ namespace EpiRisk
       ;
 
       void
-      updateInfecByContact() const
+      updateInfecByContact()
       {
         // Sets bool Individual::infecByContact to true
         // if I coincides with an infectious contact

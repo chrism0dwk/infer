@@ -43,6 +43,8 @@
 #ifndef INCLUDE_AITYPES_HPP
 #define INCLUDE_AITYPES_HPP
 
+#include <limits>
+
 namespace EpiRisk
 {
 
@@ -52,6 +54,9 @@ namespace EpiRisk
   typedef unsigned int Spos_t;
   typedef unsigned int Ipos_t;
   typedef float freq_t;
+
+  const double POSINF( std::numeric_limits<double>::infinity() );
+  const double NEGINF(-std::numeric_limits<double>::infinity() );
 
 }
 #endif
