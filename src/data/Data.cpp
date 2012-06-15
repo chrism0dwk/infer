@@ -17,25 +17,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with InFER.  If not, see <http://www.gnu.org/licenses/>.
  *************************************************************************/
-/* ./src/data/Data.cpp
- *
- * Copyright 2012 Chris Jewell <chrism0dwk@gmail.com>
- *
- * This file is part of InFER.
- *
- * InFER is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * InFER is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with InFER.  If not, see <http://www.gnu.org/licenses/>. 
- */
+
 /*
  * Importers.cpp
  *
@@ -49,8 +31,6 @@
 #include "Data.hpp"
 #include "stlStrTok.hpp"
 
-#define NEGINF (-numeric_limits<double>::infinity())
-#define POSINF (numeric_limits<double>::infinity())
 
 gsl_rng* localrng = gsl_rng_alloc(gsl_rng_mt19937);
 
@@ -165,7 +145,7 @@ EpiDataImporter::next()
   if (tokens.size() < 4) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
-  if(tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;
+  if (tokens[1] == "Inf") record.data.I = EpiRisk::POSINF;
   else if(tokens[1] == "") record.data.I = EpiRisk::POSINF;
   else record.data.I = atof(tokens[1].c_str());
 
