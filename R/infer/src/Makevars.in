@@ -1,0 +1,1 @@
+PKG_LIBS=@RCPP_PKG_LIBS@ -lhdf5 -lhdf5_cpp -lhdf5_hl -lhdf5_hl_cpp
