@@ -7,7 +7,7 @@ link_directories(${GSL_LINK_DIRECTORIES} ${Boost_LIBRARY_DIRS})
 
 set(fmdMcmc_SOURCES fmdMcmc.cpp)
 add_executable(fmdMcmc ${fmdMcmc_SOURCES})
-target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood)
+target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood posteriorwriter)
 
 set(fmdSim_SOURCES fmdSim.cpp fmdModel.cpp)
 add_executable(fmdSim ${fmdSim_SOURCES})

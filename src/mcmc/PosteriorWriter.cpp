@@ -26,18 +26,25 @@
 
 #include "PosteriorWriter.hpp"
 
+
+
 namespace EpiRisk
 {
 
-  PosteriorWriter::PosteriorWriter()
+  PosteriorWriter::PosteriorWriter(GpuLikelihood& likelihood) : likelihood_(likelihood)
   {
-    // TODO Auto-generated constructor stub
-
   }
 
   PosteriorWriter::~PosteriorWriter()
   {
-    // TODO Auto-generated destructor stub
   }
+
+  void
+  PosteriorWriter::AddParameter(Parameter& param)
+  {
+    paramVals_.push_back(&param);
+    paramTags_.push_back(param.GetTag());
+  }
+
 
 }

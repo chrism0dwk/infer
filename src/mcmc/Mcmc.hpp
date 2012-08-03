@@ -20,6 +20,8 @@
 
 /* Header file for aifuncs.cpp */
 
+//TODO Need to create an "output" class: as we add updaters, register the parameter (block) with the outputter.
+
 #ifndef INCLUDE_MCMC_H
 #define INCLUDE_MCMC_H
 

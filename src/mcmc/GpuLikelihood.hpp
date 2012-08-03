@@ -37,19 +37,24 @@
 #include <map>
 #include <ostream>
 #include <vector>
+#include <string>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
+#include "types.hpp"
 #include "Data.hpp"
+#include "PosteriorWriter.hpp"
+
 
 #ifndef __CUDACC__
 #include "Parameter.hpp"
 #else
-namespace EpiRisk {
-  class Parameter;
-  class Parameters;
-}
+//namespace EpiRisk
+//  {
+//    class Parameter;
+//    class Parameters;
+//  }
 #endif
 
 // CUDA defines
@@ -59,283 +64,307 @@ namespace EpiRisk {
 #define NUMEVENTS 3
 #define NUMSPECIES 3
 
+namespace EpiRisk
+{
 
 // Data structures
 
-struct CSRMatrix
-{
-  int* rowPtr;
-  int* colInd;
-  float* val;
-};
-
+  struct CSRMatrix
+  {
+    int* rowPtr;
+    int* colInd;
+    float* val;
+  };
 
 // Helper classes
-template <typename T>
-class PointerVector
-{
-public:
-  PointerVector() {};
-
-  PointerVector(const size_t size)
-   { content_.resize(size); }
-
-  PointerVector(PointerVector& other)
-  { content_ = other.content_; }
-
-  const PointerVector&
-  operator=(const PointerVector& other)
-  {
-    content_ = other.content_;
-    return *this;
-  }
-
-  void
-  push_back(T* x)
-  { content_.push_back(x); }
-
-  T
-  operator[](const size_t index) const
-    { return *(content_[index]); };
-
-  size_t
-  size() const { return content_.size(); };
-
-  void
-  clear() { content_.clear(); };
-
-private:
-  std::vector<T*> content_;
-};
-
-using EpiRisk::Parameter;
-using EpiRisk::Parameters;
-
-class GpuLikelihood
-{
-public:
-  explicit
-  GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
-      DistMatrixImporter& distMatrix, const size_t nSpecies, const float obsTime,
-      const bool occultsOnlyDC = true);
-  explicit
-  GpuLikelihood(const GpuLikelihood& other);
-  virtual
-  ~GpuLikelihood();
-  const GpuLikelihood&
-  operator=(const GpuLikelihood& other);
-  void
-  InfecCopy(const GpuLikelihood& other);
-  void
-  LoadPopulation(PopDataImporter& filename);
-  void
-  LoadEpidemic(EpiDataImporter& importer);
-  void
-  SortPopulation();
-  void
-  LoadDistanceMatrix(DistMatrixImporter& filename);
-  void
-  SetEvents();
-  void
-  SetSpecies();
-  void
-  SetDistance(const float* data, const int* rowptr,
-      const int* colind);
-  void
-  SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2, Parameters& xi,
-      Parameters& psi, Parameters& zeta, Parameters& phi, Parameter& delta, Parameter& a, Parameter& b);
-  void
-  RefreshParameters();
-  size_t
-  GetNumKnownInfecs() const;
-  size_t
-  GetNumInfecs() const;
-  size_t
-  GetMaxInfecs() const;
-  size_t
-  GetNumPossibleOccults() const;
-  size_t
-  GetNumOccults() const;
-  void
-  CalcSusceptibilityPow();
-  void
-  CalcSusceptibility();
-  void
-  CalcInfectivityPow();
-  void
-  CalcInfectivity();
-  void
-  UpdateI1();
-  void
-  CalcBgIntegral();
-  void
-  UpdateInfectionTime(const unsigned int idx, const float inTime);
-  void
-  AddInfectionTime(const unsigned int idx, const float inTime);
-  void
-  DeleteInfectionTime(const unsigned int idx);
-  void
-  CalcProduct();
-  void
-  CalcIntegral();
-  void
-  FullCalculate();
-  void
-  Calculate();
-  float
-  InfectionPart();
-  float
-  GetIN(const size_t index);
-  float
-  GetLogLikelihood() const;
-  float
-  GetN(const int idx) const;
-  float
-  GetMeanI2N() const;
-  float
-  GetMeanOccI() const;
-  void
-  GetSumInfectivityPow(float* result) const;
-  void
-  GetSumSusceptibilityPow(float* result) const;
-  void
-  LazyAddInfecTime(const int idx, const float inTime);
-  float
-  NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
-
-  friend std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
-
-private:
-
-  // Helper methods
-  void
-  ReduceProductVector();
-
-  // Data import
-  enum DiseaseStatus
-  {
-    IP = 0, DC = 1, SUSC = 2
-  };
-
-  struct Covars
-  {
-    string id;
-    DiseaseStatus status;
-    float I;
-    float N;
-    float R;
-    float cattle;
-    float pigs;
-    float sheep;
-  };
-
-  map<string, size_t> idMap_;
-  typedef std::vector<Covars> Population;
-
-  struct CompareByStatus
-  {
-    bool
-    operator()(const Covars& lhs, const Covars& rhs) const
+  template<typename T>
+    class PointerVector
     {
-      return (int)lhs.status < (int)rhs.status;
-    }
-  };
+    public:
+      PointerVector()
+      {
+      }
+      ;
 
-  struct CompareByI
+      PointerVector(const size_t size)
+      {
+        content_.resize(size);
+      }
+
+      PointerVector(PointerVector& other)
+      {
+        content_ = other.content_;
+      }
+
+      const PointerVector&
+      operator=(const PointerVector& other)
+      {
+        content_ = other.content_;
+        return *this;
+      }
+
+      void
+      push_back(T* x)
+      {
+        content_.push_back(x);
+      }
+
+      T
+      operator[](const size_t index) const
+      {
+        return *(content_[index]);
+      }
+      ;
+
+      size_t
+      size() const
+      {
+        return content_.size();
+      }
+      ;
+
+      void
+      clear()
+      {
+        content_.clear();
+      }
+      ;
+
+    private:
+      std::vector<T*> content_;
+    };
+
+
+  class GpuLikelihood
   {
-    bool
-    operator()(const Covars& lhs, const Covars& rhs) const
+  public:
+    explicit
+    GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
+        DistMatrixImporter& distMatrix, const size_t nSpecies,
+        const float obsTime, const bool occultsOnlyDC = true);
+    explicit
+    GpuLikelihood(const GpuLikelihood& other);
+    virtual
+    ~GpuLikelihood();
+    const GpuLikelihood&
+    operator=(const GpuLikelihood& other);
+    void
+    InfecCopy(const GpuLikelihood& other);
+    void
+    LoadPopulation(PopDataImporter& filename);
+    void
+    LoadEpidemic(EpiDataImporter& importer);
+    void
+    SortPopulation();
+    void
+    LoadDistanceMatrix(DistMatrixImporter& filename);
+    void
+    SetEvents();
+    void
+    SetSpecies();
+    void
+    SetDistance(const float* data, const int* rowptr, const int* colind);
+    void
+    SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2,
+        Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi,
+        Parameter& delta, Parameter& a, Parameter& b);
+    void
+    RefreshParameters();
+    size_t
+    GetNumKnownInfecs() const;
+    size_t
+    GetNumInfecs() const;
+    size_t
+    GetMaxInfecs() const;
+    size_t
+    GetNumPossibleOccults() const;
+    size_t
+    GetNumOccults() const;
+    void
+    CalcSusceptibilityPow();
+    void
+    CalcSusceptibility();
+    void
+    CalcInfectivityPow();
+    void
+    CalcInfectivity();
+    void
+    UpdateI1();
+    void
+    CalcBgIntegral();
+    void
+    UpdateInfectionTime(const unsigned int idx, const float inTime);
+    void
+    AddInfectionTime(const unsigned int idx, const float inTime);
+    void
+    DeleteInfectionTime(const unsigned int idx);
+    void
+    CalcProduct();
+    void
+    CalcIntegral();
+    void
+    FullCalculate();
+    void
+    Calculate();
+    float
+    InfectionPart();
+    float
+    GetIN(const size_t index);
+    float
+    GetLogLikelihood() const;
+    float
+    GetN(const int idx) const;
+    float
+    GetMeanI2N() const;
+    float
+    GetMeanOccI() const;
+    void
+    GetSumInfectivityPow(float* result) const;
+    void
+    GetSumSusceptibilityPow(float* result) const;
+    void
+    LazyAddInfecTime(const int idx, const float inTime);
+    float
+    NonCentreInfecTimes(const float oldGamma, const float newGamma,
+        const float prob);
+    void
+    GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
+
+    friend std::ostream&
+    operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+
+  private:
+
+    // Helper methods
+    void
+    ReduceProductVector();
+
+    // Data import
+    enum DiseaseStatus
     {
-      return lhs.I < rhs.I;
-    }
+      IP = 0, DC = 1, SUSC = 2
+    };
+
+    struct Covars
+    {
+      string id;
+      DiseaseStatus status;
+      float I;
+      float N;
+      float R;
+      float cattle;
+      float pigs;
+      float sheep;
+    };
+
+    map<string, size_t> idMap_;
+    typedef std::vector<Covars> Population;
+
+    struct CompareByStatus
+    {
+      bool
+      operator()(const Covars& lhs, const Covars& rhs) const
+      {
+        return (int) lhs.status < (int) rhs.status;
+      }
+    };
+
+    struct CompareByI
+    {
+      bool
+      operator()(const Covars& lhs, const Covars& rhs) const
+      {
+        return lhs.I < rhs.I;
+      }
+    };
+
+    Population hostPopulation_;
+
+    // Host vars
+    const size_t popSize_;
+    size_t numKnownInfecs_;
+    size_t maxInfecs_;
+    thrust::host_vector<unsigned int> hostInfecIdx_;
+    thrust::device_vector<unsigned int> devInfecIdx_;
+    thrust::host_vector<unsigned int> hostSuscOccults_;
+    const size_t numSpecies_;
+    float logLikelihood_;
+    const float obsTime_;
+    float I1Time_;
+    unsigned int I1Idx_;
+
+    struct LikelihoodComponents
+    {
+      float sumI;
+      float bgIntegral;
+      float logProduct;
+      float integral;
+    };
+
+    LikelihoodComponents* hostComponents_;
+    LikelihoodComponents* devComponents_;
+
+    // GPU data structures
+
+    // Covariate data is shared over a copy
+    size_t* covariateCopies_;
+    float* devAnimals_;
+    size_t animalsPitch_;
+
+    CSRMatrix devD_;
+
+    int* hostDRowPtr_;
+    size_t dnnz_; //CRS
+    curandGenerator_t cuRand_;
+
+    size_t animalsInfPowPitch_, animalsSuscPowPitch_;
+    float* devAnimalsInfPow_;
+    float* devAnimalsSuscPow_;
+    float* devEventTimes_;
+
+    size_t eventTimesPitch_;
+    float* devSusceptibility_;
+    float* devInfectivity_;
+    thrust::device_vector<float> devProduct_;
+    thrust::device_vector<float> devWorkspace_;
+    int integralBuffSize_;
+
+    // CUDAPP bits and pieces
+    CUDPPHandle cudpp_;
+    CUDPPHandle addReduce_;
+    CUDPPConfiguration addReduceCfg_;
+    CUDPPConfiguration logAddReduceCfg_;
+
+    // Parameters
+    float* epsilon_;
+    float* gamma1_;
+    float* gamma2_;
+    float* delta_;
+    float* a_;
+    float* b_;
+
+    PointerVector<float> xi_;
+    PointerVector<float> psi_;
+    PointerVector<float> zeta_;
+    PointerVector<float> phi_;
+
+    float* devXi_;
+    float* devPsi_;
+    float* devZeta_;
+    float* devPhi_;
+
+    // GPU BLAS handles
+    cublasStatus_t blasStat_;
+    cublasHandle_t cudaBLAS_;
+    cusparseStatus_t sparseStat_;
+    cusparseHandle_t cudaSparse_;
+    cusparseMatDescr_t crsDescr_;
+
   };
 
-  Population hostPopulation_;
+  std::ostream&
+  operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
-  // Host vars
-  const size_t popSize_;
-  size_t numKnownInfecs_;
-  size_t maxInfecs_;
-  thrust::host_vector<unsigned int> hostInfecIdx_;
-  thrust::device_vector<unsigned int> devInfecIdx_;
-  thrust::host_vector<unsigned int> hostSuscOccults_;
-  const size_t numSpecies_;
-  float logLikelihood_;
-  const float obsTime_;
-  float I1Time_;
-  unsigned int I1Idx_;
-
-  struct LikelihoodComponents
-  {
-    float sumI;
-    float bgIntegral;
-    float logProduct;
-    float integral;
-  };
-
-  LikelihoodComponents* hostComponents_;
-  LikelihoodComponents* devComponents_;
-
-
-  // GPU data structures
-
-  // Covariate data is shared over a copy
-  size_t* covariateCopies_;
-  float* devAnimals_;
-  size_t animalsPitch_;
-
-  CSRMatrix devD_;
-
-  int* hostDRowPtr_;
-  size_t dnnz_; //CRS
-  curandGenerator_t cuRand_;
-
-  size_t animalsInfPowPitch_, animalsSuscPowPitch_;
-  float* devAnimalsInfPow_;
-  float* devAnimalsSuscPow_;
-  float* devEventTimes_;
-
-  size_t eventTimesPitch_;
-  float* devSusceptibility_;
-  float* devInfectivity_;
-  thrust::device_vector<float> devProduct_;
-  thrust::device_vector<float> devWorkspace_;
-  int integralBuffSize_;
-
-  // CUDAPP bits and pieces
-  CUDPPHandle cudpp_;
-  CUDPPHandle addReduce_;
-  CUDPPConfiguration addReduceCfg_;
-  CUDPPConfiguration logAddReduceCfg_;
-
-  // Parameters
-  float* epsilon_;
-  float* gamma1_;
-  float* gamma2_;
-  float* delta_;
-  float* a_;
-  float* b_;
-
-  PointerVector<float> xi_;
-  PointerVector<float> psi_;
-  PointerVector<float> zeta_;
-  PointerVector<float> phi_;
-
-  float* devXi_;
-  float* devPsi_;
-  float* devZeta_;
-  float* devPhi_;
-
-
-  // GPU BLAS handles
-  cublasStatus_t blasStat_;
-  cublasHandle_t cudaBLAS_;
-  cusparseStatus_t sparseStat_;
-  cusparseHandle_t cudaSparse_;
-  cusparseMatDescr_t crsDescr_;
-
-};
-
-std::ostream& operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+} // namespace EpiRisk
 
 #endif /* GPULIKELIHOOD_HPP_ */

@@ -36,6 +36,7 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
+#include <boost/bind.hpp>
 namespace po = boost::program_options;
 
 #include "config.h"
@@ -44,6 +45,7 @@ namespace po = boost::program_options;
 #include "McmcWriter.hpp"
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
+#include "PosteriorHDF5Writer.hpp"
 
 
 
@@ -328,7 +330,6 @@ main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
 
-  typedef Population<TestCovars> MyPopulation;
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
@@ -411,57 +412,45 @@ main(int argc, char* argv[])
 
     InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
 
-    //InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
-    //InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
+    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
+    InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
 
     //// Output ////
 
     // Make output directory
-    string outputFolder(argv[4]);
-    mkdir(outputFolder.c_str(),S_IFDIR | S_IRWXU);
+    string outputFile(argv[4]);
+    PosteriorHDF5Writer output(outputFile, likelihood);
+    output.AddParameter(epsilon); output.AddParameter(gamma1);
+    output.AddParameter(gamma2); output.AddParameter(xi[0]);
+    output.AddParameter(xi[1]); output.AddParameter(xi[2]);
+    output.AddParameter(psi[0]);  output.AddParameter(psi[1]);
+    output.AddParameter(psi[2]);  output.AddParameter(zeta[0]);
+    output.AddParameter(zeta[1]); output.AddParameter(zeta[2]);
+    output.AddParameter(phi[0]);  output.AddParameter(phi[1]);
+    output.AddParameter(phi[2]);  output.AddParameter(delta);
+    output.AddParameter(b);
 
-    stringstream parmFn;
-    stringstream occFn;
-    stringstream covFn;
-
-    parmFn << outputFolder << "/parameters.asc";
-    occFn << outputFolder << "/infec.asc";
-    covFn << outputFolder << "/covariances.asc";
-
-    ofstream parmfile(parmFn.str().c_str());
-    ofstream occfile(occFn.str().c_str());
-
-    if(!parmfile.is_open()) throw data_exception("Cannot open parameter output file");
-    if(!occfile.is_open()) throw data_exception("Cannot open occ output file");
-
-    ParameterSerializerList outputparms;
-    outputparms.push_back(&epsilon); outputparms.push_back(&gamma1);
-    outputparms.push_back(&gamma2);  outputparms.push_back(&xi[0]);
-    outputparms.push_back(&xi[1]);   outputparms.push_back(&xi[2]);
-    outputparms.push_back(&psi[0]);  outputparms.push_back(&psi[1]);
-    outputparms.push_back(&psi[2]);  outputparms.push_back(&zeta[0]);
-    outputparms.push_back(&zeta[1]); outputparms.push_back(&zeta[2]);
-    outputparms.push_back(&phi[0]);  outputparms.push_back(&phi[1]);
-    outputparms.push_back(&phi[2]);  outputparms.push_back(&delta);
-    outputparms.push_back(&b);
-
-    ParameterSerializer parmSerializer(outputparms);
-    parmSerializer.Header(parmfile);
-    parmfile << ",meanI2N,meanOccI,loglikelihood\n";
+    boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
+    output.AddSpecial("loglikelihood",getlikelihood);
+    boost::function< float () > getnuminfecs = boost::bind(&GpuLikelihood::GetNumInfecs, &likelihood);
+    output.AddSpecial("numInfecs",getnuminfecs);
+    boost::function< float () > getmeanI2N = boost::bind(&GpuLikelihood::GetMeanI2N, &likelihood);
+    output.AddSpecial("meanI2N", getmeanI2N);
+    boost::function< float () > getmeanOccI = boost::bind(&GpuLikelihood::GetMeanOccI, &likelihood);
+    output.AddSpecial("meanOccI", getmeanOccI);
 
     // Run the chain
     cout << "Running MCMC" << endl;
     for(size_t k=0; k<atoi(argv[6]); ++k)
       {
-        if(k % 100 == 0) cout << "Iteration " << k << endl;
+        if(k % 100 == 0)
+          {
+            cout << "Iteration " << k << endl;
+            output.flush();
+          }
         mcmc.Update();
-
-        parmfile << parmSerializer << "," << likelihood.GetMeanI2N() << "," << likelihood.GetMeanOccI() << "," << likelihood.GetLogLikelihood() << "\n";
-        occfile << likelihood << "\n";
+        output.write();
       }
-
-    parmfile.close();
-    occfile.close();
 
     // Wrap up
     map<string, float> acceptance = mcmc.GetAcceptance();
@@ -472,13 +461,12 @@ main(int argc, char* argv[])
         cout << it->first << ": " << it->second << "\n";
       }
 
-    ofstream covfh(covFn.str().c_str());
-    covfh << updateDistance->getCovariance() << "\n";
-    covfh << updatePsi->getCovariance() << "\n";
-    covfh << updatePhi->getCovariance() << "\n";
-    covfh << updateInfec->getCovariance() << "\n";
-    covfh << updateSuscep->getCovariance() << "\n";
-    covfh.close();
+    cout << "Covariances\n";
+    cout << updateDistance->getCovariance() << "\n";
+    cout << updatePsi->getCovariance() << "\n";
+    cout << updatePhi->getCovariance() << "\n";
+    cout << updateInfec->getCovariance() << "\n";
+    cout << updateSuscep->getCovariance() << "\n";
 
 
   return EXIT_SUCCESS;

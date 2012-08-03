@@ -27,38 +27,42 @@
 #ifndef POSTERIORWRITER_HPP_
 #define POSTERIORWRITER_HPP_
 
+#include <boost/function.hpp>
+
 #include "Parameter.hpp"
 
 namespace EpiRisk
 {
 
+  // FWD decl
+  class GpuLikelihood;
+
   class PosteriorWriter
   {
   public:
+    PosteriorWriter(GpuLikelihood& likelihood);
     virtual
+    ~PosteriorWriter();
     void
-    open() = 0;
-    virtual
+    AddParameter(Parameter& param);
+    template<class F>
     void
-    close() = 0;
+    AddSpecial(std::string tag, F& functor) {
+      paramTags_.push_back(tag);
+      special_.push_back(boost::function<float ()>(functor));
+    }
     virtual
     void
     write() = 0;
-  };
 
+  protected:
+    GpuLikelihood& likelihood_;
+    std::vector<Parameter*> paramVals_; std::vector<float> valueBuff_;
+    std::vector<std::string> paramTags_; std::vector<float> infecBuff_;
+    std::vector< boost::function<float ()> > special_;
 
-  class PosteriorNullWriter
-  {
-  public:
-    virtual
     void
-    open() { };
-    virtual
-    void
-    close() { };
-    virtual
-    void
-    write(const Parameters& parameters) { }
+    GetParamVals(float* buff);
   };
 
 }

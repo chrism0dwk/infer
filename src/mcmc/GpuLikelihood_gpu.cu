@@ -26,6 +26,8 @@
 
 #include "GpuLikelihood.hpp"
 
+
+namespace EpiRisk {
 // Constants
 const float UNITY = 1.0;
 const float ZERO = 0.0;
@@ -1925,6 +1927,29 @@ GpuLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma, c
 }
 
 
+
+void
+GpuLikelihood::GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods)
+{
+  periods.resize(GetNumInfecs());
+
+  thrust::device_vector<float> devOutputVec(GetNumInfecs());
+  int blocksPerGrid((GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
+  _collectInfectiousPeriods<<<blocksPerGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),
+                                                                GetNumInfecs(),
+                                                                devEventTimes_,
+                                                                eventTimesPitch_,
+                                                                thrust::raw_pointer_cast(&devOutputVec[0]));
+
+  thrust::host_vector<float> outputVec(GetNumInfecs());
+  outputVec = devOutputVec;
+  for(size_t i=0; i<GetNumInfecs(); ++i) {
+    periods[i].idx = hostInfecIdx_[i];
+    periods[i].val = outputVec[i];
+  }
+}
+
+
 std::ostream&
 operator <<(std::ostream& out, const GpuLikelihood& likelihood)
 {
@@ -1948,4 +1973,6 @@ operator <<(std::ostream& out, const GpuLikelihood& likelihood)
 
   return out;
 }
+
+} // namespace EpiRisk
 
