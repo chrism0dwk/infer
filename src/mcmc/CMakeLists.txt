@@ -23,3 +23,7 @@ set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})
 add_dependencies(mcmc random)
 target_link_libraries(mcmc random gpulikelihood)
+
+set(posteriorwriter_SOURCES PosteriorHDF5Writer.cpp PosteriorWriter.cpp)
+add_library(posteriorwriter STATIC ${posteriorwriter_SOURCES})
+target_link_libraries(posteriorwriter hdf5 hdf5_cpp hdf5_hl hdf5_hl_cpp)

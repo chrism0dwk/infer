@@ -31,7 +31,7 @@
 #include <libpg-fe.h>
 #include "PosteriorWriter.hpp"
 
-class PosteriorPgSQLWriter : public EpiRisk::PosteriorWriter
+class PosteriorPgSQLWriter
 {
 public:
   PosteriorPgSQLWriter(const std::string connString, const EpiRisk::Parameters);
