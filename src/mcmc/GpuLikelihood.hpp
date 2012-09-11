@@ -167,7 +167,7 @@ namespace EpiRisk
     void
     SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2,
         Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi,
-        Parameter& delta, Parameter& a, Parameter& b);
+        Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b);
     void
     RefreshParameters();
     size_t
@@ -340,6 +340,8 @@ namespace EpiRisk
     float* gamma1_;
     float* gamma2_;
     float* delta_;
+    float* nu_;
+    float* alpha_;
     float* a_;
     float* b_;
 

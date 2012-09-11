@@ -129,17 +129,24 @@ template<typename T1, typename T2>
   };
 
 __device__ float
-_h(const float t)
+_h(const float t, float nu, float alpha)
 {
-  // Returns the step 'h' function
-  return t > 4.0f;
+  // Returns a logistic 'h' function
+  //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
+  //return exp(nu*t) / ( alpha + exp(nu*t));
+  return nu*nu*t*exp(-nu*t);
 }
 
 __device__ float
-_H(const float t)
+_H(const float t, float nu, float alpha)
 {
-  // Returns the integral of the step 'h' function
-  return fmaxf(0.0f, t - 4.0f);
+  // Returns the integral of the 'h' function over [0,t]
+
+  //float integral = 1.0f / nu * logf( (1.0f + expf(nu*(t - alpha))) / (1.0f + expf(-nu*alpha)));
+
+  //float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
+  float integral = -nu*t*exp(-nu*t) - exp(-nu*t) + 1;
+  return fmaxf(0.0f, integral);
 }
 
 __device__ float
@@ -209,7 +216,7 @@ __global__ void
 _calcIntegral(const unsigned int* infecIdx, const int infecSize, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch,
     const float* susceptibility, const float* infectivity, const float gamma2,
-    const float delta, float* output)
+    const float delta, const float nu, const float alpha, float* output)
 {
   // Each warp calculates a row i of the sparse matrix
 
@@ -237,8 +244,8 @@ _calcIntegral(const unsigned int* infecIdx, const int infecSize, const CSRMatrix
         {
           // Integrated infection pressure
           float Ij = eventTimes[distance.colInd[jj]];
-          float betaij = _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-          betaij += gamma2 * (_H(fminf(Ri, Ij) - Ii) - _H(fminf(Ni, Ij) - Ii));
+          float betaij = _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
+          betaij += gamma2 * (_H(fminf(Ri, Ij) - Ii, nu, alpha) - _H(fminf(Ni, Ij) - Ii, nu, alpha));
 
           // Apply distance kernel and suscep
           betaij *= delta / (delta * delta + distance.val[jj]);
@@ -263,7 +270,7 @@ _calcProduct(const unsigned int* infecIdx, const int infecSize,
     const CSRMatrix distance, const float* eventTimes,
     const int eventTimesPitch, const float* susceptibility,
     const float* infectivity, const float epsilon, const float gamma1,
-    const float gamma2, const float delta, float* prodCache)
+    const float gamma2, const float delta, const float nu, const float alpha, float* prodCache)
 {
   // Each warp calculates a row of the sparse matrix
 
@@ -297,9 +304,9 @@ _calcProduct(const unsigned int* infecIdx, const int infecSize,
             {
               float idxOnj = 0.0f;
               if (Ii < Ij and Ij <= Ni)
-                idxOnj += _h(Ij - Ii);
+                idxOnj += _h(Ij - Ii, nu, alpha);
               else if (Ni < Ij and Ij <= Ri)
-                idxOnj += gamma2 * _h(Ij - Ii);
+                idxOnj += gamma2 * _h(Ij - Ii, nu, alpha);
               threadProdCache[threadIdx.x] += idxOnj * infectivity[i] * delta
                   / (delta * delta + distance.val[ii]);
             }
@@ -347,7 +354,7 @@ _updateInfectionTimeIntegral(const unsigned int idx,
     const unsigned int* infecIdx, const float newTime, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch,
     const float* susceptibility, const float* infectivity, const float gamma2,
-    const float delta, float* output)
+    const float delta, const float nu, const float alpha, float* output)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -375,20 +382,20 @@ _updateInfectionTimeIntegral(const unsigned int idx,
       if (Ij < Nj)
         {
           // Recalculate pressure from j on idx
-          jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime))
-              + gamma2 * (_H(fminf(Rj, newTime) - Ij) - _H(fminf(Nj, newTime) - Ij)); // New pressure
-          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij))
-              + gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij)); // Old pressure
+          jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), nu, alpha)
+              + gamma2 * (_H(fminf(Rj, newTime) - Ij, nu, alpha) - _H(fminf(Nj, newTime) - Ij, nu, alpha)); // New pressure
+          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), nu, alpha)
+              + gamma2 * (_H(fminf(Rj, Ii) - Ij, nu, alpha) - _H(fminf(Nj, Ii) - Ij, nu, alpha)); // Old pressure
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
           jOnIdx *= infectivity[j];
         }
 
       // Recalculate pressure from idx on j
-      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij));
-      IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime));
-      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii     ) - _H(fminf(Ni, Ij) - Ii     ));
+      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), nu, alpha);
+      IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
+      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime, nu, alpha) - _H(fminf(Ni, Ij) - newTime, nu, alpha));
+      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii, nu, alpha     ) - _H(fminf(Ni, Ij) - Ii, nu, alpha     ));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -413,7 +420,7 @@ _updateInfectionTimeProduct(const unsigned int idx,
     const unsigned int* infecIdx, const float newTime, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch,
     const float* susceptibility, const float* infectivity, const float epsilon,
-    const float gamma1, const float gamma2, const float delta, const int I1Idx, float* prodCache)
+    const float gamma1, const float gamma2, const float delta, const float nu, const float alpha, const int I1Idx, float* prodCache)
 {
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
   extern __shared__
@@ -428,8 +435,6 @@ _updateInfectionTimeProduct(const unsigned int idx,
       if (newTime < eventTimes[I1Idx] and i != I1Idx)
         prodCache[I1Idx] = epsilon;
       __threadfence();
-
-
   }
 
   int begin = distance.rowPtr[i];
@@ -452,13 +457,13 @@ _updateInfectionTimeProduct(const unsigned int idx,
           // Adjust product cache from idx on others
           float idxOnj = 0.0f;
           if (Ii < Ij and Ij <= Ni)
-            idxOnj -= _h(Ij - Ii);
+            idxOnj -= _h(Ij - Ii, nu, alpha);
           else if (Ni < Ij and Ij <= Ri) {
-            idxOnj -= gamma2 * _h(Ij - Ii);
-            idxOnj += gamma2 * _h(Ij - newTime);
+            idxOnj -= gamma2 * _h(Ij - Ii, nu, alpha);
+            idxOnj += gamma2 * _h(Ij - newTime, nu, alpha);
           }
           if (newTime < Ij and Ij <= Ni)
-            idxOnj += _h(Ij - newTime);
+            idxOnj += _h(Ij - newTime, nu, alpha);
 
           idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + distance.val[begin + tid]);
@@ -467,9 +472,9 @@ _updateInfectionTimeProduct(const unsigned int idx,
           // Recalculate instantaneous pressure on idx
           float jOnIdx = 0.0f;
           if (Ij < newTime and newTime <= Nj)
-            jOnIdx = _h(newTime - Ij);
+            jOnIdx = _h(newTime - Ij, nu, alpha);
           else if (Nj < newTime and newTime <= Rj)
-            jOnIdx = gamma2 * _h(newTime - Ij);
+            jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
 
           jOnIdx *= susceptibility[i] * infectivity[j] * delta
               / (delta * delta + distance.val[begin + tid]);
@@ -492,7 +497,7 @@ _addInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
     const float newTime, const CSRMatrix distance,
     const float* eventTimes, const int eventTimesPitch,
     const float* susceptibility, const float* infectivity, const float gamma2,
-    const float delta, float* output)
+    const float delta, const float nu, const float alpha, float* output)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -520,10 +525,10 @@ _addInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
       if (Ij < Nj)
         {
           // Calculate pressure from j on idx
-          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii));
-          jOnIdx -= gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij));
-          jOnIdx += _H(fminf(Nj, newTime) - fminf(Ij, newTime));
-          jOnIdx += gamma2 * (_H(fminf(Rj, newTime) - Ij) - _H(fminf(Nj, newTime) - Ij));
+          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii), nu, alpha);
+          jOnIdx -= gamma2 * (_H(fminf(Rj, Ii) - Ij, nu, alpha) - _H(fminf(Nj, Ii) - Ij, nu, alpha));
+          jOnIdx += _H(fminf(Nj, newTime) - fminf(Ij, newTime), nu, alpha);
+          jOnIdx += gamma2 * (_H(fminf(Rj, newTime) - Ij, nu, alpha) - _H(fminf(Nj, newTime) - Ij, nu, alpha));
 
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
@@ -531,8 +536,8 @@ _addInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
         }
 
       // Add pressure from idx on j
-      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij));
-      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime) - _H(fminf(Ni, Ij) - newTime));
+      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), nu, alpha);
+      IdxOnj += gamma2 * (_H(fminf(Ri, Ij) - newTime, nu, alpha) - _H(fminf(Ni, Ij) - newTime, nu, alpha));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -553,7 +558,7 @@ __global__ void
 _delInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
     const float newTime, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch, const float* susceptibility,
-    const float* infectivity, const float gamma2, const float delta,
+    const float* infectivity, const float gamma2, const float delta, const float nu, const float alpha,
     float* output)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -582,10 +587,10 @@ _delInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
       if (Ij < Nj)
         {
           // Recalculate pressure from j on idx
-          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij))
-              + gamma2 * (_H(fminf(Rj, Ii) - Ij) - _H(fminf(Nj, Ii) - Ij)); // Old pressure
-          jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni))
-              + gamma2 * (_H(fminf(Rj, Ni) - Ij) - _H(fminf(Nj, Ni) - Ij)); // New pressure
+          jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), nu, alpha)
+              + gamma2 * (_H(fminf(Rj, Ii) - Ij, nu, alpha) - _H(fminf(Nj, Ii) - Ij, nu, alpha)); // Old pressure
+          jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni), nu, alpha)
+              + gamma2 * (_H(fminf(Rj, Ni) - Ij, nu, alpha) - _H(fminf(Nj, Ni) - Ij, nu, alpha)); // New pressure
           // Apply infec and suscep
           jOnIdx *= susceptibility[i];
           jOnIdx *= infectivity[j];
@@ -593,8 +598,8 @@ _delInfectionTimeIntegral(const unsigned int idx, const unsigned int* infecIdx,
 
       // Subtract pressure from idx on j
       float IdxOnj = 0.0f;
-      IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij));
-      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii) - _H(fminf(Ni, Ij) - Ii));
+      IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
+      IdxOnj -= gamma2 * (_H(fminf(Ri, Ij) - Ii, nu, alpha) - _H(fminf(Ni, Ij) - Ii, nu, alpha));
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
@@ -617,7 +622,7 @@ _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
     const float newTime, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch,
     const float* susceptibility, const float* infectivity, const float epsilon,
-    const float gamma1, const float gamma2, const float delta, const int I1Idx, float* prodCache)
+    const float gamma1, const float gamma2, const float delta, const float nu, const float alpha, const int I1Idx, float* prodCache)
 {
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
   extern __shared__
@@ -654,9 +659,9 @@ _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           // Adjust product cache from idx on others
           float idxOnj = 0.0f;
           if (newTime < Ij and Ij <= Ni)
-            idxOnj += _h(Ij - newTime);
+            idxOnj += _h(Ij - newTime, nu, alpha);
           else if (Ni < Ij and Ij <= Ri)
-            idxOnj += gamma2 * _h(Ij - newTime);
+            idxOnj += gamma2 * _h(Ij - newTime, nu, alpha);
 
           idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + distance.val[begin + tid]);
@@ -665,9 +670,9 @@ _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           // Calculate instantaneous pressure on idx
           float jOnIdx = 0.0f;
           if (Ij < newTime and newTime <= Nj)
-            jOnIdx = _h(newTime - Ij);
+            jOnIdx = _h(newTime - Ij, nu, alpha);
           else if (Nj < newTime and newTime <= Rj)
-            jOnIdx = gamma2 * _h(newTime - Ij);
+            jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
 
           jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * delta
               / (delta * delta + distance.val[begin + tid]);
@@ -690,7 +695,7 @@ _delInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
     const float newTime, const CSRMatrix distance,
     float* eventTimes, const int eventTimesPitch, const float* susceptibility,
     const float* infectivity, const float epsilon, const float gamma1,
-    const float gamma2, const float delta, float* prodCache)
+    const float gamma2, const float delta, const float nu, const float alpha, float* prodCache)
 {
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -723,9 +728,9 @@ _delInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
           // Adjust product cache from idx on others
           float idxOnj = 0.0;
           if (Ii < Ij and Ij <= Ni)
-            idxOnj -= _h(Ij - Ii);
+            idxOnj -= _h(Ij - Ii, nu, alpha);
           else if (Ni < Ij and Ij <= Ri)
-            idxOnj -= gamma2 * _h(Ij - Ii);
+            idxOnj -= gamma2 * _h(Ij - Ii, nu, alpha);
 
           idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
               / (delta * delta + distance.val[begin + tid]);
@@ -1019,7 +1024,7 @@ GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
         other.animalsPitch_), devD_(other.devD_), hostDRowPtr_(
         other.hostDRowPtr_), dnnz_(other.dnnz_), integralBuffSize_(
         other.integralBuffSize_), epsilon_(other.epsilon_), gamma1_(
-        other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_), a_(other.a_), b_(other.b_), cuRand_(other.cuRand_)
+        other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_), nu_(other.nu_), alpha_(other.alpha_), a_(other.a_), b_(other.b_), cuRand_(other.cuRand_)
 {
   timeval start, end;
   gettimeofday(&start, NULL);
@@ -1140,6 +1145,8 @@ GpuLikelihood::operator=(const GpuLikelihood& other)
   gamma1_ = other.gamma1_;
   gamma2_ = other.gamma2_;
   delta_ = other.delta_;
+  nu_ = other.nu_;
+  alpha_ = other.alpha_;
   a_ = other.a_;
   b_ = other.b_;
 
@@ -1449,7 +1456,7 @@ GpuLikelihood::CalcProduct()
 {
 
  _calcProduct<<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),devInfecIdx_.size(),devD_,
-      devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*epsilon_,*gamma1_,*gamma2_,*delta_,thrust::raw_pointer_cast(&devProduct_[0]));
+      devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*epsilon_,*gamma1_,*gamma2_,*delta_,*nu_, *alpha_, thrust::raw_pointer_cast(&devProduct_[0]));
           checkCudaError(cudaGetLastError());
 
  ReduceProductVector();
@@ -1464,7 +1471,7 @@ GpuLikelihood::CalcIntegral()
       / THREADSPERBLOCK;
 
 _calcIntegral<<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&devInfecIdx_[0]),devInfecIdx_.size(),devD_,
-      devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*gamma2_,*delta_,thrust::raw_pointer_cast(&devWorkspace_[0]));
+      devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*gamma2_,*delta_,*nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
                 checkCudaError(cudaGetLastError());
 
   CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral, thrust::raw_pointer_cast(&devWorkspace_[0]), integralBuffSize);
@@ -1601,7 +1608,7 @@ GpuLikelihood::UpdateInfectionTime(const unsigned int idx, const float inTime)
   _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       devD_,
       devEventTimes_, eventTimesPitch_, devSusceptibility_,
-      devInfectivity_, *gamma2_, *delta_, thrust::raw_pointer_cast(&devWorkspace_[0]));
+      devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               checkCudaError(cudaGetLastError());
   CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral, thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
   if(res != CUDPP_SUCCESS)
@@ -1610,7 +1617,7 @@ GpuLikelihood::UpdateInfectionTime(const unsigned int idx, const float inTime)
   _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime, devD_,
     devEventTimes_, eventTimesPitch_,
     devSusceptibility_, devInfectivity_, *epsilon_, *gamma1_, *gamma2_,
-    *delta_, I1Idx_, thrust::raw_pointer_cast(&devProduct_[0]));
+    *delta_, *nu_, *alpha_, I1Idx_, thrust::raw_pointer_cast(&devProduct_[0]));
               checkCudaError(cudaGetLastError());
 
   // Make the change to the population
@@ -1680,7 +1687,7 @@ GpuLikelihood::AddInfectionTime(const unsigned int idx, const float inTime)
       - 1) / THREADSPERBLOCK + 1;
 _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       devD_, devEventTimes_, eventTimesPitch_, devSusceptibility_,
-      devInfectivity_, *gamma2_, *delta_, thrust::raw_pointer_cast(&devWorkspace_[0]));
+      devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               checkCudaError(cudaGetLastError());
 
   CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral, thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
@@ -1690,7 +1697,7 @@ _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*size
 _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
     devD_, devEventTimes_, eventTimesPitch_,
     devSusceptibility_, devInfectivity_, *epsilon_, *gamma1_, *gamma2_,
-    *delta_, I1Idx_, thrust::raw_pointer_cast(&devProduct_[0]));
+    *delta_, *nu_, *alpha_, I1Idx_, thrust::raw_pointer_cast(&devProduct_[0]));
               checkCudaError(cudaGetLastError());
 
   // Make the change to the population
@@ -1751,7 +1758,7 @@ GpuLikelihood::DeleteInfectionTime(const unsigned int idx)
 _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&devInfecIdx_[0]), notification,
       devD_,
       devEventTimes_, eventTimesPitch_, devSusceptibility_,
-      devInfectivity_, *gamma2_, *delta_, thrust::raw_pointer_cast(&devWorkspace_[0]));
+      devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               checkCudaError(cudaGetLastError());
 
   CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral, thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
@@ -1761,7 +1768,7 @@ _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*size
   _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&devInfecIdx_[0]), notification,
     devD_, devEventTimes_, eventTimesPitch_,
     devSusceptibility_, devInfectivity_, *epsilon_, *gamma1_, *gamma2_,
-    *delta_, thrust::raw_pointer_cast(&devProduct_[0]));
+    *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devProduct_[0]));
   checkCudaError(cudaGetLastError());
 
   // Make the change to the population

@@ -364,10 +364,12 @@ main(int argc, char* argv[])
   phi[1] = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
   phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
   Parameter delta(1.14985, GammaPrior(1, 1), "delta");
+  Parameter nu(0.001, GammaPrior(1, 1), "nu");
+  Parameter alpha(60, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1,1), "a");
   Parameter b(0.3, GammaPrior(2.4,8), "b");
 
-  likelihood.SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta,a,b);
+  likelihood.SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta,nu, alpha, a,b);
 
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
@@ -380,6 +382,8 @@ main(int argc, char* argv[])
     txDelta.add(gamma1);
     txDelta.add(gamma2);
     txDelta.add(delta);
+    txDelta.add(nu);
+    //txDelta.add(alpha);
     AdaptiveMultiLogMRW* updateDistance = mcmc.NewAdaptiveMultiLogMRW("txDistance",txDelta, 300);
 
 
@@ -421,13 +425,14 @@ main(int argc, char* argv[])
     string outputFile(argv[4]);
     PosteriorHDF5Writer output(outputFile, likelihood);
     output.AddParameter(epsilon); output.AddParameter(gamma1);
-    output.AddParameter(gamma2); output.AddParameter(xi[0]);
-    output.AddParameter(xi[1]); output.AddParameter(xi[2]);
+    output.AddParameter(gamma2);  output.AddParameter(xi[0]);
+    output.AddParameter(xi[1]);   output.AddParameter(xi[2]);
     output.AddParameter(psi[0]);  output.AddParameter(psi[1]);
     output.AddParameter(psi[2]);  output.AddParameter(zeta[0]);
     output.AddParameter(zeta[1]); output.AddParameter(zeta[2]);
     output.AddParameter(phi[0]);  output.AddParameter(phi[1]);
     output.AddParameter(phi[2]);  output.AddParameter(delta);
+    output.AddParameter(nu);      output.AddParameter(alpha);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
