@@ -135,6 +135,7 @@ _h(const float t, float nu, float alpha)
   //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
   //return exp(nu*t) / ( alpha + exp(nu*t));
   return nu*nu*t*exp(-nu*t);
+	//return t < 4.0 ? 0.0f : 1.0f;
 }
 
 __device__ float
@@ -146,6 +147,7 @@ _H(const float t, float nu, float alpha)
 
   //float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
   float integral = -nu*t*exp(-nu*t) - exp(-nu*t) + 1;
+  //float integral = t - 4.0f;
   return fmaxf(0.0f, integral);
 }
 
@@ -924,6 +926,17 @@ GpuLikelihood::GpuLikelihood(PopDataImporter& population,
     popSize_(0), numSpecies_(nSpecies), obsTime_(obsTime), I1Time_(0.0), I1Idx_(
         0), covariateCopies_(0)
 {
+  
+  // Get GPU details
+  int deviceId;
+  checkCudaError(cudaGetDevice(&deviceId));
+  cudaDeviceProp deviceProp;
+  checkCudaError(cudaGetDeviceProperties(&deviceProp, deviceId));
+
+  std::cout << "Using GPGPU: " << deviceProp.name << ", id " << deviceId 
+	    << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
+  
+  
   checkCudaError(cudaSetDeviceFlags(cudaDeviceMapHost));
 
   // Load data into host memory
