@@ -108,11 +108,11 @@ namespace EpiRisk
       }
     };
 
-  template<typename T1, typename T2>
+  template<typename T>
     struct IndirectMin
     {
       __host__ __device__
-      IndirectMin(T2* ptr) :
+      IndirectMin(T* ptr) :
           ptr_(ptr)
       {
       }
@@ -120,12 +120,12 @@ namespace EpiRisk
 
       __host__ __device__
       bool
-      operator()(const T1 lhs, const T1 rhs) const
+      operator()(const InfecIdx_t& lhs, const InfecIdx_t& rhs) const
       {
-        return ptr_[lhs] < ptr_[rhs];
+        return ptr_[lhs.ptr] < ptr_[rhs.ptr];
       }
     private:
-      T2* ptr_;
+      T* ptr_;
     };
 
   __device__ float
@@ -216,7 +216,7 @@ namespace EpiRisk
   }
 
   __global__ void
-  _calcIntegral(const unsigned int* infecIdx, const int infecSize,
+  _calcIntegral(const InfecIdx_t* infecIdx, const int infecSize,
       const CSRMatrix distance, float* eventTimes, const int eventTimesPitch,
       const float* susceptibility, const float* infectivity, const float gamma2,
       const float delta, const float nu, const float alpha, float* output)
@@ -234,7 +234,7 @@ namespace EpiRisk
 
     if (row < infecSize)
       {
-        int i = infecIdx[row];
+        int i = infecIdx[row].ptr;
 
         int begin = distance.rowPtr[i];
         int end = distance.rowPtr[i + 1];
@@ -271,7 +271,7 @@ namespace EpiRisk
   }
 
   __global__ void
-  _calcProduct(const unsigned int* infecIdx, const int infecSize,
+  _calcProduct(const InfecIdx_t* infecIdx, const int infecSize,
       const CSRMatrix distance, const float* eventTimes,
       const int eventTimesPitch, const float* susceptibility,
       const float* infectivity, const float epsilon, const float gamma1,
@@ -291,7 +291,7 @@ namespace EpiRisk
 
     if (row < infecSize)
       {
-        int j = infecIdx[row];
+        int j = infecIdx[row].ptr;
 
         int begin = distance.rowPtr[j];
         int end = distance.rowPtr[j + 1];
@@ -356,7 +356,7 @@ namespace EpiRisk
 
   __global__ void
   _updateInfectionTimeIntegral(const unsigned int idx,
-      const unsigned int* infecIdx, const float newTime,
+      const InfecIdx_t* infecIdx, const float newTime,
       const CSRMatrix distance, float* eventTimes, const int eventTimesPitch,
       const float* susceptibility, const float* infectivity, const float gamma2,
       const float delta, const float nu, const float alpha, float* output)
@@ -367,7 +367,7 @@ namespace EpiRisk
     float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
 
@@ -430,7 +430,7 @@ namespace EpiRisk
 //! To be called **AFTER** the integral function!!
   __global__ void
   _updateInfectionTimeProduct(const unsigned int idx,
-      const unsigned int* infecIdx, const float newTime,
+      const InfecIdx_t* infecIdx, const float newTime,
       const CSRMatrix distance, float* eventTimes, const int eventTimesPitch,
       const float* susceptibility, const float* infectivity,
       const float epsilon, const float gamma1, const float gamma2,
@@ -442,7 +442,7 @@ namespace EpiRisk
     float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     if (tid == 0)
       {
         cache[0] = eventTimes[i];
@@ -511,7 +511,7 @@ namespace EpiRisk
 
   __global__ void
   _addInfectionTimeIntegral(const unsigned int idx,
-      const unsigned int* infecIdx, const float newTime,
+      const InfecIdx_t* infecIdx, const float newTime,
       const CSRMatrix distance, const float* eventTimes,
       const int eventTimesPitch, const float* susceptibility,
       const float* infectivity, const float gamma2, const float delta,
@@ -523,7 +523,7 @@ namespace EpiRisk
     float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
 
@@ -580,7 +580,7 @@ namespace EpiRisk
 
   __global__ void
   _delInfectionTimeIntegral(const unsigned int idx,
-      const unsigned int* infecIdx, const float newTime,
+      const InfecIdx_t* infecIdx, const float newTime,
       const CSRMatrix distance, float* eventTimes, const int eventTimesPitch,
       const float* susceptibility, const float* infectivity, const float gamma2,
       const float delta, const float nu, const float alpha, float* output)
@@ -591,7 +591,7 @@ namespace EpiRisk
     float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
 
@@ -648,7 +648,7 @@ namespace EpiRisk
   }
 
   __global__ void
-  _addInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
+  _addInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
       const float newTime, const CSRMatrix distance, float* eventTimes,
       const int eventTimesPitch, const float* susceptibility,
       const float* infectivity, const float epsilon, const float gamma1,
@@ -660,7 +660,7 @@ namespace EpiRisk
     float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     if (tid == 0)
       {
         prodCache[i] = 0.0f;
@@ -723,7 +723,7 @@ namespace EpiRisk
   }
 
   __global__ void
-  _delInfectionTimeProduct(const unsigned int idx, const unsigned int* infecIdx,
+  _delInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
       const float newTime, const CSRMatrix distance, float* eventTimes,
       const int eventTimesPitch, const float* susceptibility,
       const float* infectivity, const float epsilon, const float gamma1,
@@ -732,7 +732,7 @@ namespace EpiRisk
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    int i = infecIdx[idx];
+    int i = infecIdx[idx].ptr;
     if (tid == 0)
       {
         cache[0] = eventTimes[i];
@@ -775,7 +775,7 @@ namespace EpiRisk
 
   __global__
   void
-  _knownInfectionsLikelihood(const unsigned int* infecIdx,
+  _knownInfectionsLikelihood(const InfecIdx_t* infecIdx,
       const unsigned int knownInfecs, const float* eventTimes,
       const int eventTimesPitch, const float a, const float b,
       float* reductionBuff)
@@ -788,7 +788,7 @@ namespace EpiRisk
 
     if (tid < knownInfecs)
       {
-        int i = infecIdx[tid];
+        int i = infecIdx[tid].ptr;
         float Ii = eventTimes[i];
         float Ni = eventTimes[eventTimesPitch + i];
         float d = Ni - Ii;
@@ -803,7 +803,7 @@ namespace EpiRisk
 
   __global__
   void
-  _knownInfectionsLikelihoodPNC(const unsigned int* infecIdx,
+  _knownInfectionsLikelihoodPNC(const InfecIdx_t* infecIdx,
       const unsigned int knownInfecs, const float* eventTimes,
       const int eventTimesPitch, const float a, const float oldGamma,
       const float newGamma, const float* rns, const float prob,
@@ -819,7 +819,7 @@ namespace EpiRisk
       {
         if (rns[tid] >= prob)
           {
-            int i = infecIdx[tid];
+            int i = infecIdx[tid].ptr;
             float Ii = eventTimes[i];
             float Ni = eventTimes[eventTimesPitch + i];
             float d = Ni - Ii;
@@ -836,7 +836,7 @@ namespace EpiRisk
 
   __global__
   void
-  _nonCentreInfecTimes(const unsigned int* index, const int size,
+  _nonCentreInfecTimes(const InfecIdx_t* index, const int size,
       float* eventTimes, int eventTimesPitch, const float factor,
       const float* toCentre, const float prop)
   {
@@ -846,7 +846,7 @@ namespace EpiRisk
       {
         if (toCentre[tid] < prop)
           {
-            unsigned int i = index[tid];
+            unsigned int i = index[tid].ptr;
             float notification = eventTimes[i + eventTimesPitch];
             float infection = eventTimes[i];
             eventTimes[i] = notification - (notification - infection) * factor;
@@ -856,14 +856,14 @@ namespace EpiRisk
 
   __global__
   void
-  _collectInfectiousPeriods(const unsigned int* index, const int size,
+  _collectInfectiousPeriods(const InfecIdx_t* index, const int size,
       const float* eventTimes, const int eventTimesPitch, float* output)
   {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (tid < size)
       {
-        int i = index[tid];
+        int i = index[tid].ptr;
         float infecPeriod = eventTimes[eventTimesPitch + i] - eventTimes[i];
         output[tid] = infecPeriod;
       }
@@ -881,7 +881,7 @@ namespace EpiRisk
 
   __global__
   void
-  _indirectedSum(const unsigned int* index, const int size, const float* data,
+  _indirectedSum(const InfecIdx_t* index, const int size, const float* data,
       float* output)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -892,7 +892,7 @@ namespace EpiRisk
 
     if (tid < size)
       {
-        buff[threadIdx.x] = data[index[tid]];
+        buff[threadIdx.x] = data[index[tid].ptr];
         _shmemReduce(buff);
       }
     if (threadIdx.x == 0)
@@ -900,7 +900,7 @@ namespace EpiRisk
   }
 
   float
-  indirectedSum(const unsigned int* index, const int size, const float* data)
+  indirectedSum(const InfecIdx_t* index, const int size, const float* data)
   {
     int numBlocks = (size + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
     thrust::device_vector<float> output(numBlocks);
@@ -1489,10 +1489,11 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   void
   GpuLikelihood::UpdateI1()
   {
-    thrust::device_vector<unsigned int>::iterator myMin;
+    thrust::device_vector<InfecIdx_t>::iterator myMin;
     myMin = thrust::min_element(devInfecIdx_.begin(), devInfecIdx_.end(),
-        IndirectMin<unsigned int, float>(devEventTimes_));
-    I1Idx_ = *myMin;
+        IndirectMin<float>(devEventTimes_));
+    InfecIdx_t tmp = *myMin;
+    I1Idx_ = tmp.ptr;
 
     thrust::device_ptr<float> v(devEventTimes_);
     I1Time_ = v[I1Idx_];
@@ -1633,9 +1634,9 @@ _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*siz
       {
         float Ii, Ni;
         checkCudaError(
-            cudaMemcpy(&Ii, devEventTimes_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+            cudaMemcpy(&Ii, devEventTimes_+hostInfecIdx_[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         checkCudaError(
-            cudaMemcpy(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+            cudaMemcpy(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         loglikelihood += log(
             gsl_cdf_gamma_Q(Ni - Ii, (double) *a_, 1.0 / (double) *b_));
       }
@@ -1664,7 +1665,7 @@ _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*siz
     // Save likelihood components
     float savedIntegral = hostComponents_->integral;
 
-    int i = hostInfecIdx_[idx];
+    int i = hostInfecIdx_[idx].ptr;
 
     thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
     float newTime = hostPopulation_[i].N - inTime; // Relies on hostPopulation.N *NOT* being changed!
@@ -1746,7 +1747,7 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
     // Save likelihood components
     float savedIntegral = hostComponents_->integral;
 
-    unsigned int i = hostSuscOccults_[idx];
+    unsigned int i = hostSuscOccults_[idx].ptr;
 
     thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
     float Ni = hostPopulation_[i].N;
@@ -1831,7 +1832,7 @@ _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
 
     // Identify occult to delete
     unsigned int ii = idx + numKnownInfecs_;
-    unsigned int i = hostInfecIdx_[ii];
+    unsigned int i = hostInfecIdx_[ii].ptr;
 
     thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
 
@@ -1902,7 +1903,7 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
   float
   GpuLikelihood::GetIN(const size_t index)
   {
-    int i = hostInfecIdx_[index];
+    int i = hostInfecIdx_[index].ptr;
     thrust::device_vector<float> res(1);
     thrust::device_ptr<float> et(devEventTimes_);
     thrust::transform(et + eventTimesPitch_ + i, et + eventTimesPitch_ + i + 1,
@@ -2017,9 +2018,9 @@ _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&dev
       {
         float Ii, Ni;
         checkCudaError(
-            cudaMemcpyAsync(&Ii, devEventTimes_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+            cudaMemcpyAsync(&Ii, devEventTimes_+hostInfecIdx_[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         checkCudaError(
-            cudaMemcpyAsync(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i], sizeof(float), cudaMemcpyDeviceToHost));
+            cudaMemcpyAsync(&Ni, devEventTimes_+eventTimesPitch_+hostInfecIdx_[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         cudaDeviceSynchronize();
         logLikDiff += logf(gsl_cdf_gamma_Q(Ni - Ii, *a_, 1.0 / newGamma))
             - logf(gsl_cdf_gamma_Q(Ni - Ii, *a_, 1.0 / oldGamma));
@@ -2048,7 +2049,7 @@ _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&dev
     outputVec = devOutputVec;
     for (size_t i = 0; i < GetNumInfecs(); ++i)
       {
-        periods[i].idx = hostInfecIdx_[i];
+        periods[i].idx = hostInfecIdx_[i].ptr;
         periods[i].val = outputVec[i];
       }
   }
@@ -2069,10 +2070,10 @@ _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&dev
     thrust::host_vector<float> outputVec(likelihood.GetNumInfecs());
     outputVec = devOutputVec;
 
-    out << likelihood.hostPopulation_[likelihood.hostInfecIdx_[0]].id << ":"
+    out << likelihood.hostPopulation_[likelihood.hostInfecIdx_[0].ptr].id << ":"
         << outputVec[0];
     for (size_t i = 1; i < likelihood.GetNumInfecs(); ++i)
-      out << "," << likelihood.hostPopulation_[likelihood.hostInfecIdx_[i]].id
+      out << "," << likelihood.hostPopulation_[likelihood.hostInfecIdx_[i].ptr].id
           << ":" << outputVec[i];
 
     return out;
