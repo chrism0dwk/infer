@@ -76,6 +76,21 @@ namespace EpiRisk
     float* val;
   };
 
+  struct InfecIdx_t
+  {
+    unsigned int ptr;
+    char         flags;
+    InfecIdx_t(unsigned int ptr_, char flags_=0)
+    {
+      ptr = ptr_;
+      flags = flags_;
+    }
+    InfecIdx_t()
+    {
+
+    }
+  };
+
 // Helper classes
   template<typename T>
     class PointerVector
@@ -284,9 +299,11 @@ namespace EpiRisk
     const size_t popSize_;
     size_t numKnownInfecs_;
     size_t maxInfecs_;
-    thrust::host_vector<unsigned int> hostInfecIdx_;
-    thrust::device_vector<unsigned int> devInfecIdx_;
-    thrust::host_vector<unsigned int> hostSuscOccults_;
+
+
+    thrust::host_vector<InfecIdx_t> hostInfecIdx_;
+    thrust::device_vector<InfecIdx_t> devInfecIdx_;
+    thrust::host_vector<InfecIdx_t> hostSuscOccults_;
     const size_t numSpecies_;
     float logLikelihood_;
     const float obsTime_;
