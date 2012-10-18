@@ -28,8 +28,9 @@
 
 namespace EpiRisk
 {
-
-  McmcLikelihood::McmcLikelihood(GpuLikelihood& likelihood)
+ namespace Mcmc
+ {
+  LikelihoodHandler::LikelihoodHandler(GpuLikelihood& likelihood)
     : likelihood_(&likelihood), lastMove_(PARAMETER)
   {
     proposal_ = new GpuLikelihood(*likelihood_);
@@ -38,13 +39,13 @@ namespace EpiRisk
     proposal_->FullCalculate();
   }
 
-  McmcLikelihood::~McmcLikelihood()
+  LikelihoodHandler::~LikelihoodHandler()
   {
     delete proposal_;
   }
 
   void
-  McmcLikelihood::Accept()
+  LikelihoodHandler::Accept()
   {
     if (lastMove_ == PARAMETER)
       *likelihood_ = *proposal_;
@@ -55,7 +56,7 @@ namespace EpiRisk
   }
 
   float
-  McmcLikelihood::AddI(size_t idx, float inTime)
+  LikelihoodHandler::AddI(size_t idx, float inTime)
   {
     lastMove_ = ADD;
     proposal_->AddInfectionTime(idx, inTime);
@@ -64,7 +65,7 @@ namespace EpiRisk
   }
 
   float
-  McmcLikelihood::DeleteI(size_t idx)
+  LikelihoodHandler::DeleteI(size_t idx)
   {
     lastMove_ = DELETE;
     proposal_->DeleteInfectionTime(idx);
@@ -72,44 +73,44 @@ namespace EpiRisk
   }
 
   float
-  McmcLikelihood::GetCurrentValue() const
+  LikelihoodHandler::GetCurrentValue() const
   {
     return likelihood_->GetLogLikelihood();
   }
 
   float
-  McmcLikelihood::GetInfectionPart(const bool proposal) const
+  LikelihoodHandler::GetInfectionPart(const bool proposal) const
   {
     if(proposal) return proposal_->InfectionPart();
     else return likelihood_->InfectionPart();
   }
 
   float
-  McmcLikelihood::GetMeanI2N() const
+  LikelihoodHandler::GetMeanI2N() const
   {
     return likelihood_->GetMeanI2N();
   }
 
   float
-  McmcLikelihood::GetMeanOccI() const
+  LikelihoodHandler::GetMeanOccI() const
   {
     return likelihood_->GetMeanOccI();
   }
 
   void
-  McmcLikelihood::GetSumInfectivityPow(float* result) const
+  LikelihoodHandler::GetSumInfectivityPow(float* result) const
   {
     return likelihood_->GetSumInfectivityPow(result);
   }
 
   void
-  McmcLikelihood::GetSumSusceptibilityPow(float* result) const
+  LikelihoodHandler::GetSumSusceptibilityPow(float* result) const
   {
     return likelihood_->GetSumSusceptibilityPow(result);
   }
 
   float
-  McmcLikelihood::Propose()
+  LikelihoodHandler::Propose()
   {
     lastMove_ = PARAMETER;
     proposal_->FullCalculate();
@@ -117,7 +118,7 @@ namespace EpiRisk
   }
 
   void
-  McmcLikelihood::Reject()
+  LikelihoodHandler::Reject()
   {
     if (lastMove_ == PARAMETER)
       *proposal_ = *likelihood_;
@@ -126,7 +127,7 @@ namespace EpiRisk
   }
 
   float
-  McmcLikelihood::UpdateI(size_t idx, float inTime)
+  LikelihoodHandler::UpdateI(size_t idx, float inTime)
   {
     lastMove_ = INFECTIME;
     proposal_->UpdateInfectionTime(idx, inTime);
@@ -135,49 +136,50 @@ namespace EpiRisk
   }
 
   size_t
-  McmcLikelihood::GetNumInfecs() const
+  LikelihoodHandler::GetNumInfecs() const
   {
     return likelihood_->GetNumInfecs();
   }
 
   float
-  McmcLikelihood::GetIN(const size_t index) const
+  LikelihoodHandler::GetIN(const size_t index) const
   {
     return likelihood_->GetIN(index);
   }
 
   size_t
-  McmcLikelihood::GetNumPossibleOccults() const
+  LikelihoodHandler::GetNumPossibleOccults() const
   {
     return likelihood_->GetNumPossibleOccults();
   }
 
   size_t
-  McmcLikelihood::GetNumOccults() const
+  LikelihoodHandler::GetNumOccults() const
   {
     return likelihood_->GetNumOccults();
   }
 
   size_t
-  McmcLikelihood::GetNumKnownInfecs() const
+  LikelihoodHandler::GetNumKnownInfecs() const
   {
     return likelihood_->GetNumKnownInfecs();
   }
 
   bool
-  McmcLikelihood::IsInfecDC(const size_t index) const
+  LikelihoodHandler::IsInfecDC(const size_t index) const
   {
     return index >= likelihood_->GetNumKnownInfecs() and index < likelihood_->GetMaxInfecs();
   }
 
   float
-  McmcLikelihood::GetValue() const
+  LikelihoodHandler::GetValue() const
   {
     return likelihood_->GetLogLikelihood();
   }
   float
-  McmcLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob)
+  LikelihoodHandler::NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob)
   {
     return proposal_->NonCentreInfecTimes(oldGamma, newGamma, prob);
   }
+ }
 } /* namespace EpiRisk */

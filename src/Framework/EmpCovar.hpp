@@ -75,6 +75,7 @@
 
 
 #include <stdexcept>
+#include <string>
 #include <iostream>
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
@@ -224,8 +225,13 @@ namespace EpiRisk
       sample(ublas::vector<double>& theSample)
       {
         if(theSample.size() != params_.size())
-          throw std::logic_error("Sample size does not match param size in EmpCovar!");
-
+          {
+            std::stringstream msg;
+            msg << "Sample size " << theSample.size()
+                << " does not match param size " << params_.size()
+                << " in EmpCovar!";
+          throw std::logic_error(msg.str().c_str());
+          }
         for (int i = 0; i < params_.size();++i)
                   {
                     double pi = transformFunc_(theSample(i));

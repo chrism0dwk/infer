@@ -35,214 +35,111 @@
 //#endif
 
 #include "Mcmc.hpp"
+#include "McmcFactory.hpp"
 
-using namespace EpiRisk;
+namespace EpiRisk
+{
+  namespace Mcmc
+  {
 
 // Constants
-const double tuneI = 2.5;
+    const double tuneI = 2.5;
 
-inline
-double
-timeinseconds(const timeval a, const timeval b)
-{
-  timeval result;
-  timersub(&b, &a, &result);
-  return result.tv_sec + result.tv_usec / 1000000.0;
-}
+    inline
+    double
+    timeinseconds(const timeval a, const timeval b)
+    {
+      timeval result;
+      timersub(&b, &a, &result);
+      return result.tv_sec + result.tv_usec / 1000000.0;
+    }
 
-inline
-double
-onlineMean(const double x, const double xbar, const double n)
-{
-  return xbar + (x - xbar) / n;
-}
+    inline
+    double
+    onlineMean(const double x, const double xbar, const double n)
+    {
+      return xbar + (x - xbar) / n;
+    }
 
+    Mcmc::Mcmc() : likelihood_(NULL),random_(NULL) {}
 
+    void
+    Mcmc::Register(LikelihoodHandler* logLikelihood, Random* random)
+    {
+      likelihood_ = logLikelihood;
+      random_ = random;
+    }
 
-Mcmc::Mcmc(GpuLikelihood& likelihood, const size_t randomSeed) :
-    likelihood_(likelihood), random_(NULL), timeCalc_(0.0), timeUpdate_(
-        0.0)
-{
+    void
+    Mcmc::SetTag(TagType tag)
+    {
+      tag_ = tag;
+    }
 
-  random_ = new Random(randomSeed);
-}
+    TagType
+    Mcmc::GetTag() const
+    {
+      return tag_;
+    }
 
-Mcmc::~Mcmc()
-{
-  delete random_;
-}
-
-//! Pushes an updater onto the MCMC stack
-SingleSiteLogMRW*
-Mcmc::NewSingleSiteLogMRW(Parameter& param, const double tuning)
-{
-  SingleSiteLogMRW* update = new SingleSiteLogMRW(param.GetTag(), param, tuning,
-      *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an updater onto the MCMC stack
-AdaptiveMultiLogMRW*
-Mcmc::NewAdaptiveMultiLogMRW(const string name, UpdateBlock& updateGroup,
-    size_t burnin)
-{
-  // Create starting covariance matrix
-  EmpCovar<LogTransform>::CovMatrix initCov(updateGroup.size());
-  for (size_t i = 0; i < updateGroup.size(); ++i)
-    for (size_t j = 0; j <= i; ++j)
-      initCov(i, j) = i == j ? 0.1 : 0.0;
-
-  AdaptiveMultiLogMRW* update = new AdaptiveMultiLogMRW(name, updateGroup,
-      burnin, *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an updater onto the MCMC stack
-AdaptiveMultiMRW*
-Mcmc::NewAdaptiveMultiMRW(const string name, UpdateBlock& updateGroup,
-    const size_t burnin)
-{
-  // Create starting covariance matrix
-  EmpCovar<Identity>::CovMatrix initCov(updateGroup.size());
-  for (size_t i = 0; i < updateGroup.size(); ++i)
-    for (size_t j = 0; j <= i; ++j)
-      initCov(i, j) = i == j ? 0.1 : 0.0;
-
-  AdaptiveMultiMRW* update = new AdaptiveMultiMRW(name, updateGroup, burnin,
-      *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an SpeciesMRW updater onto the MCMC stack
-SpeciesMRW*
-Mcmc::NewSpeciesMRW(const string tag, UpdateBlock& params,
-    std::vector<double>& alpha, const size_t burnin)
-{
-  SpeciesMRW* update = new SpeciesMRW(tag, params, alpha, burnin, *random_,
-      likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an SusceptibilityMRW updater onto the MCMC stack
-SusceptibilityMRW*
-Mcmc::NewSusceptibilityMRW(const string tag, UpdateBlock& params,
-    const size_t burnin)
-{
-  SusceptibilityMRW* update = new SusceptibilityMRW(tag, params, burnin,
-      *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an InfectivityMRW updater onto the MCMC stack
-InfectivityMRW*
-Mcmc::NewInfectivityMRW(const string tag, UpdateBlock& params,
-    const size_t burnin)
-{
-  InfectivityMRW* update = new InfectivityMRW(tag, params, burnin,
-      *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an infectious period scale updater onto the MCMC stack
-InfectionTimeGammaCentred*
-Mcmc::NewInfectionTimeGammaCentred(const string tag, Parameter& param, const float tuning)
-{
-  InfectionTimeGammaCentred* update = new InfectionTimeGammaCentred(tag, param, tuning, *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes a non-centred infectious period scale updater onto the MCMC stack
-InfectionTimeGammaNC*
-Mcmc::NewInfectionTimeGammaNC(const string tag, Parameter& param, const float tuning, const float ncProp)
-{
-  InfectionTimeGammaNC* update = new InfectionTimeGammaNC(tag, param, tuning, ncProp, *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes an infection time updater on the the MCMC stack
-InfectionTimeUpdate*
-Mcmc::NewInfectionTimeUpdate(const string tag, Parameter& a, Parameter& b, const size_t reps)
-{
-  InfectionTimeUpdate* update = new InfectionTimeUpdate(tag, a, b, reps, *random_, likelihood_);
-  updateStack_.push_back(update);
-
-  return update;
-}
-
-//! Pushes a SellkeSerializer onto the MCMC stack
-SellkeSerializer*
-Mcmc::NewSellkeSerializer(const string filename)
-{
-  SellkeSerializer* update = new SellkeSerializer(filename, *random_,
-      likelihood_);
-  updateStack_.push_back(update);
-  return update;
-}
+//! Creates an updater and pushes it onto the MCMC call stack
+    Mcmc*
+    McmcContainer::Create(const UpdaterType updaterType, TagType tag)
+    {
+      Mcmc* updater = McmcFactory::Instance().Create(updaterType);
+      updater->Register(likelihood_, random_);
+      updater->SetTag(tag);
+      updateStack_.push_back(updater);
+      return updater;
+    }
 
 //! Performs a parameter sweep
-void
-Mcmc::Update()
-{
-  // Performs a sweep over the parameters
-  //  this could be generalized!
-
-  try
+    void
+    McmcContainer::Update()
     {
+      // Performs a sweep over the parameters
+          for (boost::ptr_list<Mcmc>::iterator it = updateStack_.begin();
+              it != updateStack_.end(); ++it)
+            {
+              it->Update();
+            }
+    }
 
-      for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
-          it != updateStack_.end(); ++it)
+    map<string, float>
+    McmcContainer::GetAcceptance() const
+    {
+      map<string, float> acceptance;
+      for (boost::ptr_list<Mcmc>::const_iterator it =
+          updateStack_.begin(); it != updateStack_.end(); ++it)
         {
-          it->Update();
+          map<string, float> tmp = it->GetAcceptance();
+          acceptance.insert(tmp.begin(), tmp.end());
         }
+
+      return acceptance;
     }
-  catch (logic_error& e)
+
+    void
+    McmcContainer::ResetAcceptance()
     {
-      cerr << "Logic Error occurred: " << e.what() << endl;
-      throw e;
+      for (boost::ptr_list<Mcmc>::iterator it = updateStack_.begin();
+          it != updateStack_.end(); ++it)
+        it->ResetAcceptance();
     }
-  catch (exception& e)
+
+
+    McmcRoot::McmcRoot(GpuLikelihood& likelihood, size_t seed)
     {
-      cerr << "Unknown error in " << __FILE__ << ":" << __LINE__ << ": "
-          << e.what() << endl;
-      throw e;
+      likelihood_ = new LikelihoodHandler(likelihood);
+      random_ = new Random(seed);
+      tag_ = "Root";
     }
-}
 
-map<string, float>
-Mcmc::GetAcceptance() const
-{
-  map<string, float> acceptance;
-  for (boost::ptr_list<McmcUpdate>::const_iterator it = updateStack_.begin();
-      it != updateStack_.end(); ++it)
+    McmcRoot::~McmcRoot()
     {
-      map<string, float> tmp = it->GetAcceptance();
-      acceptance.insert(tmp.begin(), tmp.end());
+      delete likelihood_;
+      delete random_;
     }
 
-  return acceptance;
+  }
 }
-
-void
-Mcmc::ResetAcceptance()
-{
-  for (boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
-      it != updateStack_.end(); ++it)
-    it->ResetAcceptance();
-}
-

@@ -31,14 +31,15 @@
 
 namespace EpiRisk
 {
-
-  class McmcLikelihood
+ namespace Mcmc
+ {
+  class LikelihoodHandler
   {
   public:
     explicit
-    McmcLikelihood(GpuLikelihood& likelihood);
+    LikelihoodHandler(GpuLikelihood& likelihood);
     virtual
-    ~McmcLikelihood();
+    ~LikelihoodHandler();
     float
     Propose();
     float
@@ -91,6 +92,6 @@ namespace EpiRisk
       DELETE
     } lastMove_;
   };
-
+ }
 } /* namespace EpiRisk */
 #endif /* MCMCLIKELIHOOD_HPP_ */

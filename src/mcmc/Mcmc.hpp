@@ -21,7 +21,6 @@
 /* Header file for aifuncs.cpp */
 
 //TODO Need to create an "output" class: as we add updaters, register the parameter (block) with the outputter.
-
 #ifndef INCLUDE_MCMC_H
 #define INCLUDE_MCMC_H
 
@@ -37,104 +36,89 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 
-
-
 #include "types.hpp"
-#include "GpuLikelihood.hpp"
 #include "Parameter.hpp"
 #include "Random.hpp"
 #include "EmpCovar.hpp"
-#include "McmcWriter.hpp"
-#include "MCMCUpdater.hpp"
+#include "GpuLikelihood.hpp"
 #include "McmcLikelihood.hpp"
-
 
 namespace EpiRisk
 {
-  using namespace std;
-  using namespace EpiRisk;
-
-  // FWD DECLS
-  class McmcUpdate;
-  class SingleSiteLogMRW;
-  class AdaptiveMultiLogMRW;
-  class AdaptiveMultiMRW;
-  class SpeciesMRW;
-  class SusceptibilityMRW;
-  class InfectivityMRW;
-  class InfectionTimeGammaCentred;
-  class InfectionTimeGammaNC;
-  class InfectionTimeUpdate;
-  class SellkeSerializer;
-
-
-
-
-  class Mcmc
+  namespace Mcmc
   {
 
-    McmcLikelihood likelihood_;
-    Random* random_;
+    class Mcmc
+         {
+         public:
+           explicit
+           Mcmc();
+           virtual
+           ~Mcmc() {};
+           void
+           Register(LikelihoodHandler* logLikelihood, Random* random);
+           virtual
+           void
+           SetTag(TagType tag);
+           virtual
+           TagType
+           GetTag() const;
+           virtual
+           void
+           Update() = 0;
+           virtual
+           std::map<std::string, float>
+           GetAcceptance() const = 0;
+           virtual
+           void
+           ResetAcceptance() = 0;
 
-    boost::ptr_list<McmcUpdate> updateStack_;
+         protected:
+           LikelihoodHandler* likelihood_;
+           Random* random_;
+           TagType tag_;
+         };
 
-    std::vector<size_t> elements_;
-    ofstream mcmcOutput_;
-    ofstream stdout_;
+    class McmcContainer : public Mcmc
+    {
+    public:
+      virtual
+      Mcmc*
+      Create(const UpdaterType updaterType, TagType tag);
+      virtual
+      void
+      Update();
+      virtual
+      std::map<std::string, float>
+      GetAcceptance() const;
+      virtual
+      void
+      ResetAcceptance();
 
-    double timeCalc_,timeUpdate_;
+    protected:
+      boost::ptr_list<Mcmc> updateStack_;
+    };
 
-    // Likelihood functions
-    float Propose();
-    void AcceptProposal();
-    void RejectProposal();
-
-    // Infection time functions -- should really be an updater
-    bool
-    UpdateI();
-    bool
-    AddI();
-    bool
-    DeleteI();
-
-    void
-    DumpParms() const;
-
-  public:
-    Mcmc(GpuLikelihood& logLikelihood, const size_t randomSeed);
-    ~Mcmc();
-    void
-    Update();
-    //! Creates a single site log MRW updater
-    SingleSiteLogMRW*
-    NewSingleSiteLogMRW(Parameter& param, const double tuning);
-    //! Creates a block update group
-    AdaptiveMultiLogMRW*
-    NewAdaptiveMultiLogMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
-    AdaptiveMultiMRW*
-    NewAdaptiveMultiMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
-    SpeciesMRW*
-    NewSpeciesMRW(const string tag, UpdateBlock& params, std::vector<double>& alpha, const size_t burnin = 1000);
-    InfectivityMRW*
-    NewInfectivityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
-    SusceptibilityMRW*
-    NewSusceptibilityMRW(const string tag, UpdateBlock& params, const size_t burnin = 1000);
-    InfectionTimeGammaCentred*
-    NewInfectionTimeGammaCentred(const string tag, Parameter& param, const float tuning);
-    InfectionTimeGammaNC*
-    NewInfectionTimeGammaNC(const string tag, Parameter& param, const float tuning, const float ncProp);
-    InfectionTimeUpdate*
-    NewInfectionTimeUpdate(const string tag, Parameter& a, Parameter& b, const size_t reps);
-    SellkeSerializer*
-    NewSellkeSerializer(const string filename);
-
-    std::map<std::string, float>
-    GetAcceptance() const;
-    void
-    ResetAcceptance();
+    class McmcRoot : public McmcContainer
+    {
+    public:
+      explicit
+      McmcRoot(GpuLikelihood& likelihood, const size_t seed);
+      ~McmcRoot();
+    };
 
 
-  };
+    class McmcRandomScan : public McmcContainer
+    {
+    public:
+      virtual
+      ~McmcRandomScan();
+      virtual
+      void
+      Update();
+    };
 
+
+  }
 }
 #endif

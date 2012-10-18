@@ -26,6 +26,7 @@
 #define INCLUDE_AITYPES_HPP
 
 #include <limits>
+#include <string>
 
 namespace EpiRisk
 {
@@ -44,6 +45,13 @@ namespace EpiRisk
     size_t idx;
     float  val;
   } IPTuple_t;
+
+  namespace Mcmc
+  {
+    typedef std::string TagType;
+    typedef std::string UpdaterType;
+
+  }
 
 }
 #endif
