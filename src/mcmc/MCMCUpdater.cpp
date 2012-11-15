@@ -89,12 +89,12 @@ namespace EpiRisk
     }
 
     template<class T>
-      double
+      float
       _determinant(const T& mat)
       {
-        ublas::matrix<double> m = mat;
+        ublas::matrix<float> m = mat;
         ublas::permutation_matrix<size_t> pm(m.size1());
-        double det = 1.0;
+        float det = 1.0;
         if (ublas::lu_factorize(m, pm))
           {
             det = 0.0;
@@ -109,36 +109,36 @@ namespace EpiRisk
       }
 
     inline
-    double
-    extremepdf(const double x, const double a, const double b)
+    float
+    extremepdf(const float x, const float a, const float b)
     {
       return a * b * exp(a + b * x - a * exp(b * x));
     }
 
     inline
-    double
-    extremecdf(const double x, const double a, const double b)
+    float
+    extremecdf(const float x, const float a, const float b)
     {
       return 1 - exp(-a * (exp(b * x) - 1));
     }
 
     inline
-    double
-    gammacdf(const double x, const double a, const double b)
+    float
+    gammacdf(const float x, const float a, const float b)
     {
       return gsl_cdf_gamma_P(x, a, 1.0 / b);
     }
 
     inline
-    double
-    gammapdf(const double x, const double a, const double b)
+    float
+    gammapdf(const float x, const float a, const float b)
     {
       return gsl_ran_gamma_pdf(x, a, 1.0 / b);
     }
 
     inline
-    double
-    gaussianTailPdf(const double x, const double mean, const double var)
+    float
+    gaussianTailPdf(const float x, const float mean, const float var)
     {
       return gsl_ran_gaussian_tail_pdf(x - mean, -mean, sqrt(var));
     }
@@ -180,7 +180,7 @@ namespace EpiRisk
     }
 
     void
-    SingleSiteLogMRW::SetTuning(const double tuning)
+    SingleSiteLogMRW::SetTuning(const float tuning)
     {
       tuning_ = tuning;
     }
@@ -190,10 +190,10 @@ namespace EpiRisk
     {
       Parameter& param_((*params_)[0].getParameter());
 
-      double oldValue = param_;
+      float oldValue = param_;
 
       // Calculate current posterior
-      double logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
 
       // Proposal via log random walk
       param_ *= exp(random_->gaussian(0, tuning_));
@@ -234,7 +234,7 @@ namespace EpiRisk
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.234)
             adaptScalar_ *= exp(-deltan);
@@ -271,15 +271,15 @@ namespace EpiRisk
         (*params_)[p].setValue((*params_)[p].getValue() + vars[p]);
 
       // Calculate candidate posterior
-      double logPiCan = likelihood_->Propose();
+      float logPiCan = likelihood_->Propose();
       for (size_t p = 0; p < params_->size(); ++p)
         logPiCan += log((*params_)[p].prior());
 
       // Proposal ratio
-      double qRatio = 0.0; // Gaussian proposal cancels
+      float qRatio = 0.0; // Gaussian proposal cancels
 
       // Accept or reject
-      double accept = logPiCan - logPiCur + qRatio;
+      float accept = logPiCan - logPiCur + qRatio;
       if (log(random_->uniform()) < accept)
         {
           likelihood_->Accept();
@@ -311,7 +311,7 @@ namespace EpiRisk
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.234)
             adaptScalar_ *= exp(-deltan);
@@ -354,12 +354,12 @@ namespace EpiRisk
         logPiCan += log((*params_)[p].prior());
 
       // Proposal ratio
-      double qRatio = 0.0;
+      float qRatio = 0.0;
       for (size_t p = 0; p < params_->size(); ++p)
         qRatio += log((*params_)[p].getValue() / oldParams[p]);
 
       // Accept or reject
-      double accept = logPiCan - logPiCur + qRatio;
+      float accept = logPiCan - logPiCur + qRatio;
       if (log(random_->uniform()) < accept)
         {
           likelihood_->Accept();
@@ -386,7 +386,7 @@ namespace EpiRisk
       transformedGroup_.add(params[1]);
       transformedGroup_.add(params[2]);
 
-     InitCovariance(transformedGroup_);
+      InitCovariance(transformedGroup_);
 
     }
 
@@ -402,17 +402,17 @@ namespace EpiRisk
       likelihood_->GetSumInfectivityPow(&constants_[0]);
 
       // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
-      double R = (*params_)[0].getValue()
+      float R = (*params_)[0].getValue()
           * (constants_[0] + (*params_)[1].getValue() * constants_[1]
               + (*params_)[2].getValue() * constants_[2]);
 
       // Current posterior
-      double logPiCur = likelihood_->GetCurrentValue()
+      float logPiCur = likelihood_->GetCurrentValue()
           + log((*params_)[0].prior()) + log((*params_)[1].prior())
           + log((*params_)[2].prior());
 
       // Make proposal
-      ublas::vector<double> transform(params_->size());
+      ublas::vector<float> transform(params_->size());
       transform(0) = (*params_)[0].getValue() * constants_[0];
       transform(1) = (*params_)[0].getValue() * (*params_)[1].getValue()
           * constants_[1];
@@ -420,15 +420,14 @@ namespace EpiRisk
           * constants_[2];
 
       // Sample transformed posterior
-      ublas::vector<double> sample =
-          ublas::vector_range<ublas::vector<double> >(transform,
-              ublas::range(1, transform.size()));
+      ublas::vector<float> sample = ublas::vector_range<ublas::vector<float> >(
+          transform, ublas::range(1, transform.size()));
       empCovar_->sample(sample);
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.234)
             adaptScalar_ *= exp(-deltan);
@@ -542,7 +541,7 @@ namespace EpiRisk
           + log((*params_)[2].prior());
 
       // Make proposal
-      ublas::vector<double> transform(params_->size());
+      ublas::vector<float> transform(params_->size());
       transform(0) = (*params_)[0].getValue() * constants_[0];
       transform(1) = (*params_)[0].getValue() * (*params_)[1].getValue()
           * constants_[1];
@@ -550,15 +549,14 @@ namespace EpiRisk
           * constants_[2];
 
       // Sample transformed posterior
-      ublas::vector<double> sample =
-          ublas::vector_range<ublas::vector<double> >(transform,
-              ublas::range(1, transform.size()));
+      ublas::vector<float> sample = ublas::vector_range<ublas::vector<float> >(
+          transform, ublas::range(1, transform.size()));
       empCovar_->sample(sample);
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.234)
             adaptScalar_ *= exp(-deltan);
@@ -609,11 +607,11 @@ namespace EpiRisk
           transform(2) / ((*params_)[0].getValue() * constants_[2]));
 
       // Calculate candidate posterior
-      double logPiCan = likelihood_->Propose() + log((*params_)[0].prior())
+      float logPiCan = likelihood_->Propose() + log((*params_)[0].prior())
           + log((*params_)[1].prior()) + log((*params_)[2].prior());
 
       // q-Ratio
-      double qRatio = log(
+      float qRatio = log(
           transform(1) / (oldParams[0] * oldParams[1] * constants_[1]))
           + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
 
@@ -654,15 +652,15 @@ namespace EpiRisk
 
       Parameter& param_((*params_)[0].getParameter());
 
-      double oldValue = param_;
+      float oldValue = param_;
 
       // Calculate current posterior
-      double logPiCur = likelihood_->GetInfectionPart() + log(param_.prior());
+      float logPiCur = likelihood_->GetInfectionPart() + log(param_.prior());
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.44)
             tuning_ *= exp(-deltan);
@@ -726,15 +724,15 @@ namespace EpiRisk
 
       Parameter& param_((*params_)[0].getParameter());
 
-      double oldValue = param_;
+      float oldValue = param_;
 
       // Calculate current posterior
-      double logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
-          double accept = (double) windowAcceptance_ / (double) windowUpdates_;
+          float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
           if (accept < 0.44)
             tuning_ *= exp(-deltan);
@@ -776,7 +774,7 @@ namespace EpiRisk
     }
 
     InfectionTimeUpdate::InfectionTimeUpdate() :
-        reps_(1)
+        reps_(1), ucalls_(0), doCompareProductVector_(NULL)
     {
       calls_.resize(3);
       accept_.resize(3);
@@ -800,14 +798,14 @@ namespace EpiRisk
     {
       for (size_t infec = 0; infec < reps_; ++infec)
         {
-          float pickMove = random_->uniform();
+          float pickMove = random_->uniform(0.0f, 1.0f);
 
-          if (pickMove < 0.667)
+          if (pickMove < 0.0f)
             {
               accept_[0] += UpdateI();
               calls_[0]++;
             }
-          else if (pickMove < 0.833)
+          else if (pickMove < 0.525f)
             {
               accept_[1] += AddI();
               calls_[1]++;
@@ -817,20 +815,59 @@ namespace EpiRisk
               accept_[2] += DeleteI();
               calls_[2]++;
             }
+
+          if (*doCompareProductVector_)
+            {
+              float proposal = likelihood_->Propose();
+
+              float likdiff = fabs(
+                  (proposal - likelihood_->GetCurrentValue())
+                      / likelihood_->GetCurrentValue());
+
+              if (true)
+                {
+                  std::stringstream s;
+                  s << "Likelihood discrepancy! Updated: "
+                      << likelihood_->GetCurrentValue() << "; recalc: "
+                      << proposal << " (" << likdiff << ")";
+
+                  likelihood_->CompareProdVectors();
+
+                  const GpuLikelihood::LikelihoodComponents* pLik =
+                      likelihood_->GetProposal();
+                  const GpuLikelihood::LikelihoodComponents* cLik =
+                      likelihood_->GetCurrent();
+                  cerr << "bgIntegral: " << pLik->bgIntegral << "\t"
+                      << cLik->bgIntegral << endl;
+                  cerr << "integral: " << pLik->integral << "\t"
+                      << cLik->integral << endl;
+                  cerr << "product: " << pLik->logProduct << "\t"
+                      << cLik->logProduct << endl;
+                  cerr << "Likelihood: " << proposal << "\t" << likelihood_->GetCurrentValue();
+                  likelihood_->Reject();
+                  //throw logic_error(s.str().c_str());
+                }
+              *doCompareProductVector_ = false;
+            }
         }
+      ucalls_++;
     }
 
     bool
     InfectionTimeUpdate::UpdateI()
     {
 
+#ifndef NDEBUG
+      std::cerr << "UPDATE" << std::endl;
+#endif
+
       Parameter& a_((*params_)[0].getParameter());
       Parameter& b_((*params_)[1].getParameter());
 
       size_t index = random_->integer(likelihood_->GetNumInfecs());
-      //double newIN = random_.gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
-      double oldIN = likelihood_->GetIN(index);
-      double newIN = oldIN * exp(random_->gaussian(0.0f, TUNEIN));
+      //float newIN = random_->gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
+      float oldIN = likelihood_->GetIN(index);
+      float newIN = oldIN * exp(random_->gaussian(0.0f, TUNEIN));
 
       float piCur = likelihood_->GetCurrentValue();
       float piCan = likelihood_->UpdateI(index, newIN);
@@ -846,11 +883,11 @@ namespace EpiRisk
           piCur += log(1 - gammacdf(oldIN, a_, b_));
         }
 
-      double qRatio = log(newIN / oldIN);
+      float qRatio = log(newIN / oldIN);
 
-      //log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
+      //float qRatio = log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
 
-      double accept = piCan - piCur + qRatio;
+      float accept = piCan - piCur + qRatio;
 
       if (log(random_->uniform()) < accept)
         {
@@ -875,6 +912,10 @@ namespace EpiRisk
     InfectionTimeUpdate::AddI()
     {
 
+#ifndef NDEBUG
+      std::cerr << "ADD" << std::endl;
+#endif
+
       Parameter& a_((*params_)[0].getParameter());
       Parameter& b_((*params_)[1].getParameter());
 
@@ -885,19 +926,20 @@ namespace EpiRisk
 
       size_t index = random_->integer(numSusceptible);
 
-      double inProp = random_->gamma(INFECPROP_A, INFECPROP_B);
+      float inProp = random_->gamma(INFECPROP_A, INFECPROP_B);
 
-      double logPiCur = likelihood_->GetCurrentValue();
+      float logPiCur = likelihood_->GetCurrentValue();
 
-      double logPiCan = likelihood_->AddI(index, inProp)
-          + log(1.0 - gammacdf(inProp, a_, b_));
+      float logLikCan = likelihood_->AddI(index, inProp);
 
-      double qRatio = log(
+      float logPiCan = logLikCan + log(1.0 - gammacdf(inProp, a_, b_));
+
+      float qRatio = log(
           (1.0 / (likelihood_->GetNumOccults() + 1))
               / ((1.0 / numSusceptible)
                   * gammapdf(inProp, INFECPROP_A, INFECPROP_B)));
 
-      double accept = logPiCan - logPiCur + qRatio;
+      float accept = logPiCan - logPiCur + qRatio;
 
       // Perform accept/reject step.
       if (log(random_->uniform()) < accept)
@@ -922,6 +964,10 @@ namespace EpiRisk
     InfectionTimeUpdate::DeleteI()
     {
 
+#ifndef NDEBUG
+      std::cerr << "DEL" << std::endl;
+#endif
+
       Parameter& a_((*params_)[0].getParameter());
       Parameter& b_((*params_)[1].getParameter());
 
@@ -944,13 +990,13 @@ namespace EpiRisk
           + log(1 - gammacdf(inTime, a_, b_));
 
       float logPiCan = likelihood_->DeleteI(toRemove);
-      double qRatio = log(
+      float qRatio = log(
           (1.0 / (numSusceptible + 1)
               * gammapdf(inTime, INFECPROP_A, INFECPROP_B))
               / (1.0 / likelihood_->GetNumOccults()));
 
       // Perform accept/reject step.
-      double accept = logPiCan - logPiCur + qRatio;
+      float accept = logPiCan - logPiCur + qRatio;
 
       if (log(random_->uniform()) < accept)
         {

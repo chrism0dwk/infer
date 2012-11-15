@@ -43,6 +43,7 @@
 #include "GpuLikelihood.hpp"
 #include "McmcLikelihood.hpp"
 
+
 namespace EpiRisk
 {
   namespace Mcmc

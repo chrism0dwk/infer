@@ -93,8 +93,8 @@ struct Settings
     phi_s = pt.get<double> ("fmdGillespieSim.parameters.phi_s");
     a = pt.get<double> ("fmdGillespieSim.parameters.a");
     b = pt.get<double> ("fmdGillespieSim.parameters.b");
-    latency = pt.get<double> ("fmdGillespieSim.options.latency", 0.0);
-    ntor = pt.get<double> ("fmdGillespieSim.options.ntor",1.0);
+    latency = pt.get<double> ("fmdGillespieSim.options.latency", 0.0f);
+    ntor = pt.get<double> ("fmdGillespieSim.options.ntor",1.0f);
   }
 
 };

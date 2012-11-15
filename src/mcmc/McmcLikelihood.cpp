@@ -114,6 +114,7 @@ namespace EpiRisk
   {
     lastMove_ = PARAMETER;
     proposal_->FullCalculate();
+
     return proposal_->GetLogLikelihood();
   }
 
@@ -180,6 +181,23 @@ namespace EpiRisk
   LikelihoodHandler::NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob)
   {
     return proposal_->NonCentreInfecTimes(oldGamma, newGamma, prob);
+  }
+  void
+  LikelihoodHandler::CompareProdVectors() const
+  {
+    thrust::host_vector<float> current = likelihood_->GetProdVector();
+    thrust::host_vector<float> proposal = proposal_->GetProdVector();
+    cerr << "Checking prod vector (" << current.size() << "):" << endl;
+    cerr.precision(15);
+    for(size_t i = 0; i<current.size(); ++i)
+      {
+        float curr = current[i];
+        float prop = proposal[i];
+        if (fabs((curr - prop)/curr) > 1e-6)
+          {
+            cerr << i << ":\t" << curr << "\t" << prop << "\t" << curr - prop << endl;
+          }
+      }
   }
  }
 } /* namespace EpiRisk */

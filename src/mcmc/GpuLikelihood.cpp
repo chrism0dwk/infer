@@ -52,9 +52,11 @@ namespace EpiRisk
             Covars covars;
             covars.id = record.id;
             covars.status = SUSC;
-            covars.I = EpiRisk::POSINF;
-            covars.N = EpiRisk::POSINF;
-            covars.R = EpiRisk::POSINF;
+            covars.x = record.data.x;
+            covars.y = record.data.y;
+            covars.I = obsTime_; //EpiRisk::POSINF;
+            covars.N = obsTime_; //EpiRisk::POSINF;
+            covars.R = obsTime_; //EpiRisk::POSINF;
             covars.cattle = record.data.cattle;
             covars.pigs = record.data.pigs;
             covars.sheep = record.data.sheep;
@@ -134,16 +136,18 @@ namespace EpiRisk
 
             maxInfecs_++;
           }
+
       }
     catch (EpiRisk::fileEOF& e)
       {
-        return;
+        ;
       }
     catch (...)
       {
         throw;
       }
 
+    if (!occultsOnlyDC_) maxInfecs_ = hostPopulation_.size();
     importer.close();
 
   }
@@ -238,13 +242,15 @@ namespace EpiRisk
     delete Dimport;
   }
 
+
   void
-  GpuLikelihood::SetParameters(Parameter& epsilon, Parameter& gamma1,
+  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1,
       Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
       Parameters& phi, Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
   {
 
-    epsilon_ = epsilon.GetValuePtr();
+    epsilon1_ = epsilon1.GetValuePtr();
+    epsilon2_ = epsilon2.GetValuePtr();
     gamma1_ = gamma1.GetValuePtr();
     gamma2_ = gamma2.GetValuePtr();
     delta_ = delta.GetValuePtr();
@@ -266,6 +272,18 @@ namespace EpiRisk
       }
 
     RefreshParameters();
+  }
+
+  void
+  GpuLikelihood::SetMovtBan(const float movtBanTime)
+  {
+	  movtBan_ = movtBanTime;
+  }
+
+  float
+  GpuLikelihood::GetMovtBan() const
+  {
+	  return movtBan_;
   }
 
   size_t

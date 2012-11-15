@@ -27,6 +27,8 @@
 #ifndef GPULIKELIHOOD_HPP_
 #define GPULIKELIHOOD_HPP_
 
+
+
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <cublas_v2.h>
@@ -45,6 +47,7 @@
 #include "types.hpp"
 #include "Data.hpp"
 #include "PosteriorWriter.hpp"
+
 
 
 #ifndef __CUDACC__
@@ -69,11 +72,14 @@ namespace EpiRisk
 
 // Data structures
 
-  struct CSRMatrix
+  struct CsrMatrix
   {
     int* rowPtr;
     int* colInd;
     float* val;
+    int nnz;
+    int n;
+    int m;
   };
 
   struct InfecIdx_t
@@ -85,7 +91,7 @@ namespace EpiRisk
       ptr = Ptr;
       dc = DC;
     }
-    InfecIdx_t()
+    InfecIdx_t() : ptr(NULL), dc(-1)
     {
     }
   };
@@ -152,10 +158,18 @@ namespace EpiRisk
   class GpuLikelihood
   {
   public:
+    struct LikelihoodComponents
+    {
+      float sumI;
+      float bgIntegral;
+      float logProduct;
+      float integral;
+    };
+
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
-        DistMatrixImporter& distMatrix, const size_t nSpecies,
-        const float obsTime, const bool occultsOnlyDC = true);
+        const size_t nSpecies,
+        const float obsTime, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
     GpuLikelihood(const GpuLikelihood& other);
     virtual
@@ -173,17 +187,23 @@ namespace EpiRisk
     void
     LoadDistanceMatrix(DistMatrixImporter& filename);
     void
+    CalcDistanceMatrix();
+    void
     SetEvents();
     void
     SetSpecies();
     void
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
-    SetParameters(Parameter& epsilon, Parameter& gamma1, Parameter& gamma2,
+    SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1, Parameter& gamma2,
         Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi,
         Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b);
     void
     RefreshParameters();
+    void
+    SetMovtBan(const float movtBanTime);
+    float
+    GetMovtBan() const;
     size_t
     GetNumKnownInfecs() const;
     size_t
@@ -226,6 +246,16 @@ namespace EpiRisk
     GetIN(const size_t index);
     float
     GetLogLikelihood() const;
+    const LikelihoodComponents*
+    GetLikelihoodComponents() const
+    {
+      return hostComponents_;
+    }
+    const thrust::device_vector<float>&
+    GetProdVector() const
+    {
+      return devProduct_;
+    }
     float
     GetN(const int idx) const;
     float
@@ -262,6 +292,7 @@ namespace EpiRisk
     struct Covars
     {
       string id;
+      float x,y;
       DiseaseStatus status;
       float I;
       float N;
@@ -298,22 +329,18 @@ namespace EpiRisk
     const size_t popSize_;
     size_t numKnownInfecs_;
     size_t maxInfecs_;
+    size_t occultsOnlyDC_;
     thrust::host_vector<InfecIdx_t> hostInfecIdx_;
     thrust::device_vector<InfecIdx_t> devInfecIdx_;
     thrust::host_vector<InfecIdx_t> hostSuscOccults_;
     const size_t numSpecies_;
     float logLikelihood_;
     const float obsTime_;
+    float movtBan_;
     float I1Time_;
     unsigned int I1Idx_;
 
-    struct LikelihoodComponents
-    {
-      float sumI;
-      float bgIntegral;
-      float logProduct;
-      float integral;
-    };
+
 
     LikelihoodComponents* hostComponents_;
     LikelihoodComponents* devComponents_;
@@ -325,7 +352,7 @@ namespace EpiRisk
     float* devAnimals_;
     size_t animalsPitch_;
 
-    CSRMatrix devD_;
+    CsrMatrix* devD_;
 
     int* hostDRowPtr_;
     size_t dnnz_; //CRS
@@ -348,9 +375,12 @@ namespace EpiRisk
     CUDPPHandle addReduce_;
     CUDPPConfiguration addReduceCfg_;
     CUDPPConfiguration logAddReduceCfg_;
+    CUDPPHandle minReduce_;
+    CUDPPConfiguration minReduceCfg_;
 
     // Parameters
-    float* epsilon_;
+    float* epsilon1_;
+    float* epsilon2_;
     float* gamma1_;
     float* gamma2_;
     float* delta_;

@@ -50,6 +50,7 @@
 #include "EmpCovar.hpp"
 #include "Mcmc.hpp"
 
+
 namespace EpiRisk
 {
   namespace Mcmc
@@ -61,8 +62,8 @@ namespace EpiRisk
     // FUNCTORS
     struct ExpTransform
     {
-      double
-      operator()(const double x)
+      float
+      operator()(const float x)
       {
         return exp(x);
       }
@@ -70,8 +71,8 @@ namespace EpiRisk
 
     struct LogTransform
     {
-      double
-      operator()(const double x)
+      float
+      operator()(const float x)
       {
         return log(x);
       }
@@ -109,12 +110,12 @@ namespace EpiRisk
     public:
       SingleSiteLogMRW();
       void
-      SetTuning(const double tuning);
+      SetTuning(const float tuning);
       void
       Update();
 
     private:
-      double tuning_;
+      float tuning_;
     };
 
     //! Adaptive Multisite updater class
@@ -191,7 +192,7 @@ namespace EpiRisk
           empCovar_ = new EmpCovar<Transform>(params, *stdCov_);
         }
         size_t burnin_;
-        double adaptScalar_;
+        float adaptScalar_;
         size_t windowUpdates_;
         size_t windowAcceptance_;
         bool isAdaptiveInitialized_;
@@ -294,15 +295,22 @@ namespace EpiRisk
       void
       SetReps(const size_t reps);
       void
+      SetCompareProductVector(bool* doCompareProductVector)
+      {
+        doCompareProductVector_ = doCompareProductVector;
+      }
+      void
       Update();
       std::map<std::string, float>
       GetAcceptance() const;
       void
       ResetAcceptance();
     private:
+      bool* doCompareProductVector_;
       ublas::vector<float> calls_;
       ublas::vector<float> accept_;
       size_t reps_;
+      size_t ucalls_;
       bool
       UpdateI();
       bool

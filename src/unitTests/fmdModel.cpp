@@ -29,14 +29,14 @@
 #include "fmdModel.hpp"
 
 
-FmdModel::FmdModel(Population<TestCovars>& population, FmdParameters& parameters) : Model< Population<TestCovars> >(population), params_(parameters)
+FmdModel::FmdModel(Population<TestCovars>& population, FmdParameters& parameters)
+  : Model< Population<TestCovars> >(population), params_(parameters)
 {
 
 }
 
 FmdModel::~FmdModel()
 {
-
 }
 
 double
@@ -105,7 +105,7 @@ FmdModel::ItoN(const double rn) const
 }
 
 double
-FmdModel::ItoN(Random& random) const
+FmdModel::ItoN(Random& random)
 {
   return random.gamma(params_.a, params_.b);
 }

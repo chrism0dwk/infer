@@ -29,10 +29,15 @@
 
 #include "GpuLikelihood.hpp"
 
+
+
 namespace EpiRisk
 {
  namespace Mcmc
  {
+
+
+
   class LikelihoodHandler
   {
   public:
@@ -80,7 +85,12 @@ namespace EpiRisk
     GetValue() const;
     float
     NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
-
+    const GpuLikelihood::LikelihoodComponents*
+    GetProposal() const { return proposal_->GetLikelihoodComponents(); }
+    const GpuLikelihood::LikelihoodComponents*
+    GetCurrent() const { return likelihood_->GetLikelihoodComponents(); }
+    void
+    CompareProdVectors() const;
   private:
     GpuLikelihood* likelihood_;
     GpuLikelihood* proposal_;
