@@ -360,8 +360,8 @@ main(int argc, char* argv[])
   // Set up parameters
   Parameter epsilon1(1e-7, GammaPrior(5e-5, 1), "epsilon1");
   Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
-  Parameter gamma1(0.03, GammaPrior(1, 1), "gamma1");
-  Parameter gamma2(0.23, GammaPrior(1, 1), "gamma2");
+  Parameter gamma1(0.003, GammaPrior(1, 1), "gamma1");
+  Parameter gamma2(0.23, GammaPrior(2, 4), "gamma2");
   Parameters xi(3);
   xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
   xi[1] = Parameter(0.29, GammaPrior(1, 1), "xi_p");
@@ -396,69 +396,69 @@ main(int argc, char* argv[])
 
   float ncratio = atof(argv[7]);
 
-//  UpdateBlock txDelta;
-//  txDelta.add(epsilon1);
-//  txDelta.add(epsilon2);
-//  txDelta.add(gamma1);
-//  txDelta.add(gamma2);
-//  txDelta.add(delta);
-//  //txDelta.add(nu);
-//  //txDelta.add(alpha);
-//  Mcmc::AdaptiveMultiLogMRW* updateDistance =
-//      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
-//          "txDistance");
-//  updateDistance->SetParameters(txDelta);
-//
-//  UpdateBlock txPsi;
-//  txPsi.add(psi[0]);
-//  txPsi.add(psi[1]);
-//  txPsi.add(psi[2]);
-//  Mcmc::AdaptiveMultiLogMRW* updatePsi =
-//      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
-//  updatePsi->SetParameters(txPsi);
-//
-//  UpdateBlock txPhi;
-//  txPhi.add(phi[0]);
-//  txPhi.add(phi[1]);
-//  txPhi.add(phi[2]);
-//  Mcmc::AdaptiveMultiLogMRW* updatePhi =
-//      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
-//  updatePhi->SetParameters(txPhi);
-//
-//  UpdateBlock txInfec;
-//  txInfec.add(gamma1);
-//  txInfec.add(xi[1]);
-//  txInfec.add(xi[2]);
-//  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
-//      "AdaptiveMultiLogMRW", "txInfec");
-//  updateInfec->SetParameters(txInfec);
-//
-//  UpdateBlock txSuscep;
-//  txSuscep.add(gamma1);
-//  txSuscep.add(zeta[1]);
-//  txSuscep.add(zeta[2]);
-//  Mcmc::SusceptibilityMRW* updateSuscep =
-//      (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-//  updateSuscep->SetParameters(txSuscep);
+  UpdateBlock txDelta;
+  txDelta.add(epsilon1);
+  //txDelta.add(epsilon2);
+  txDelta.add(gamma1);
+  txDelta.add(gamma2);
+  txDelta.add(delta);
+  //txDelta.add(nu);
+  //txDelta.add(alpha);
+  Mcmc::AdaptiveMultiLogMRW* updateDistance =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
+          "txDistance");
+  updateDistance->SetParameters(txDelta);
+
+  UpdateBlock txPsi;
+  txPsi.add(psi[0]);
+  txPsi.add(psi[1]);
+  txPsi.add(psi[2]);
+  Mcmc::AdaptiveMultiLogMRW* updatePsi =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
+  updatePsi->SetParameters(txPsi);
+
+  UpdateBlock txPhi;
+  txPhi.add(phi[0]);
+  txPhi.add(phi[1]);
+  txPhi.add(phi[2]);
+  Mcmc::AdaptiveMultiLogMRW* updatePhi =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
+  updatePhi->SetParameters(txPhi);
+
+  UpdateBlock txInfec;
+  txInfec.add(gamma1);
+  txInfec.add(xi[1]);
+  txInfec.add(xi[2]);
+  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
+      "AdaptiveMultiLogMRW", "txInfec");
+  updateInfec->SetParameters(txInfec);
+
+  UpdateBlock txSuscep;
+  txSuscep.add(gamma1);
+  txSuscep.add(zeta[1]);
+  txSuscep.add(zeta[2]);
+  Mcmc::SusceptibilityMRW* updateSuscep =
+      (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+  updateSuscep->SetParameters(txSuscep);
 
   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
-  UpdateBlock infecPeriod;
-  infecPeriod.add(a);
-  infecPeriod.add(b);
-  Mcmc::InfectionTimeUpdate* updateInfecTime =
-      (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-          "infecTimes");
-  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
-  updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetReps(750);
-
+//  UpdateBlock infecPeriod;
+//  infecPeriod.add(a);
+//  infecPeriod.add(b);
+//  Mcmc::InfectionTimeUpdate* updateInfecTime =
+//      (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+//          "infecTimes");
+//  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
+//  updateInfecTime->SetParameters(infecPeriod);
+//  updateInfecTime->SetReps(750);
+//
 //  UpdateBlock bUpdate; bUpdate.add(b);
 //  Mcmc::InfectionTimeGammaCentred* updateBC =
 //      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
 //  updateBC->SetParameters(bUpdate);
 //  updateBC->SetTuning(0.014);
-
+//
 //  Mcmc::InfectionTimeGammaNC* updateBNC =
 //      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
 //  updateBNC->SetParameters(bUpdate);

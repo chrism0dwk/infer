@@ -49,6 +49,7 @@
 #include <boost/numeric/ublas/lu.hpp>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
+#include <iomanip>
 
 #include "MCMCUpdater.hpp"
 #include "StochasticNode.hpp"
@@ -800,7 +801,7 @@ namespace EpiRisk
         {
           float pickMove = random_->uniform(0.0f, 1.0f);
 
-          if (pickMove < 0.0f)
+          if (pickMove < 1.0f)
             {
               accept_[0] += UpdateI();
               calls_[0]++;
@@ -837,6 +838,7 @@ namespace EpiRisk
                       likelihood_->GetProposal();
                   const GpuLikelihood::LikelihoodComponents* cLik =
                       likelihood_->GetCurrent();
+                  cerr << setprecision(6);
                   cerr << "bgIntegral: " << pLik->bgIntegral << "\t"
                       << cLik->bgIntegral << endl;
                   cerr << "integral: " << pLik->integral << "\t"

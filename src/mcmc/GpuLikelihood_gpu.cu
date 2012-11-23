@@ -136,7 +136,7 @@ namespace EpiRisk
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
     //return exp(nu*t) / ( alpha + exp(nu*t));
     //return nu*nu*t*exp(-nu*t);
-    return 1.0f;//t < 4.0 ? 0.0f : 1.0f;
+    return t < 4.0 ? 0.0f : 1.0f;
   }
 
   __device__ float
@@ -149,7 +149,7 @@ namespace EpiRisk
     //float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
     //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
 
-    float integral = t - 0.0f;
+    float integral = t - 4.0f;
     return fmaxf(0.0f, integral);
   }
 
@@ -785,17 +785,6 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     buff[threadIdx.x] = 0.0f;
 
     int i = infecIdx[idx].ptr;
-    if (tid == 0)
-      {
-        cache[0] = eventTimes[i];
-        eventTimes[i] = newTime; // Update population -- can be done at leisure
-        prodCache[i] = 0.0f;
-        if (newTime < eventTimes[I1Idx] and i != I1Idx)
-          prodCache[I1Idx] = newTime < movtBan ? epsilon1 : (epsilon1 * epsilon2);
-        __threadfence();
-      }
-
-    __syncthreads();
 
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
@@ -809,7 +798,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
         if (Ij < Nj)
           {
-            float Ii = cache[0]; //eventTimes[i];
+            float Ii = eventTimes[i];
             float Ni = eventTimes[i + eventTimesPitch];
             float Ri = eventTimes[i + eventTimesPitch * 2];
             float Rj = eventTimes[j + eventTimesPitch * 2];
@@ -1006,16 +995,6 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     buff[threadIdx.x] = 0.0f;
 
     int i = infecIdx[idx].ptr;
-    if (tid == 0)
-      {
-        prodCache[i] = 0.0f; // Move out!
-        if (newTime < eventTimes[I1Idx])
-          prodCache[I1Idx] = newTime < movtBan ? epsilon1 : (epsilon1 * epsilon2);
-        eventTimes[i] = newTime; // Update population -- can be done at leisure
-        __threadfence();
-      }
-
-    __syncthreads();
 
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
@@ -1063,9 +1042,9 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
         if (threadIdx.x == 0)
           _atomicAdd(prodCache + i, buff[0]);
-        if (tid == 0) {
-            float epsilon = newTime < movtBan ? epsilon1 : (epsilon1*epsilon2);
-            _atomicAdd(prodCache + i, epsilon);
+        if (tid == 0) { // Add background pressure, or turn to 1.0f for I1
+          float epsilon = newTime < movtBan ? epsilon1 : (epsilon1*epsilon2);
+          _atomicAdd(prodCache + i, epsilon);
         }
       }
   }
@@ -1081,15 +1060,6 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     int i = infecIdx[idx].ptr;
-    if (tid == 0)
-      {
-        cache[0] = eventTimes[i];
-        prodCache[i] = 1.0f;
-        eventTimes[i] = eventTimes[i + eventTimesPitch];
-        __threadfence();
-      }
-
-    __syncthreads();
 
     int begin = distance.rowPtr[i];
     int end = distance.rowPtr[i + 1];
@@ -1104,7 +1074,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         if (Ij < Nj)
           {
 
-            float Ii = cache[0]; //eventTimes[i];
+            float Ii = eventTimes[i];
             float Ni = eventTimes[i + eventTimesPitch];
             float Ri = eventTimes[i + eventTimesPitch * 2];
 
@@ -2074,20 +2044,28 @@ _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*siz
 
     thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
     float newTime = hostPopulation_[i].N - inTime; // Relies on hostPopulation.N *NOT* being changed!
-    float oldTime; checkCudaError(cudaMemcpy(&oldTime, devEventTimes_+i, sizeof(float), cudaMemcpyDeviceToHost));//eventTimesPtr[i]; // CUDA_MEMCPY Memcpy
+    float oldTime = eventTimesPtr[i];
+
+    bool haveNewI1 = false;
+    if (newTime < I1Time_ or i == I1Idx_)
+      {
+        haveNewI1 = true;
+        devProduct_[I1Idx_] = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
+      }
+
+    devProduct_[i] = 0.0f;
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
         - 1) / THREADSPERBLOCK + 1;
 
-
-    cerr << "Moving idx " << idx << " from " << oldTime << " to " << newTime << endl;
+    cerr << "Moving idx " << idx << " from " <<  oldTime << " to " << newTime << endl;
     // Integrated infection pressure
 _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       *devD_,
       devEventTimes_, eventTimesPitch_, devSusceptibility_,
       devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               	    	    checkCudaError(cudaGetLastError());
-      cudaDeviceSynchronize();
+
       CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
         thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
     if (res != CUDPP_SUCCESS)
@@ -2101,9 +2079,9 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
               	    	    checkCudaError(cudaGetLastError());
 
     // Make the change to the population
-    bool haveNewI1 = false;
+    eventTimesPtr[i] = newTime;
 
-    if (newTime < I1Time_ or i == I1Idx_)
+    if (haveNewI1)
       {
         UpdateI1();
         CalcBgIntegral();
@@ -2164,11 +2142,16 @@ _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*si
     float newTime = Ni - inTime;
 
     // Update the indices
-    cudaDeviceSynchronize();
     devInfecIdx_.push_back(i);
     hostInfecIdx_.push_back(i);
     hostSuscOccults_.erase(hostSuscOccults_.begin() + idx);
-    cudaDeviceSynchronize();
+
+    devProduct_[i] = 0.0f; // Zero out product cache
+    bool haveNewI1 = false;
+    if(newTime < I1Time_) {
+      devProduct_[I1Idx_] = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
+      haveNewI1 = true;
+    }
 
     unsigned int addIdx = devInfecIdx_.size() - 1;
 
@@ -2178,7 +2161,7 @@ _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*size
       *devD_, devEventTimes_, eventTimesPitch_, devSusceptibility_,
       devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               	    	    checkCudaError(cudaGetLastError());
-    cudaDeviceSynchronize();
+
     CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
         thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
     if (res != CUDPP_SUCCESS)
@@ -2191,14 +2174,12 @@ _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
     *delta_, *nu_, *alpha_, movtBan_, I1Idx_, thrust::raw_pointer_cast(&devProduct_[0]));
               	    	    checkCudaError(cudaGetLastError());
 
-    // Make the change to the population
-    bool haveNewI1 = false;
-    //eventTimesPtr[i] = newTime;
-    if (newTime < I1Time_)
+    // Update the population
+    eventTimesPtr[i] = newTime;
+    if (haveNewI1)
       {
         UpdateI1();
         CalcBgIntegral();
-        haveNewI1 = true;
 #ifndef NDEBUG
         std::cerr << "New I1" << std::endl;
 #endif
@@ -2260,7 +2241,7 @@ _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*size
       devEventTimes_, eventTimesPitch_, devSusceptibility_,
       devInfectivity_, *gamma2_, *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devWorkspace_[0]));
               	    	    checkCudaError(cudaGetLastError());
-    cudaDeviceSynchronize();
+
     CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
         thrust::raw_pointer_cast(&devWorkspace_[0]), blocksPerGrid);
     if (res != CUDPP_SUCCESS)
@@ -2272,14 +2253,14 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
     devSusceptibility_, devInfectivity_, *gamma1_, *gamma2_,
     *delta_, *nu_, *alpha_, thrust::raw_pointer_cast(&devProduct_[0]));
   	    	    checkCudaError(cudaGetLastError());
-    cudaDeviceSynchronize();
+
     // Make the change to the population
     bool haveNewI1 = false;
     devInfecIdx_.erase(devInfecIdx_.begin() + ii);
     hostInfecIdx_.erase(hostInfecIdx_.begin() + ii);
     hostSuscOccults_.push_back(i);
-    cudaDeviceSynchronize();
-    //eventTimesPtr[i] = notification;
+    eventTimesPtr[i] = notification;
+    devProduct_[i] = 1.0f;
 
     if (i == I1Idx_)
       {
