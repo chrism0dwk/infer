@@ -293,6 +293,11 @@ namespace EpiRisk
       virtual
       ~InfectionTimeUpdate();
       void
+      SetUpdateTuning(const float tuning)
+      {
+    	  updateTuning_ = tuning;
+      }
+      void
       SetReps(const size_t reps);
       void
       SetCompareProductVector(bool* doCompareProductVector)
@@ -311,6 +316,7 @@ namespace EpiRisk
       ublas::vector<float> accept_;
       size_t reps_;
       size_t ucalls_;
+      float updateTuning_;
       bool
       UpdateI();
       bool

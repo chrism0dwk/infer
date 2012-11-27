@@ -443,27 +443,28 @@ main(int argc, char* argv[])
 
   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
-//  UpdateBlock infecPeriod;
-//  infecPeriod.add(a);
-//  infecPeriod.add(b);
-//  Mcmc::InfectionTimeUpdate* updateInfecTime =
-//      (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-//          "infecTimes");
-//  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
-//  updateInfecTime->SetParameters(infecPeriod);
-//  updateInfecTime->SetReps(750);
-//
-//  UpdateBlock bUpdate; bUpdate.add(b);
-//  Mcmc::InfectionTimeGammaCentred* updateBC =
-//      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-//  updateBC->SetParameters(bUpdate);
-//  updateBC->SetTuning(0.014);
-//
-//  Mcmc::InfectionTimeGammaNC* updateBNC =
-//      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-//  updateBNC->SetParameters(bUpdate);
-//  updateBNC->SetTuning(0.0007);
-//  updateBNC->SetNCRatio(ncratio);
+  UpdateBlock infecPeriod;
+  infecPeriod.add(a);
+  infecPeriod.add(b);
+  Mcmc::InfectionTimeUpdate* updateInfecTime =
+      (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+          "infecTimes");
+  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
+  updateInfecTime->SetParameters(infecPeriod);
+  updateInfecTime->SetUpdateTuning(5.0);
+  updateInfecTime->SetReps(1000);
+
+  UpdateBlock bUpdate; bUpdate.add(b);
+  Mcmc::InfectionTimeGammaCentred* updateBC =
+      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+  updateBC->SetParameters(bUpdate);
+  updateBC->SetTuning(0.014);
+
+  Mcmc::InfectionTimeGammaNC* updateBNC =
+      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+  updateBNC->SetParameters(bUpdate);
+  updateBNC->SetTuning(0.0007);
+  updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
