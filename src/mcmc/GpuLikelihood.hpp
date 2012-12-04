@@ -166,18 +166,6 @@ namespace EpiRisk
       float integral;
     };
 
-
-    struct GpuParams
-    {
-    	float epsilon1;
-    	float epsilon2;
-    	float gamma1;
-    	float gamma2;
-    	float delta;
-    	float alpha;
-    	float nu;
-    };
-
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
@@ -382,9 +370,6 @@ namespace EpiRisk
     thrust::device_vector<float> devWorkspace_;
     int integralBuffSize_;
 
-    // Cuda streams
-    cudaStream_t stream_[2];
-
     // CUDAPP bits and pieces
     CUDPPHandle cudpp_;
     CUDPPHandle addReduce_;
@@ -403,8 +388,6 @@ namespace EpiRisk
     float* alpha_;
     float* a_;
     float* b_;
-
-    GpuParams gpuParams_;
 
     PointerVector<float> xi_;
     PointerVector<float> psi_;

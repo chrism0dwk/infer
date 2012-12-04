@@ -451,8 +451,8 @@ main(int argc, char* argv[])
           "infecTimes");
   updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetUpdateTuning(5.0);
-  updateInfecTime->SetReps(1000);
+  updateInfecTime->SetUpdateTuning(2.5);
+  updateInfecTime->SetReps(750);
 
   UpdateBlock bUpdate; bUpdate.add(b);
   Mcmc::InfectionTimeGammaCentred* updateBC =

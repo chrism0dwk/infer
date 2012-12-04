@@ -801,7 +801,7 @@ namespace EpiRisk
         {
           float pickMove = random_->uniform(0.0f, 1.0f);
 
-          if (pickMove < 1.0f)
+          if (pickMove < 0.05f)
             {
               accept_[0] += UpdateI();
               calls_[0]++;
