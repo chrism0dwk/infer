@@ -27,3 +27,8 @@ target_link_libraries(mcmc random gpulikelihood)
 set(posteriorwriter_SOURCES PosteriorHDF5Writer.cpp PosteriorWriter.cpp)
 add_library(posteriorwriter STATIC ${posteriorwriter_SOURCES})
 target_link_libraries(posteriorwriter hdf5 hdf5_cpp hdf5_hl hdf5_hl_cpp)
+
+set(posteriorreader_SOURCES PosteriorHDF5Reader.cpp)
+add_library(posteriorreader STATIC ${posteriorreader_SOURCES})
+target_link_libraries(posteriorreader hdf5 hdf5_cpp hdf5_hl hdf5_hl_cpp)
+

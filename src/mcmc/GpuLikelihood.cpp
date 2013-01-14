@@ -311,6 +311,20 @@ namespace EpiRisk
   }
 
   size_t
+  GpuLikelihood::GetPopulationSize() const
+  {
+	  return popSize_;
+  }
+
+  void
+  GpuLikelihood::GetIds(std::vector<std::string>& ids) const
+  {
+	  ids.resize(popSize_);
+	  for(size_t i=0; i<popSize_; ++i)
+		  ids[i] = hostPopulation_[i].id;
+  }
+
+  size_t
   GpuLikelihood::GetNumOccults() const
   {
     return hostInfecIdx_.size() - numKnownInfecs_;

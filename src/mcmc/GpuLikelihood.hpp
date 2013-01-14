@@ -213,6 +213,10 @@ namespace EpiRisk
     size_t
     GetNumPossibleOccults() const;
     size_t
+    GetPopulationSize() const;
+    void
+    GetIds(std::vector<std::string>& ids) const;
+    size_t
     GetNumOccults() const;
     void
     CalcSusceptibilityPow();

@@ -361,23 +361,23 @@ main(int argc, char* argv[])
   Parameter epsilon1(1e-7, GammaPrior(5e-5, 1), "epsilon1");
   Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
   Parameter gamma1(0.003, GammaPrior(1, 1), "gamma1");
-  Parameter gamma2(0.23, GammaPrior(2, 4), "gamma2");
+  Parameter gamma2(1.0, GammaPrior(2, 4), "gamma2");
   Parameters xi(3);
   xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
   xi[1] = Parameter(0.29, GammaPrior(1, 1), "xi_p");
   xi[2] = Parameter(1.0, GammaPrior(1, 1), "xi_s");
   Parameters psi(3);
-  psi[0] = Parameter(0.35, BetaPrior(15, 15), "psi_c");
-  psi[1] = Parameter(0.43, BetaPrior(15, 15), "psi_p");
-  psi[2] = Parameter(0.13, BetaPrior(15, 15), "psi_s");
+  psi[0] = Parameter(0.5, BetaPrior(15, 15), "psi_c");
+  psi[1] = Parameter(0.5, BetaPrior(15, 15), "psi_p");
+  psi[2] = Parameter(0.5, BetaPrior(15, 15), "psi_s");
   Parameters zeta(3);
   zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
   zeta[1] = Parameter(0.08, GammaPrior(1, 1), "zeta_p");
   zeta[2] = Parameter(0.99, GammaPrior(1, 1), "zeta_s");
   Parameters phi(3);
-  phi[0] = Parameter(0.75, BetaPrior(15, 15), "phi_c");
-  phi[1] = Parameter(0.57, BetaPrior(15, 15), "phi_p");
-  phi[2] = Parameter(0.45, BetaPrior(15, 15), "phi_s");
+  phi[0] = Parameter(0.5, BetaPrior(15, 15), "phi_c");
+  phi[1] = Parameter(0.5, BetaPrior(15, 15), "phi_p");
+  phi[2] = Parameter(0.5, BetaPrior(15, 15), "phi_s");
   Parameter delta(0.57, GammaPrior(1, 1), "delta");
   Parameter nu(0.001, GammaPrior(1, 1), "nu");
   Parameter alpha(60, GammaPrior(1, 1), "alpha");
@@ -400,7 +400,7 @@ main(int argc, char* argv[])
   txDelta.add(epsilon1);
   //txDelta.add(epsilon2);
   txDelta.add(gamma1);
-  txDelta.add(gamma2);
+  //txDelta.add(gamma2);
   txDelta.add(delta);
   //txDelta.add(nu);
   //txDelta.add(alpha);
@@ -429,8 +429,9 @@ main(int argc, char* argv[])
   txInfec.add(gamma1);
   txInfec.add(xi[1]);
   txInfec.add(xi[2]);
+
   Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
-      "AdaptiveMultiLogMRW", "txInfec");
+      "InfectivityMRW", "txInfec");
   updateInfec->SetParameters(txInfec);
 
   UpdateBlock txSuscep;
@@ -454,17 +455,17 @@ main(int argc, char* argv[])
   updateInfecTime->SetUpdateTuning(2.5);
   updateInfecTime->SetReps(750);
 
-  UpdateBlock bUpdate; bUpdate.add(b);
-  Mcmc::InfectionTimeGammaCentred* updateBC =
-      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  updateBC->SetParameters(bUpdate);
-  updateBC->SetTuning(0.014);
-
-  Mcmc::InfectionTimeGammaNC* updateBNC =
-      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  updateBNC->SetParameters(bUpdate);
-  updateBNC->SetTuning(0.0007);
-  updateBNC->SetNCRatio(ncratio);
+//  UpdateBlock bUpdate; bUpdate.add(b);
+//  Mcmc::InfectionTimeGammaCentred* updateBC =
+//      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+//  updateBC->SetParameters(bUpdate);
+//  updateBC->SetTuning(0.014);
+//
+//  Mcmc::InfectionTimeGammaNC* updateBNC =
+//      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+//  updateBNC->SetParameters(bUpdate);
+//  updateBNC->SetTuning(0.0007);
+//  updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -492,6 +493,18 @@ main(int argc, char* argv[])
     boost::function< float () > getmeanOccI = boost::bind(&GpuLikelihood::GetMeanOccI, &likelihood);
     output.AddSpecial("meanOccI", getmeanOccI);
 
+    // Output the population id index
+    string idxfn = outputFile + ".stridx";
+    ofstream idxfile; idxfile.open(idxfn.c_str(), ios::out);
+    std::vector<std::string> ids; likelihood.GetIds(ids);
+    for(std::vector<std::string>::const_iterator it = ids.begin();
+    		it != ids.end();
+    		it++)
+    {
+    	idxfile << *it << "\n";
+    }
+    idxfile.close();
+
     // Run the chain
     cout << "Running MCMC" << endl;
     for(size_t k=0; k<atoi(argv[5]); ++k)
@@ -515,11 +528,11 @@ main(int argc, char* argv[])
       }
 
     cout << "Covariances\n";
-//    cout << updateDistance->GetCovariance() << "\n";
-//    cout << updatePsi->GetCovariance() << "\n";
-//    cout << updatePhi->GetCovariance() << "\n";
-//    cout << updateInfec->GetCovariance() << "\n";
-//    cout << updateSuscep->GetCovariance() << "\n";
+    cout << updateDistance->GetCovariance() << "\n";
+    cout << updatePsi->GetCovariance() << "\n";
+    cout << updatePhi->GetCovariance() << "\n";
+    cout << updateInfec->GetCovariance() << "\n";
+    cout << updateSuscep->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 
