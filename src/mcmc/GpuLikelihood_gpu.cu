@@ -109,6 +109,7 @@ namespace EpiRisk
       }
     };
 
+
   template<typename T>
     struct IndirectMin
     {
@@ -220,6 +221,7 @@ namespace EpiRisk
       }
     __syncthreads();
 
+
     if (col < n)
       {
         float2 x = coords[col];
@@ -232,7 +234,6 @@ namespace EpiRisk
             float dy = x.y - y.y;
             float d = dx * dx + dy * dy; //hypotf(dx, dy);
             nnzbuff[threadIdx.x] += d <= dsq and d > 0.0f;
-
           }
       }
 
@@ -489,7 +490,6 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         for(size_t colidx=0; colidx<cRowLen; ++colidx)
           {
             int colnum = csrMatrix->colInd[rowptr + colidx];
-
             float rtoc = csrMatrix->val[rowptr + colidx];
             float ctor;
             bool rv = getDistMatrixElement(colnum,row,csrMatrix,&ctor);
@@ -1033,6 +1033,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
             jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * delta
                 / (delta * delta + distance.val[begin + tid]);
+
 
             buff[threadIdx.x] = jOnIdx;
 
@@ -2315,7 +2316,6 @@ _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeo
   float
   GpuLikelihood::GetLogLikelihood() const
   {
-
     return logLikelihood_;
   }
 
@@ -2429,6 +2429,7 @@ _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&dev
 
     logLikDiff += thrust::reduce(devWorkspace_.begin(),
         devWorkspace_.begin() + dimGrid);
+
 
     return logLikDiff;
   }

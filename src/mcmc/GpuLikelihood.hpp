@@ -96,6 +96,7 @@ namespace EpiRisk
     }
   };
 
+
 // Helper classes
   template<typename T>
     class PointerVector
@@ -334,6 +335,7 @@ namespace EpiRisk
     size_t numKnownInfecs_;
     size_t maxInfecs_;
     size_t occultsOnlyDC_;
+
     thrust::host_vector<InfecIdx_t> hostInfecIdx_;
     thrust::device_vector<InfecIdx_t> devInfecIdx_;
     thrust::host_vector<InfecIdx_t> hostSuscOccults_;
