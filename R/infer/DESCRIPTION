@@ -1,11 +1,11 @@
 Package: infer
 Type: Package
 Title: Inference For Epidemic-related Risk
-Version: 1.1
+Version: 1.2
 Date: 2013-01-08
 Author: Chris Jewell (c) 2013
 Maintainer: Chris Jewell <c.p.jewell@massey.ac.nz>
 Description: This package performs Bayesian Inference on epidemic models, and hence provides real-time risk prediction for disease outbreaks.
 License: GPLv3
-Depends: Rcpp (>= 0.9.10)
+Depends: Rcpp (>= 0.9.10), methods
 LinkingTo: Rcpp

@@ -11,29 +11,29 @@ getPosteriorModel <- function(filename)
 	return(.Call("getPosteriorModel", filename))
 }
 
-getPosteriorParam <- function(filename, i, j)
-{
-	rows <- NULL
-	cols <- NULL
-	
-	# Assess missingness of operators
-	if(!missing(i)) rows <- i
-	if(!missing(j)) cols <- j
-	
-	return(.Call("getPosteriorParam", filename))	
-}
-
-getPosteriorInfec <- function(filename, i, j)
-{
-	rows <- NULL
-	cols <- NULL
-	
-	# Assess missingness of operators
-	if(!missing(i)) rows <- i
-	if(!missing(j)) cols <- j
-	
-	return(.Call("getPosteriorInfec", filename))
-}
+#getPosteriorParam <- function(filename, i, j)
+#{
+#	rows <- NULL
+#	cols <- NULL
+#	
+#	# Assess missingness of operators
+#	if(!missing(i)) rows <- i
+#	if(!missing(j)) cols <- j
+#	
+#	return(.Call("getPosteriorParam", filename))	
+#}
+#
+#getPosteriorInfec <- function(filename, i, j)
+#{
+#	rows <- NULL
+#	cols <- NULL
+#	
+#	# Assess missingness of operators
+#	if(!missing(i)) rows <- i
+#	if(!missing(j)) cols <- j
+#	
+#	return(.Call("getPosteriorInfec", filename))
+#}
 
 lookupInfIdxNames <- function(theVector, tags)
 {
@@ -46,7 +46,7 @@ lookupInfIdxNames <- function(theVector, tags)
 
 # Proxy classes -- these classes provide an interface to the posterior in
 #   the underlying disc storage.
-HD5ParamProxy <- setClass("HD5ParamProxy",representation(filename="character",tags="character",length="numeric"))
+setClass("HD5ParamProxy",representation(filename="character",tags="character",length="numeric"))
 setMethod("initialize","HD5ParamProxy",
 		function(.Object,filename) {
 			.Object@filename <- filename
@@ -57,7 +57,13 @@ setMethod("initialize","HD5ParamProxy",
 		}
 )
 
-HD5InfecProxy <- setClass("HD5InfecProxy",representation(filename="character",tags="character",length="numeric"))
+HD5ParamProxy <- function(filename)
+{
+	new("HD5ParamProxy", filename=filename)
+}
+
+
+setClass("HD5InfecProxy",representation(filename="character",tags="character",length="numeric"))
 setMethod("initialize","HD5InfecProxy",
 		function(.Object,filename) {
 			.Object@filename <- filename
@@ -68,7 +74,17 @@ setMethod("initialize","HD5InfecProxy",
 		}
 )
 
-Posterior <- setClass("Posterior",representation(filename="character", model="character", param="HD5ParamProxy",infec="HD5InfecProxy"))
+HD5InfecProxy <- function(filename)
+{
+	new("HD5InfecProxy", filename=filename)
+}
+
+Posterior <- function(filename)
+{
+	new("Posterior", filename=filename)
+}
+
+setClass("Posterior",representation(filename="character", model="character", param="HD5ParamProxy",infec="HD5InfecProxy"))
 setMethod("initialize", "Posterior", function(.Object, filename) {
 			.Object@filename <- filename
 			.Object@model <- getPosteriorModel(filename)
@@ -76,6 +92,7 @@ setMethod("initialize", "Posterior", function(.Object, filename) {
 			.Object@infec <- HD5InfecProxy(filename)
 			return(.Object)
 		})
+
 
 
 

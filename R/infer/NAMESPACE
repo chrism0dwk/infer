@@ -1,8 +1,5 @@
 useDynLib(infer)
 
-import(Rcpp)
-import(methods)
-
 exportClasses(Posterior,
 			  HD5ParamProxy,
 			  HD5InfecProxy)
