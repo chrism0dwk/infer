@@ -31,12 +31,13 @@
 namespace EpiRisk
 {
 
+  typedef float FP_t;
   typedef double eventTime_t;
   typedef unsigned int Ilabel_t;
   typedef unsigned int Slabel_t;
   typedef unsigned int Spos_t;
   typedef unsigned int Ipos_t;
-  typedef float freq_t;
+  typedef FP_t freq_t;
 
   typedef float fp_t;
 

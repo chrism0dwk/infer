@@ -31,6 +31,7 @@
 #include <fstream>
 #include <string>
 
+#include "types.hpp"
 #include "Individual.hpp"
 #include "DataImporter.hpp"
 
@@ -49,6 +50,7 @@ struct TestCovars {
   double pigssusc;
   double sheepsusc;
 };
+
 
 struct COOMatrixElement
 {

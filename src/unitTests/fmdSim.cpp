@@ -29,6 +29,7 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+#include "config.h"
 #include "fmdModel.hpp"
 #include "GillespieSim.hpp"
 #include "Data.hpp"
@@ -106,6 +107,9 @@ main(int argc, char* argv[])
 
   string configFilename;
   int seed;
+
+  std::cerr << "fmdSim (" << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
+      << " " << __TIME__ << ")" <<  std::endl;
 
   try
     {
@@ -205,7 +209,7 @@ main(int argc, char* argv[])
   GillespieSim<FmdModel> simulation(model, random);
   simulation.setMaxTime(settings.maxTime);
 
-  simulation.simulate(settings.simCensoredEvents);
+  simulation.simulate(true); //settings.simCensoredEvents);
 
   stringstream s(settings.output);
   s << "." << seed;

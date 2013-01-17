@@ -7,7 +7,7 @@
 
 #include <H5PacketTable.h>
 #include <stdexcept>
-#include <malloc.h>
+#include <cstdlib>
 #include <iostream>
 
 #include "PosteriorHDF5Reader.hpp"

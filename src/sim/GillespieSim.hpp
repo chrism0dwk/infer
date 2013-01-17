@@ -277,11 +277,21 @@ namespace EpiRisk
             {
               Events events;
               events.I = it->getI();
-              events.N = events.I + model_.ItoN(random_);
+              events.N = events.I + model_.ItoN(random_); /// Require rejection here!!!
               events.R = events.N + model_.NtoR();
 
               population_.updateEvents(*it,events);
             }
+
+          if (it->getN() < population_.getObsTime() and it->getR() > population_.getObsTime())
+            {
+              Events events = it->getEvents();
+              double Rcan = it->getN() + model_.NtoR();
+              events.R = Rcan >= population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
+
+              population_.updateEvents(*it, events);
+            }
+
         }
     }
 
@@ -489,7 +499,7 @@ namespace EpiRisk
               if (isInfectious(j->second, nextInfecTime))
             	  event = shared_ptr<Infection> (new Infection(j, nextInfecTime));
               else
-            	  event == shared_ptr<Ghost> (new Ghost(j->second, nextInfecTime));
+            	  event = shared_ptr<Ghost> (new Ghost(j->second, nextInfecTime));
             }
 
           currentTime = event->getTime();
