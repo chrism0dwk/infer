@@ -31,5 +31,7 @@ set(LIBS ${LIBS} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
 
 configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h @ONLY)
 
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmc ${CMAKE_BINARY_DIR}/src/unitTests/fmdSim DESTINATION bin)
+
 
 add_subdirectory(src)
