@@ -8,8 +8,9 @@
 #include <H5PacketTable.h>
 #include <H5Exception.h>
 
-#define PARAMPATH "posterior/parameters"
-#define INFECPATH "posterior/infections"
+static char paramPath[] = "posterior/parameters";
+static char infecpath[] = "posterior/infections";
+static char idsPath[] = "posterior/ids";
 
 typedef struct
 {
@@ -54,20 +55,60 @@ getFLPTwidth(H5::DataSet& dataset)
   return numFields;
 }
 
-void
-postparams(H5::H5File& file, size_t burnin, size_t thin,
-    Rcpp::DataFrame& posterior)
+RcppExport SEXP
+getPosteriorParams(SEXP filename, SEXP rows, SEXP cols)
 {
+  // Rows and cols are 0-based!
+  // No subscript boundary checking is performed.
 
-  char paramPath[] = "posterior/parameters";
+  Rcpp::CharacterVector _filename(filename);
+  Rcpp::IntegerVector _rows(rows);
+  Rcpp::IntegerVector _cols(cols);
 
-  H5::DataSet pds = file.openDataSet(paramPath);
-
-  // Get parameter names
-  Rcpp::CharacterVector rTags;
+  Rcpp::List dataList(_cols.length());
   try
     {
-      readTags(pds, rTags);
+      H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
+
+      H5::DataSet pds = file.openDataSet(paramPath);
+
+      // Open parameters as a packet list
+      FL_PacketTable parameters(file.getId(), paramPath);
+      hsize_t totalRecords = parameters.GetPacketCount();
+      hsize_t numFields = getFLPTwidth(pds);
+
+      // Get parameter names
+      Rcpp::CharacterVector rTags;
+      Rcpp::CharacterVector allTags;
+      readTags(pds, allTags);
+      for (size_t i = 0; i < _cols.length(); ++i)
+        {
+          rTags.push_back(allTags[_cols[i]]);
+        }
+
+      // Construct R data.frame
+      for (int i = 0; i < _cols.length(); ++i)
+        {
+          Rcpp::NumericVector myVector(_rows.length());
+          dataList[i] = myVector;
+        }
+      dataList.attr("names") = rTags;
+
+      // Copy in data
+      float* record = new float[numFields];
+      for (int i = 0; i < _rows.length(); ++i)
+        {
+          parameters.GetPacket(_rows[i], record);
+          for (int j = 0; j < _cols.length(); ++j)
+            {
+              Rcpp::NumericVector col = dataList[j];
+              col[i] = record[_cols[j]];
+            }
+        }
+      delete[] record;
+
+      file.close();
+
     }
   catch (std::exception& __ex__)
     {
@@ -82,134 +123,226 @@ postparams(H5::H5File& file, size_t burnin, size_t thin,
       ::Rf_error("c++ exception (unknown reason)");
     }
 
-  // Now open parameters as a packet list
-  FL_PacketTable parameters(file.getId(), paramPath);
-  hsize_t totalRecords = parameters.GetPacketCount();
-  hsize_t numFields = getFLPTwidth(pds);
-
-  // Construct R data.frame
-  hsize_t numRecords = (totalRecords - burnin) / thin;
-  Rcpp::List dataList(numFields);
-  for (int i = 0; i < numFields; ++i)
-    {
-      Rcpp::NumericVector myVector(numRecords);
-      dataList[i] = myVector;
-    }
-  dataList.attr("names") = rTags;
-
-  // Copy in data
-  float* record = new float[numFields];
-  //parameters.SetIndex(_burnin[0]);
-  for (int i = 0; i < numRecords; ++i)
-    {
-      parameters.GetPacket(burnin + i * thin, record);
-      for (int j = 0; j < numFields; ++j)
-        {
-          Rcpp::NumericVector col = dataList[j];
-          col[i] = record[j];
-        }
-    }
-  delete[] record;
-
-  posterior = Rcpp::DataFrame(dataList);
-}
-
-void
-postinfecs(H5::H5File& file, size_t burnin, size_t thin, Rcpp::List& posterior)
-{
-  char infecpath[] = INFECPATH;
-
-  FL_PacketTable infections(file.getId(), infecpath);
-
-  size_t totalRecords = infections.GetPacketCount();
-  size_t numRecords = (totalRecords - burnin) / thin;
-
-  Rcpp::List data(numRecords);
-
-  hvl_t buff;
-  for (size_t i = 0; i < numRecords; ++i)
-    {
-      infections.GetPacket(burnin + i * thin, &buff);
-
-      Rcpp::IntegerVector ids(buff.len);
-      Rcpp::NumericVector val(buff.len);
-      ipTuple_t* records = (ipTuple_t*) buff.p;
-
-      for (size_t j = 0; j < buff.len; ++j)
-        {
-          ids[j] = records[j].idx;
-          val[j] = records[j].val;
-        }
-
-      free(buff.p);
-      Rcpp::DataFrame valframe(Rcpp::DataFrame::create(Rcpp::Named("time") =
-          val));
-      valframe.attr("row.names") = ids;
-
-      data[i] = valframe;
-    }
-
-  posterior = data;
+  if(_cols.length() == 1) return dataList[0];
+  else return Rcpp::DataFrame(dataList);
 }
 
 RcppExport SEXP
-readPosterior(SEXP filename, SEXP burnin, SEXP thin, SEXP actions)
+getPosteriorInfecs(SEXP filename, SEXP rows, SEXP cols)
 {
-  Rcpp::IntegerVector _actions(actions);
+  // Rows and cols are 0-based!
+  // No subscript boundary checking is performed
+  // cols is currently unused
+
   Rcpp::CharacterVector _filename(filename);
-  Rcpp::IntegerVector _burnin(burnin);
-  Rcpp::IntegerVector _thin(thin);
+  Rcpp::IntegerVector _rows(rows);
+
+  Rcpp::List data(_rows.length());
+
+  Rcpp::List info = getPosteriorInfecInfo(filename);
+  Rcpp::CharacterVector tags = info[1];
 
   try
     {
       H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
 
-      Rcpp::List posterior(2);
-      Rcpp::CharacterVector posteriorTags(2);
-      posteriorTags[0] = "parameters";
-      posteriorTags[1] = "infec";
-      posterior.attr("names") = posteriorTags;
+      FL_PacketTable infections(file.getId(), infecpath);
 
-      Rcpp::DataFrame params;
-      Rcpp::List infecs;
+      size_t totalRecords = infections.GetPacketCount();
 
-      // Get parameters
-      if (_actions[0] == 0)
+      hvl_t buff;
+      for (size_t i = 0; i < _rows.length(); ++i)
         {
-          Rcpp::DataFrame params;
-          postparams(file, _burnin[0], _thin[0], params);
-          Rcpp::List infecs;
-          postinfecs(file, _burnin[0], _thin[0], infecs);
-          return Rcpp::List::create(Rcpp::Named("parameters") = params,
-              Rcpp::Named("infec") = infecs);
+          infections.GetPacket(_rows[i], &buff);
+
+          Rcpp::CharacterVector ids(buff.len);
+          Rcpp::NumericVector val(buff.len);
+          ipTuple_t* records = (ipTuple_t*) buff.p;
+
+          for (size_t j = 0; j < buff.len; ++j)
+            {
+              ids[j] = tags[records[j].idx];
+              val[j] = records[j].val;
+            }
+          free(buff.p);
+
+          val.attr("names") = ids;
+          data[i] = val;
         }
-      else if (_actions[0] == 1)
-        {
-          Rcpp::DataFrame params;
-          postparams(file, _burnin[0], _thin[0], params);
-          return params;
-        }
-      else if (_actions[0] == 2)
-        {
-          Rcpp::List infecs;
-          postinfecs(file, _burnin[0], _thin[0], infecs);
-          return infecs;
-        }
-      else
-        {
-          throw std::runtime_error("Invalid action specified");
-        }
+
+      file.close();
+    }
+  catch (std::exception& __ex__)
+    {
+      forward_exception_to_r(__ex__);
     }
   catch (H5::Exception& e)
     {
-      ::Rf_error("Error opening HDF5 file");
-    }
-  catch (std::runtime_error& e)
-    {
-      ::Rf_error(e.what());
+      ::Rf_error(e.getCDetailMsg());
     }
   catch (...)
     {
-      ::Rf_error("Unknown exception reading file");
+      ::Rf_error("c++ exception (unknown reason)");
     }
+
+  return data;
+
 }
+
+
+RcppExport SEXP
+getPosteriorParamInfo(SEXP filename)
+{
+  Rcpp::CharacterVector _filename(filename);
+
+  Rcpp::List info(2);
+  Rcpp::CharacterVector infoNames(2);
+  infoNames[0] = "length";
+  infoNames[1] = "tags";
+  info.attr("names") = infoNames;
+
+  try
+    {
+      H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
+      FL_PacketTable parameters(file.getId(), paramPath);
+
+      // Extract length
+      Rcpp::NumericVector length(1);
+      length[0] = parameters.GetPacketCount();
+      info[0] = length;
+
+      // Extract tags
+      Rcpp::CharacterVector tags;
+      H5::DataSet pds = file.openDataSet(paramPath);
+      readTags(pds, tags);
+      info[1] = tags;
+      file.close();
+    }
+  catch (std::exception& __ex__)
+    {
+      forward_exception_to_r(__ex__);
+    }
+  catch (H5::Exception& e)
+    {
+      ::Rf_error(e.getCDetailMsg());
+    }
+  catch (...)
+    {
+      ::Rf_error("c++ exception (unknown reason)");
+    }
+
+  return info;
+}
+
+
+RcppExport SEXP
+getPosteriorInfecInfo(SEXP filename)
+{
+  Rcpp::CharacterVector _filename(filename);
+
+  Rcpp::List info(2);
+  Rcpp::CharacterVector infoNames(2);
+  infoNames[0] = "length";
+  infoNames[1] = "tags";
+  info.attr("names") = infoNames;
+
+  try
+    {
+      H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
+      FL_PacketTable infecs(file.getId(), infecpath);
+
+      // Extract length
+      Rcpp::NumericVector length(1);
+      length[0] = infecs.GetPacketCount();
+      info[0] = length;
+
+      // Extract tags
+      H5::DataSet pds = file.openDataSet(idsPath);
+
+      H5::DataSpace tagDS = pds.getSpace();
+      hsize_t* aDim = new hsize_t[tagDS.getSimpleExtentNdims()];
+      tagDS.getSimpleExtentDims(aDim);
+
+
+      char** readBuff = new char*[aDim[0]];
+      H5::DataType paramTag_t = pds.getDataType();
+      pds.read(readBuff, paramTag_t);
+
+      Rcpp::CharacterVector rTags(aDim[0]);
+      for (int i = 0; i < aDim[0]; ++i)
+        {
+          rTags[i] = readBuff[i];
+        }
+
+      info[1] = rTags;
+
+      H5Dvlen_reclaim(paramTag_t.getId(), tagDS.getId(), H5P_DEFAULT, readBuff);
+      delete[] readBuff;
+      delete[] aDim;
+
+
+
+
+
+      file.close();
+    }
+  catch (std::exception& __ex__)
+    {
+      forward_exception_to_r(__ex__);
+    }
+  catch (H5::Exception& e)
+    {
+      ::Rf_error(e.getCDetailMsg());
+    }
+  catch (...)
+    {
+      ::Rf_error("c++ exception (unknown reason)");
+    }
+
+  return info;
+}
+
+
+RcppExport SEXP
+getPosteriorLen(SEXP filename)
+{
+  Rcpp::CharacterVector _filename(filename);
+
+  Rcpp::NumericVector postLength(1);
+
+  try
+    {
+      H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
+      FL_PacketTable parameters(file.getId(), paramPath);
+      postLength[0] = parameters.GetPacketCount();
+      file.close();
+    }
+  catch (std::exception& __ex__)
+    {
+      forward_exception_to_r(__ex__);
+    }
+  catch (H5::Exception& e)
+    {
+      ::Rf_error(e.getCDetailMsg());
+    }
+  catch (...)
+    {
+      ::Rf_error("c++ exception (unknown reason)");
+    }
+
+  return postLength;
+}
+
+RcppExport SEXP
+getPosteriorModel(SEXP filename)
+{
+  Rcpp::CharacterVector _filename(filename);
+
+  Rcpp::CharacterVector model(1);
+
+  model[0] = "To be implemented";
+
+  return model;
+}
+
+

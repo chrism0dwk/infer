@@ -4,7 +4,7 @@ project(infer-fmd)
 cmake_minimum_required(VERSION 2.8)
 set(CMAKE_MODULE_PATH ${infer-fmd_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
 
-
+set(CMAKE_VERBOSE_MAKEFILE true)
 ### VERSION INFO ###
 set(PACKAGE_NAME infer-fmd)
 set(VERSION_MAJOR 0)
@@ -13,14 +13,13 @@ set(VERSION_MINOR 7)
 # Get Git version
 find_package(Git)
 
-exec_program(${GIT_EXECUTABLE} 
-			 ${CMAKE_CURRENT_SOURCE_DIR} 
-			 ARGS "log -1 --oneline" 
-			 OUTPUT_VARIABLE GITCOMMIT )
+execute_process(COMMAND ${GIT_EXECUTABLE} log -1 --oneline 
+			    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} 
+			    OUTPUT_VARIABLE GITCOMMIT )
 			 
 string( REGEX REPLACE "^([^ ]+).*" "\\1" VERSION_PATCH "${GITCOMMIT}")
 
-####################
+#####################
 
 
 

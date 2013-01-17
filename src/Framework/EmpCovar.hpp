@@ -50,7 +50,7 @@
  #include <gsl/gsl_matrix.h>
  #include "adaptive.h"
 
- double mySigma[] = {1,1,1,1,1}
+ fp_t mySigma[] = {1,1,1,1,1}
  McmcOutput myOutput(5,100,10000,mySigma}
 
  //MCMC Loop:
@@ -75,11 +75,13 @@
 
 
 #include <stdexcept>
+#include <string>
 #include <iostream>
 #include <boost/numeric/ublas/symmetric.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 
+#include "types.hpp"
 #include "StochasticNode.hpp"
 
 using namespace boost::numeric::ublas;
@@ -108,8 +110,8 @@ namespace EpiRisk
 
   struct Identity
   {
-    double
-    operator()(const double x) const
+    fp_t
+    operator()(const fp_t x) const
     {
       return x;
     }
@@ -120,17 +122,17 @@ namespace EpiRisk
     class EmpCovar
     {
     public:
-      typedef symmetric_matrix<double> CovMatrix;
+      typedef symmetric_matrix<fp_t> CovMatrix;
 
     private:
       typedef ublas::vector<Parameter>::const_iterator ParamIter; // Tries to enforce type consistency
 
       size_t p_;
-      ublas::vector<double> sum_;
-      symmetric_matrix<double> sumSq_;
+      ublas::vector<fp_t> sum_;
+      symmetric_matrix<fp_t> sumSq_;
       CovMatrix covMatrix_;
       CovMatrix correlation_;
-      ublas::vector<double> expectation_;
+      ublas::vector<fp_t> expectation_;
 
       const UpdateBlock& params_;
 
@@ -176,7 +178,7 @@ namespace EpiRisk
       getCovariance()
       {
         // Create covariance matrix
-        double denominator = rowCount_;
+        fp_t denominator = rowCount_;
         expectation_ = sum_ / denominator; // Averages
         kronecker();
         covMatrix_ = sumSq_ / denominator - covMatrix_;
@@ -197,23 +199,23 @@ namespace EpiRisk
         std::cerr << "Sum: " << sum_ << std::endl;
         std::cerr << "Sumsq: " << sumSq_ << std::endl;
         std::cerr << "Row count: " << rowCount_ << std::endl;
-        expectation_ = sum_ / (double)rowCount_;
+        expectation_ = sum_ / (fp_t)rowCount_;
         std::cerr << "Expectation: " << expectation_ << std::endl;
         kronecker();
         std::cerr << "kronecker: " << covMatrix_ << std::endl;
-        std::cerr << "covMatrix: " << sumSq_ / (double)rowCount_ - covMatrix_;
+        std::cerr << "covMatrix: " << sumSq_ / (fp_t)rowCount_ - covMatrix_;
       }
       void
       sample()
       {
         for (int i = 0; i < params_.size();++i)
           {
-            double pi = transformFunc_(params_[i].getValue());
+            fp_t pi = transformFunc_(params_[i].getValue());
             sum_(i) += pi;
             sumSq_(i, i) += pi*pi;
             for (size_t j = 0; j < i; ++j)
               {
-                double pj = transformFunc_(params_[j].getValue());
+                fp_t pj = transformFunc_(params_[j].getValue());
                 sumSq_(i, j) += pi * pj;
               }
           }
@@ -221,19 +223,24 @@ namespace EpiRisk
         rowCount_++;
       }
       void
-      sample(ublas::vector<double>& theSample)
+      sample(ublas::vector<fp_t>& theSample)
       {
         if(theSample.size() != params_.size())
-          throw std::logic_error("Sample size does not match param size in EmpCovar!");
-
+          {
+            std::stringstream msg;
+            msg << "Sample size " << theSample.size()
+                << " does not match param size " << params_.size()
+                << " in EmpCovar!";
+          throw std::logic_error(msg.str().c_str());
+          }
         for (int i = 0; i < params_.size();++i)
                   {
-                    double pi = transformFunc_(theSample(i));
+                    fp_t pi = transformFunc_(theSample(i));
                     sum_(i) += pi;
                     sumSq_(i, i) += pi*pi;
                     for (size_t j = 0; j < i; ++j)
                       {
-                        double pj = transformFunc_(theSample(j));
+                        fp_t pj = transformFunc_(theSample(j));
                         sumSq_(i, j) += pi * pj;
                       }
                   }

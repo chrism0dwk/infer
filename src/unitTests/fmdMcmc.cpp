@@ -31,6 +31,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -41,21 +43,31 @@ namespace po = boost::program_options;
 
 #include "config.h"
 #include "Mcmc.hpp"
+#include "McmcFactory.hpp"
+#include "MCMCUpdater.hpp"
 #include "Data.hpp"
 #include "McmcWriter.hpp"
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
 #include "PosteriorHDF5Writer.hpp"
 
-
-
 using namespace std;
 using namespace boost::numeric;
+using namespace EpiRisk;
 
 #define NSPECIES 3
 #define NEVENTS 3
 
-using namespace EpiRisk;
+bool doCompareProdVec = false;
+
+void
+sig_handler(int signo)
+{
+  if(signo == SIGUSR1) {
+      std::cout << "Caught SIGUSR1" << std::endl;
+      doCompareProdVec = true;
+  }
+}
 
 inline
 double
@@ -99,7 +111,7 @@ class BetaPrior : public Prior
   float b_;
 public:
   BetaPrior(const float a, const float b) :
-    a_(a), b_(b)
+      a_(a), b_(b)
   {
   }
   ;
@@ -125,7 +137,7 @@ class InfSuscSN : public StochasticNode
   Parameter* A_;
 public:
   InfSuscSN(Parameter& A, Parameter& B) :
-    A_(&A), StochasticNode(B)
+      A_(&A), StochasticNode(B)
   {
   }
   InfSuscSN*
@@ -144,7 +156,6 @@ public:
     *param_ = x / *A_;
   }
 };
-
 
 struct ParamSetting
 {
@@ -191,124 +202,124 @@ struct Settings
 
     read_xml(filename, pt);
 
-    populationfile = pt.get<string> ("fmdMcmc.paths.population");
-    epidemicfile = pt.get<string> ("fmdMcmc.paths.epidemic");
-    connectionfile = pt.get<string> ("fmdMcmc.paths.connections");
-    posteriorfile = pt.get<string> ("fmdMcmc.paths.posterior");
+    populationfile = pt.get<string>("fmdMcmc.paths.population");
+    epidemicfile = pt.get<string>("fmdMcmc.paths.epidemic");
+    connectionfile = pt.get<string>("fmdMcmc.paths.connections");
+    posteriorfile = pt.get<string>("fmdMcmc.paths.posterior");
 
-    obstime = pt.get<double> ("fmdMcmc.options.obstime", POSINF);
-    iterations = pt.get<double> ("fmdMcmc.options.iterations", 1);
-    iupdates = pt.get<double> ("fmdMcmc.options.iupdates", 0);
-    seed = pt.get<int> ("fmdMcmc.options.seed", 1);
+    obstime = pt.get<double>("fmdMcmc.options.obstime", POSINF);
+    iterations = pt.get<double>("fmdMcmc.options.iterations", 1);
+    iupdates = pt.get<double>("fmdMcmc.options.iupdates", 0);
+    seed = pt.get<int>("fmdMcmc.options.seed", 1);
 
-    parameters.epsilon.value = pt.get<double> (
+    parameters.epsilon.value = pt.get<double>(
         "fmdMcmc.parameters.epsilon.value", 0.5);
-    parameters.epsilon.priorparams[0] = pt.get<double> (
+    parameters.epsilon.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.epsilon.prior.gamma.a", 1);
-    parameters.epsilon.priorparams[1] = pt.get<double> (
+    parameters.epsilon.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.epsilon.prior.gamma.b", 1);
 
-    parameters.gamma1.value = pt.get<double> (
-        "fmdMcmc.parameters.gamma1.value", 0.5);
-    parameters.gamma1.priorparams[0] = pt.get<double> (
+    parameters.gamma1.value = pt.get<double>("fmdMcmc.parameters.gamma1.value",
+        0.5);
+    parameters.gamma1.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.gamma1.prior.gamma.a", 1);
-    parameters.gamma1.priorparams[1] = pt.get<double> (
+    parameters.gamma1.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.gamma1.prior.gamma.b", 1);
 
-    parameters.gamma2.value = pt.get<double> (
-        "fmdMcmc.parameters.gamma2.value", 0.5);
-    parameters.gamma2.priorparams[0] = pt.get<double> (
+    parameters.gamma2.value = pt.get<double>("fmdMcmc.parameters.gamma2.value",
+        0.5);
+    parameters.gamma2.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.gamma2.prior.gamma.a", 1);
-    parameters.gamma2.priorparams[1] = pt.get<double> (
+    parameters.gamma2.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.gamma2.prior.gamma.b", 1);
 
-    parameters.delta.value = pt.get<double> ("fmdMcmc.parameters.delta.value",
+    parameters.delta.value = pt.get<double>("fmdMcmc.parameters.delta.value",
         0.5);
-    parameters.delta.priorparams[0] = pt.get<double> (
+    parameters.delta.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.delta.prior.gamma.a", 1);
-    parameters.delta.priorparams[1] = pt.get<double> (
+    parameters.delta.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.delta.prior.gamma.b", 1);
 
-    parameters.xi_p.value = pt.get<double> ("fmdMcmc.parameters.xi_p.value",
+    parameters.xi_p.value = pt.get<double>("fmdMcmc.parameters.xi_p.value",
         0.5);
-    parameters.xi_p.priorparams[0] = pt.get<double> (
+    parameters.xi_p.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.xi_p.prior.gamma.a", 1);
-    parameters.xi_p.priorparams[1] = pt.get<double> (
+    parameters.xi_p.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.xi_p.prior.gamma.b", 1);
 
-    parameters.xi_s.value = pt.get<double> ("fmdMcmc.parameters.xi_s.value",
+    parameters.xi_s.value = pt.get<double>("fmdMcmc.parameters.xi_s.value",
         0.5);
-    parameters.xi_s.priorparams[0] = pt.get<double> (
+    parameters.xi_s.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.xi_s.prior.gamma.a", 1);
-    parameters.xi_s.priorparams[1] = pt.get<double> (
+    parameters.xi_s.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.xi_s.prior.gamma.b", 1);
 
-    parameters.phi_c.value = pt.get<double> ("fmdMcmc.parameters.phi_c.value",
+    parameters.phi_c.value = pt.get<double>("fmdMcmc.parameters.phi_c.value",
         0.5);
-    parameters.phi_c.priorparams[0] = pt.get<double> (
+    parameters.phi_c.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.phi_c.prior.beta.a", 1);
-    parameters.phi_c.priorparams[1] = pt.get<double> (
+    parameters.phi_c.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.phi_c.prior.beta.b", 1);
 
-    parameters.phi_p.value = pt.get<double> ("fmdMcmc.parameters.phi_p.value",
+    parameters.phi_p.value = pt.get<double>("fmdMcmc.parameters.phi_p.value",
         0.5);
-    parameters.phi_p.priorparams[0] = pt.get<double> (
+    parameters.phi_p.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.phi_p.prior.beta.a", 1);
-    parameters.phi_p.priorparams[1] = pt.get<double> (
+    parameters.phi_p.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.phi_p.prior.beta.b", 1);
 
-    parameters.phi_s.value = pt.get<double> ("fmdMcmc.parameters.phi_s.value",
+    parameters.phi_s.value = pt.get<double>("fmdMcmc.parameters.phi_s.value",
         0.5);
-    parameters.phi_s.priorparams[0] = pt.get<double> (
+    parameters.phi_s.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.phi_s.prior.beta.a", 1);
-    parameters.phi_s.priorparams[1] = pt.get<double> (
+    parameters.phi_s.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.phi_s.prior.beta.b", 1);
 
-    parameters.zeta_p.value = pt.get<double> (
-        "fmdMcmc.parameters.zeta_p.value", 0.5);
-    parameters.zeta_p.priorparams[0] = pt.get<double> (
+    parameters.zeta_p.value = pt.get<double>("fmdMcmc.parameters.zeta_p.value",
+        0.5);
+    parameters.zeta_p.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.zeta_p.prior.gamma.a", 1);
-    parameters.zeta_p.priorparams[1] = pt.get<double> (
+    parameters.zeta_p.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.zeta_p.prior.gamma.b", 1);
 
-    parameters.zeta_s.value = pt.get<double> (
-        "fmdMcmc.parameters.zeta_s.value", 0.5);
-    parameters.zeta_s.priorparams[0] = pt.get<double> (
+    parameters.zeta_s.value = pt.get<double>("fmdMcmc.parameters.zeta_s.value",
+        0.5);
+    parameters.zeta_s.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.zeta_s.prior.gamma.a", 1);
-    parameters.zeta_s.priorparams[1] = pt.get<double> (
+    parameters.zeta_s.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.zeta_s.prior.gamma.b", 1);
 
-    parameters.psi_c.value = pt.get<double> ("fmdMcmc.parameters.psi_c.value",
+    parameters.psi_c.value = pt.get<double>("fmdMcmc.parameters.psi_c.value",
         0.5);
-    parameters.psi_c.priorparams[0] = pt.get<double> (
+    parameters.psi_c.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.psi_c.prior.beta.a", 1);
-    parameters.psi_c.priorparams[1] = pt.get<double> (
+    parameters.psi_c.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.psi_c.prior.beta.b", 1);
 
-    parameters.psi_p.value = pt.get<double> ("fmdMcmc.parameters.psi_p.value",
+    parameters.psi_p.value = pt.get<double>("fmdMcmc.parameters.psi_p.value",
         0.5);
-    parameters.psi_p.priorparams[0] = pt.get<double> (
+    parameters.psi_p.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.psi_p.prior.beta.a", 1);
-    parameters.psi_p.priorparams[1] = pt.get<double> (
+    parameters.psi_p.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.psi_p.prior.beta.b", 1);
 
-    parameters.psi_s.value = pt.get<double> ("fmdMcmc.parameters.psi_s.value",
+    parameters.psi_s.value = pt.get<double>("fmdMcmc.parameters.psi_s.value",
         0.5);
-    parameters.psi_s.priorparams[0] = pt.get<double> (
+    parameters.psi_s.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.psi_s.prior.beta.a", 1);
-    parameters.psi_s.priorparams[1] = pt.get<double> (
+    parameters.psi_s.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.psi_s.prior.beta.b", 1);
 
-    parameters.a.value = pt.get<double> ("fmdMcmc.parameter.a.value", 0.08);
-    parameters.b.priorparams[0] = pt.get<double> (
+    parameters.a.value = pt.get<double>("fmdMcmc.parameter.a.value", 0.08);
+    parameters.b.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.a.prior.gamma.a", 1);
-    parameters.b.priorparams[1] = pt.get<double> (
+    parameters.b.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.a.prior.gamma.b", 1);
 
-    parameters.b.value = pt.get<double> ("fmdMcmc.parameter.b.value", 0.005);
-    parameters.b.priorparams[0] = pt.get<double> (
+    parameters.b.value = pt.get<double>("fmdMcmc.parameter.b.value", 0.005);
+    parameters.b.priorparams[0] = pt.get<double>(
         "fmdMcmc.parameters.b.prior.gamma.a", 1);
-    parameters.b.priorparams[1] = pt.get<double> (
+    parameters.b.priorparams[1] = pt.get<double>(
         "fmdMcmc.parameters.b.prior.gamma.b", 1);
 
   }
@@ -325,109 +336,152 @@ main(int argc, char* argv[])
   if (argc != 9)
     {
       cerr
-          << "Usage: fmdMcmc <pop file> <epi file> <dist matrix> <output folder> <obs time> <num iterations> <seed> <nc percentage>"
+          << "Usage: fmdMcmc <pop file> <epi file> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu>"
           << endl;
       return EXIT_FAILURE;
     }
 
+  if(signal(SIGUSR1,sig_handler) == SIG_ERR)
+    throw runtime_error("Cannot register signal handler");
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
-  DistMatrixImporter* distMatrixImporter = new DistMatrixImporter(argv[3]);
+  float obsTime = atof(argv[4]);
+  size_t seed = atoi(argv[6]);
+  int gpuId = atoi(argv[8]);
 
-  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *distMatrixImporter, (size_t)3, (float)atof(argv[5]));
+  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
+      (size_t) 3, obsTime, false, gpuId);
 
   delete popDataImporter;
   delete epiDataImporter;
-  delete distMatrixImporter;
-
 
   // Parameters
   // Set up parameters
-  Parameter epsilon(7.72081e-05, GammaPrior(1, 1), "epsilon");
-  Parameter gamma1(0.01, GammaPrior(1, 1), "gamma1");
-  Parameter gamma2(0.5, GammaPrior(1, 1), "gamma2");
+  Parameter epsilon1(1e-7, GammaPrior(5e-5, 1), "epsilon1");
+  Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
+  Parameter gamma1(0.003, GammaPrior(1, 1), "gamma1");
+  Parameter gamma2(1.0, GammaPrior(2, 4), "gamma2");
   Parameters xi(3);
   xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
-  xi[1] = Parameter(0.00205606, GammaPrior(1, 1), "xi_p");
-  xi[2] = Parameter(0.613016, GammaPrior(1, 1), "xi_s");
+  xi[1] = Parameter(0.29, GammaPrior(1, 1), "xi_p");
+  xi[2] = Parameter(1.0, GammaPrior(1, 1), "xi_s");
   Parameters psi(3);
-  psi[0] = Parameter(0.237344, BetaPrior(2, 2), "psi_c");
-  psi[1] = Parameter(0.665464, BetaPrior(2, 2), "psi_p");
-  psi[2] = Parameter(0.129998, BetaPrior(2, 2), "psi_s");
+  psi[0] = Parameter(0.5, BetaPrior(15, 15), "psi_c");
+  psi[1] = Parameter(0.5, BetaPrior(15, 15), "psi_p");
+  psi[2] = Parameter(0.5, BetaPrior(15, 15), "psi_s");
   Parameters zeta(3);
   zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
-  zeta[1] = Parameter(0.000295018, GammaPrior(1, 1), "zeta_p");
-  zeta[2] = Parameter(0.259683, GammaPrior(1, 1), "zeta_s");
+  zeta[1] = Parameter(0.08, GammaPrior(1, 1), "zeta_p");
+  zeta[2] = Parameter(0.99, GammaPrior(1, 1), "zeta_s");
   Parameters phi(3);
-  phi[0] = Parameter(0.402155, BetaPrior(2, 2), "phi_c");
-  phi[1] = Parameter(0.749019, BetaPrior(2, 2), "phi_p");
-  phi[2] = Parameter(0.365774, BetaPrior(2, 2), "phi_s");
-  Parameter delta(1.14985, GammaPrior(1, 1), "delta");
-  Parameter a(4.0, GammaPrior(1,1), "a");
-  Parameter b(0.3, GammaPrior(2.4,8), "b");
+  phi[0] = Parameter(0.5, BetaPrior(15, 15), "phi_c");
+  phi[1] = Parameter(0.5, BetaPrior(15, 15), "phi_p");
+  phi[2] = Parameter(0.5, BetaPrior(15, 15), "phi_s");
+  Parameter delta(0.57, GammaPrior(1, 1), "delta");
+  Parameter nu(0.001, GammaPrior(1, 1), "nu");
+  Parameter alpha(60, GammaPrior(1, 1), "alpha");
+  Parameter a(4.0, GammaPrior(1, 1), "a");
+  Parameter b(0.5, GammaPrior(2.4, 8), "b");
 
-  likelihood.SetParameters(epsilon,gamma1,gamma2,xi,psi,zeta,phi,delta,a,b);
+  likelihood.SetMovtBan(23.0f);
+  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta,
+      nu, alpha, a, b);
 
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
-  Mcmc mcmc(likelihood, atoi(argv[7]));
-  
-  float ncratio = atof(argv[8])/10.0;
+  Mcmc::Initialize();
+
+  Mcmc::McmcRoot mcmc(likelihood, seed);
+
+  float ncratio = atof(argv[7]);
 
   UpdateBlock txDelta;
-    txDelta.add(epsilon);
-    txDelta.add(gamma1);
-    txDelta.add(gamma2);
-    txDelta.add(delta);
-    AdaptiveMultiLogMRW* updateDistance = mcmc.NewAdaptiveMultiLogMRW("txDistance",txDelta, 300);
+  txDelta.add(epsilon1);
+  //txDelta.add(epsilon2);
+  txDelta.add(gamma1);
+  //txDelta.add(gamma2);
+  txDelta.add(delta);
+  //txDelta.add(nu);
+  //txDelta.add(alpha);
+  Mcmc::AdaptiveMultiLogMRW* updateDistance =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
+          "txDistance");
+  updateDistance->SetParameters(txDelta);
 
+  UpdateBlock txPsi;
+  txPsi.add(psi[0]);
+  txPsi.add(psi[1]);
+  txPsi.add(psi[2]);
+  Mcmc::AdaptiveMultiLogMRW* updatePsi =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
+  updatePsi->SetParameters(txPsi);
 
-    UpdateBlock txPsi;
-    txPsi.add(psi[0]);
-    txPsi.add(psi[1]);
-    txPsi.add(psi[2]);
-    AdaptiveMultiLogMRW* updatePsi = mcmc.NewAdaptiveMultiLogMRW("txPsi",txPsi, 300);
+  UpdateBlock txPhi;
+  txPhi.add(phi[0]);
+  txPhi.add(phi[1]);
+  txPhi.add(phi[2]);
+  Mcmc::AdaptiveMultiLogMRW* updatePhi =
+      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
+  updatePhi->SetParameters(txPhi);
 
+  UpdateBlock txInfec;
+  txInfec.add(gamma1);
+  txInfec.add(xi[1]);
+  txInfec.add(xi[2]);
 
-    UpdateBlock txPhi;
-    txPhi.add(phi[0]);
-    txPhi.add(phi[1]);
-    txPhi.add(phi[2]);
-    AdaptiveMultiLogMRW* updatePhi = mcmc.NewAdaptiveMultiLogMRW("txPhi",txPhi, 300);
+  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
+      "InfectivityMRW", "txInfec");
+  updateInfec->SetParameters(txInfec);
 
-    UpdateBlock txInfec;
-    txInfec.add(gamma1);
-    txInfec.add(xi[1]);
-    txInfec.add(xi[2]);
-    InfectivityMRW* updateInfec = mcmc.NewInfectivityMRW("txInfec",txInfec, 300);
+  UpdateBlock txSuscep;
+  txSuscep.add(gamma1);
+  txSuscep.add(zeta[1]);
+  txSuscep.add(zeta[2]);
+  Mcmc::SusceptibilityMRW* updateSuscep =
+      (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+  updateSuscep->SetParameters(txSuscep);
 
-    UpdateBlock txSuscep;
-    txSuscep.add(gamma1);
-    txSuscep.add(zeta[1]);
-    txSuscep.add(zeta[2]);
-    SusceptibilityMRW* updateSuscep = mcmc.NewSusceptibilityMRW("txSuscep",txSuscep, 300);
+  // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
-   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
+  UpdateBlock infecPeriod;
+  infecPeriod.add(a);
+  infecPeriod.add(b);
+  Mcmc::InfectionTimeUpdate* updateInfecTime =
+      (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+          "infecTimes");
+  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
+  updateInfecTime->SetParameters(infecPeriod);
+  updateInfecTime->SetUpdateTuning(2.5);
+  updateInfecTime->SetReps(750);
 
-    InfectionTimeUpdate* updateInfecTime = mcmc.NewInfectionTimeUpdate("infecTimes", a, b, 200);
-
-    InfectionTimeGammaCentred* updateBC = mcmc.NewInfectionTimeGammaCentred("b_centred", b, 0.014);
-    InfectionTimeGammaNC* updateBNC = mcmc.NewInfectionTimeGammaNC("b_ncentred", b, 0.0007,ncratio);
+//  UpdateBlock bUpdate; bUpdate.add(b);
+//  Mcmc::InfectionTimeGammaCentred* updateBC =
+//      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+//  updateBC->SetParameters(bUpdate);
+//  updateBC->SetTuning(0.014);
+//
+//  Mcmc::InfectionTimeGammaNC* updateBNC =
+//      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+//  updateBNC->SetParameters(bUpdate);
+//  updateBNC->SetTuning(0.0007);
+//  updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
     // Make output directory
-    string outputFile(argv[4]);
+    string outputFile(argv[3]);
     PosteriorHDF5Writer output(outputFile, likelihood);
-    output.AddParameter(epsilon); output.AddParameter(gamma1);
-    output.AddParameter(gamma2); output.AddParameter(xi[0]);
-    output.AddParameter(xi[1]); output.AddParameter(xi[2]);
+    output.AddParameter(epsilon1); output.AddParameter(epsilon2);
+    output.AddParameter(gamma1);
+    output.AddParameter(gamma2);  output.AddParameter(xi[0]);
+    output.AddParameter(xi[1]);   output.AddParameter(xi[2]);
     output.AddParameter(psi[0]);  output.AddParameter(psi[1]);
     output.AddParameter(psi[2]);  output.AddParameter(zeta[0]);
     output.AddParameter(zeta[1]); output.AddParameter(zeta[2]);
     output.AddParameter(phi[0]);  output.AddParameter(phi[1]);
     output.AddParameter(phi[2]);  output.AddParameter(delta);
+    output.AddParameter(nu);      output.AddParameter(alpha);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
@@ -439,11 +493,23 @@ main(int argc, char* argv[])
     boost::function< float () > getmeanOccI = boost::bind(&GpuLikelihood::GetMeanOccI, &likelihood);
     output.AddSpecial("meanOccI", getmeanOccI);
 
+    // Output the population id index
+    string idxfn = outputFile + ".stridx";
+    ofstream idxfile; idxfile.open(idxfn.c_str(), ios::out);
+    std::vector<std::string> ids; likelihood.GetIds(ids);
+    for(std::vector<std::string>::const_iterator it = ids.begin();
+    		it != ids.end();
+    		it++)
+    {
+    	idxfile << *it << "\n";
+    }
+    idxfile.close();
+
     // Run the chain
     cout << "Running MCMC" << endl;
-    for(size_t k=0; k<atoi(argv[6]); ++k)
+    for(size_t k=0; k<atoi(argv[5]); ++k)
       {
-        if(k % 100 == 0)
+        if(k % 1 == 0)
           {
             cout << "Iteration " << k << endl;
             output.flush();
@@ -462,17 +528,13 @@ main(int argc, char* argv[])
       }
 
     cout << "Covariances\n";
-    cout << updateDistance->getCovariance() << "\n";
-    cout << updatePsi->getCovariance() << "\n";
-    cout << updatePhi->getCovariance() << "\n";
-    cout << updateInfec->getCovariance() << "\n";
-    cout << updateSuscep->getCovariance() << "\n";
-
+    cout << updateDistance->GetCovariance() << "\n";
+    cout << updatePsi->GetCovariance() << "\n";
+    cout << updatePhi->GetCovariance() << "\n";
+    cout << updateInfec->GetCovariance() << "\n";
+    cout << updateSuscep->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 
 }
-
-
-
 

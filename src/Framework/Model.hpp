@@ -92,6 +92,16 @@ namespace EpiRisk
     double
     background(const Individual& j) const = 0;
 
+    /*! Returns the infectivity function on an individual
+     *
+     * @param j the individual
+     * @param time the time at which the infectivity function is evaluated
+     * @return how infectious the individual is, range [0,1]
+     */
+    virtual
+    double
+    hFunction(const Individual& j, const double time) const = 0;
+
     virtual
     double
     instantPressureOn(const typename Population::InfectiveIterator& j, double time) const

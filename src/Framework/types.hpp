@@ -26,16 +26,20 @@
 #define INCLUDE_AITYPES_HPP
 
 #include <limits>
+#include <string>
 
 namespace EpiRisk
 {
 
+  typedef float FP_t;
   typedef double eventTime_t;
   typedef unsigned int Ilabel_t;
   typedef unsigned int Slabel_t;
   typedef unsigned int Spos_t;
   typedef unsigned int Ipos_t;
-  typedef float freq_t;
+  typedef FP_t freq_t;
+
+  typedef float fp_t;
 
   const double POSINF( std::numeric_limits<double>::infinity() );
   const double NEGINF(-std::numeric_limits<double>::infinity() );
@@ -44,6 +48,13 @@ namespace EpiRisk
     size_t idx;
     float  val;
   } IPTuple_t;
+
+  namespace Mcmc
+  {
+    typedef std::string TagType;
+    typedef std::string UpdaterType;
+
+  }
 
 }
 #endif

@@ -139,6 +139,13 @@ namespace EpiRisk
         }
       };
 
+      class Ghost : public Event
+      {
+      public:
+    	  Ghost(const typename Model::Individual* individual, const double time) :
+    		  Event(individual, time) {};
+      };
+
       struct EventQueueCmp {
         bool operator() (const shared_ptr<Event>& lhs, const shared_ptr<Event>& rhs) const
         {
@@ -146,11 +153,11 @@ namespace EpiRisk
         }
       };
       typedef set<shared_ptr<Event>, EventQueueCmp > EventQueue;
-
       Model& model_;
       Random& random_;
       double maxTime_;
       PressureCDF pressureCDF_;
+      PressureCDF infectorCDF_;
       EventQueue eventQueue_;
       typename Model::PopulationType& population_;
       int numS_, numI_, numN_, numR_;
@@ -158,6 +165,8 @@ namespace EpiRisk
 
       void
       calcPressureCDF();
+      bool
+      isInfectious(const typename Model::Individual* individual, const double time);
       void
       checkPressureCDF() const;
       void
@@ -223,6 +232,39 @@ namespace EpiRisk
     }
 
   template<typename Model>
+  	bool
+  	GillespieSim<Model>::isInfectious(const typename Model::Individual* infectee, const double time)
+  	{
+	  infectorCDF_.clear();
+	  double cumulativePressure = 0.0;
+
+	  for(typename EventQueue::const_iterator i = eventQueue_.begin();
+			  i != eventQueue_.end();
+			  ++i)
+	  {
+		  Removal* removal = dynamic_cast<Removal*> (i->get());
+		  if (removal)
+		  {
+			  const typename Model::Individual* infector = (*i)->getIndividual();
+			  if (infector->getN() > time)
+			  {
+				  cumulativePressure += model_.beta(*infector, *infectee, time);
+				  infectorCDF_.insert(make_pair(cumulativePressure, infector));
+			  }
+			  else
+			  {
+				  cumulativePressure += model_.betastar(*infector, *infectee, time);
+			  }
+		  }
+	  }
+
+	  typename PressureCDF::const_iterator chosen = infectorCDF_.lower_bound(random_.uniform(0.0, cumulativePressure));
+
+	  if(chosen != infectorCDF_.end())
+		  return random_.uniform() < model_.hFunction(*(chosen->second), time);
+  	}
+
+  template<typename Model>
     void
     GillespieSim<Model>::simulateCensoredEvents()
     {
@@ -235,11 +277,21 @@ namespace EpiRisk
             {
               Events events;
               events.I = it->getI();
-              events.N = events.I + model_.ItoN(random_);
+              events.N = events.I + model_.ItoN(random_); /// Require rejection here!!!
               events.R = events.N + model_.NtoR();
 
               population_.updateEvents(*it,events);
             }
+
+          if (it->getN() < population_.getObsTime() and it->getR() > population_.getObsTime())
+            {
+              Events events = it->getEvents();
+              double Rcan = it->getN() + model_.NtoR();
+              events.R = Rcan >= population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
+
+              population_.updateEvents(*it, events);
+            }
+
         }
     }
 
@@ -327,7 +379,7 @@ namespace EpiRisk
 
       it = infectee;
       it++;
-      for (it = it; it != pressureCDF_.end(); it++)
+      for (/*it = it*/; it != pressureCDF_.end(); it++)
         {
           cumPressure += model_.beta(*(infection->getIndividual()),
               *(it->second), infection->getTime());
@@ -439,10 +491,15 @@ namespace EpiRisk
             }
           else
             {
-              // Choose infection
-              typename PressureCDF::iterator it = pressureCDF_.upper_bound(
+              // Choose who gets infected
+              typename PressureCDF::iterator j = pressureCDF_.upper_bound(
                   random_.uniform(0.0, beta_max()));
-              event = shared_ptr<Infection> (new Infection(it, nextInfecTime));
+
+              // Retrospective sample for either true infection or ghost
+              if (isInfectious(j->second, nextInfecTime))
+            	  event = shared_ptr<Infection> (new Infection(j, nextInfecTime));
+              else
+            	  event = shared_ptr<Ghost> (new Ghost(j->second, nextInfecTime));
             }
 
           currentTime = event->getTime();
@@ -456,6 +513,10 @@ namespace EpiRisk
               infect(infection);
 
             }
+          else if (Ghost* ghost = dynamic_cast<Ghost*> (event.get()))
+          {
+        	  // Do nothing here
+          }
           else if (Notification* notification = dynamic_cast<Notification*> (event.get()))
             {
 #ifndef NDEBUG

@@ -38,6 +38,7 @@ using namespace EpiRisk;
   {
     float shape_;
     float rate_;
+
   public:
     GammaPrior(const float shape, const float rate)
     {
@@ -120,12 +121,14 @@ public:
   double beta(const Individual& i, const Individual& j, const double time) const;
   double betastar(const Individual& i, const Individual& j, const double time) const;
   double background(const Individual& j) const;
+  double hFunction(const Individual& j, const double time) const;
   double ItoN(const double rn) const;
-  double ItoN(Random& random) const;
+  double ItoN(Random& random);
   double NtoR() const;
 
 private:
   FmdParameters& params_;
+
 };
 
 #endif /* FMDMODEL_HPP_ */

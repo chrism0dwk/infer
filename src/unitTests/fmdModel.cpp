@@ -29,21 +29,19 @@
 #include "fmdModel.hpp"
 
 
-FmdModel::FmdModel(Population<TestCovars>& population, FmdParameters& parameters) : Model< Population<TestCovars> >(population), params_(parameters)
+FmdModel::FmdModel(Population<TestCovars>& population, FmdParameters& parameters)
+  : Model< Population<TestCovars> >(population), params_(parameters)
 {
 
 }
 
 FmdModel::~FmdModel()
 {
-
 }
 
 double
 FmdModel::infectivity(const Individual& i, const double time) const
 {
-
-  if(time - i.getI() < params_.latency) return 0.0;
 
   double infectivity = powf(i.getCovariates().cattle,params_.psi_c) +
                        params_.xi_p*powf(i.getCovariates().pigs,params_.psi_p) +
@@ -99,13 +97,20 @@ FmdModel::background(const Individual& j) const
 }
 
 double
+FmdModel::hFunction(const Individual& j, const double time) const
+{
+	if(time - j.getI() < params_.latency) return 0.0;
+	else return 1.0;
+}
+
+double
 FmdModel::ItoN(const double rn) const
 {
   return rn;
 }
 
 double
-FmdModel::ItoN(Random& random) const
+FmdModel::ItoN(Random& random)
 {
   return random.gamma(params_.a, params_.b);
 }

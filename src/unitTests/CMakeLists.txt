@@ -2,8 +2,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 include_directories(${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/Framework
 ${CMAKE_SOURCE_DIR}/src/data ${CMAKE_SOURCE_DIR}/src/mcmc ${CMAKE_SOURCE_DIR}/src/sim ${CUDA_INCLUDE_DIRS}
-${Boost_INCLUDE_DIRS} ${GSL_INCLUDE_DIR})
-link_directories(${GSL_LINK_DIRECTORIES} ${Boost_LIBRARY_DIRS})
+${Boost_INCLUDE_DIRS} ${GSL_INCLUDE_DIR} ${CMAKE_INCLUDE_PATH})
+link_directories(${GSL_LINK_DIRECTORIES} ${Boost_LIBRARY_DIRS} ${CMAKE_LIBRARY_PATH})
 
 set(fmdMcmc_SOURCES fmdMcmc.cpp)
 add_executable(fmdMcmc ${fmdMcmc_SOURCES})

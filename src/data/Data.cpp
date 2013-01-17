@@ -27,6 +27,8 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <cstdlib>
+#include <vector>
+#include <sstream>
 #include "types.hpp"
 #include "Data.hpp"
 #include "stlStrTok.hpp"
@@ -50,7 +52,9 @@ PopDataImporter::open()
 {
   dataFile_.open(filename_.c_str(),ios::in);
     if(!dataFile_.is_open()) {
-        throw EpiRisk::data_exception("Cannot open population file for reading");
+        std::stringstream msg;
+        msg << "Cannot open population file '" << filename_ << "' for reading";
+        throw EpiRisk::data_exception(msg.str().c_str());
     }
 
     // Take out header line
@@ -117,7 +121,9 @@ EpiDataImporter::open()
 {
   dataFile_.open(filename_.c_str(),ios::in);
       if(!dataFile_.is_open()) {
-          throw EpiRisk::data_exception("Cannot open population file for reading");
+          std::stringstream msg;
+          msg << "Cannot open epidemic file '" << filename_ << "' for reading";
+          throw EpiRisk::data_exception(msg.str().c_str());
       }
 
   string row;
@@ -157,7 +163,7 @@ EpiDataImporter::next()
   else if(tokens[3] == "") record.data.R = EpiRisk::POSINF;
   else record.data.R = atof(tokens[3].c_str());
 
-  if(tokens[4] != "IP") record.data.I = EpiRisk::POSINF;
+  record.data.type = tokens[4];
 
   return record;
 }
