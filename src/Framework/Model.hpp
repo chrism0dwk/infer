@@ -27,7 +27,9 @@
 #ifndef MODEL_HPP_
 #define MODEL_HPP_
 
+#include "types.hpp"
 #include "Parameter.hpp"
+#include "Random.hpp"
 
 
 namespace EpiRisk
@@ -132,7 +134,7 @@ namespace EpiRisk
 
     virtual
     double
-    ItoN(const double rn) const = 0;
+    ItoN(Random& random) const = 0;
 
     virtual
     double
@@ -146,6 +148,10 @@ namespace EpiRisk
 
     double
     getObsTime() const {return population_.getObsTime();}
+
+    virtual
+    double
+    leftTruncatedItoN(Random& random, const Individual& j) const = 0;
 
 
 

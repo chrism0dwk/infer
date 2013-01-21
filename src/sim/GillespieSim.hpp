@@ -33,6 +33,7 @@
 #include <map>
 #include <fstream>
 #include <tr1/memory>
+#include <gsl/gsl_cdf.h>
 
 #include "types.hpp"
 #include "Random.hpp"
@@ -223,8 +224,6 @@ namespace EpiRisk
 
       typename Model::PopulationType::InfectiveIterator it = ++population_.infecEnd();
 
-      cerr << "Starting CDF at individual " << it->getId() << endl;
-
       for (; it != population_.infecPopEnd(); it++)
         {
           cumulativePressure += model_.instantPressureOn(it,
@@ -280,16 +279,7 @@ namespace EpiRisk
             {
               Events events;
               events.I = it->getI();
-              FP_t d = 0;
-              // Condition d > obsTime - I for occult.
-              // Slightly funny 'for' construct -- effective for rejection sampling, though.
-              for(int i=1; d<population_.getObsTime() - events.I; ++i)
-                {
-                  d = model_.ItoN(random_);
-                  if((i % 1024) == 0) std::cerr << "WARNING: rejection iterations = "
-                                                << i << " for individual " << it->getId() << std::endl;
-                }
-              events.N = events.I + d;
+              events.N = events.I + model_.leftTruncatedItoN(random_, *it);
               events.R = events.N + model_.NtoR();
 
               population_.updateEvents(*it,events);

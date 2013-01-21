@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 #include "fmdModel.hpp"
 
@@ -100,19 +101,14 @@ FmdModel::background(const Individual& j) const
 double
 FmdModel::hFunction(const Individual& j, const double time) const
 {
-  assert(time >= 0);
+  assert(time >= 0.0);
 	if(time - j.getI() < params_.latency) return 0.0;
 	else return 1.0;
 }
 
-double
-FmdModel::ItoN(const double rn) const
-{
-  return rn;
-}
 
 double
-FmdModel::ItoN(Random& random)
+FmdModel::ItoN(Random& random) const
 {
   return random.gamma(params_.a, params_.b);
 }
@@ -122,3 +118,15 @@ FmdModel::NtoR() const
 {
   return params_.ntor;
 }
+
+double
+FmdModel::leftTruncatedItoN(Random& random, const Individual& j) const
+{
+  EpiRisk::FP_t d = population_.getObsTime() - j.getI();
+  EpiRisk::FP_t s = gsl_cdf_gamma_P(d, params_.a, 1.0/params_.b);
+  EpiRisk::FP_t u = random.uniform(s,1.0);
+  d = gsl_cdf_gamma_Pinv(u, params_.a, 1.0/params_.b);
+
+  return d;
+}
+
