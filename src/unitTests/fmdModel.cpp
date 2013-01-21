@@ -24,6 +24,7 @@
  *      Author: stsiab
  */
 
+#include <cassert>
 #include <gsl/gsl_randist.h>
 
 #include "fmdModel.hpp"
@@ -99,6 +100,7 @@ FmdModel::background(const Individual& j) const
 double
 FmdModel::hFunction(const Individual& j, const double time) const
 {
+  assert(time >= 0);
 	if(time - j.getI() < params_.latency) return 0.0;
 	else return 1.0;
 }

@@ -30,7 +30,6 @@
 #include <stdexcept>
 #include <algorithm>
 #include <string>
-#include <gsl/gsl_math.h>
 
 
 #include "types.hpp"

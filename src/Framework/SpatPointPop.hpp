@@ -356,6 +356,9 @@ namespace EpiRisk
       /// Returns an iterator to one past the end of the infectives
       InfectiveIterator
       infecEnd() const;
+      /// Returns an iterator to the end of the population
+      InfectiveIterator
+      infecPopEnd() const;
       /// Returns an iterator to the beginning of the occults
       InfectiveIterator
       occultBegin() const;
@@ -400,8 +403,9 @@ namespace EpiRisk
         cerr.precision(15);
         InfectiveIndex& iIndex = population_.get<byI>();
         typename InfectiveIndex::iterator it = iIndex.begin();
-        while(it->getI() <= obsTime_) {
-            cerr << it->getId() << "\t"
+        for(int i=0; it->getI() <= obsTime_; ++i) {
+            cerr << i << "\t"
+                << it->getId() << "\t"
                 << it->getI() << "\t"
                 << it->getN() << "\t"
                 << it->getR() << endl;
@@ -887,6 +891,13 @@ namespace EpiRisk
   {
     typename Population<Covars>::InfectiveIterator it = infIndex_.upper_bound(obsTime_);
     return it;
+  }
+
+  template<typename Covars>
+  typename Population<Covars>::InfectiveIterator
+  Population<Covars>::infecPopEnd() const
+  {
+    return infIndex_.end();
   }
 
   template<typename Covars>

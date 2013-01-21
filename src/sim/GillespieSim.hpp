@@ -221,10 +221,13 @@ namespace EpiRisk
       pressureCDF_.clear();
       double cumulativePressure = 0.0;
 
-      for (typename Model::PopulationType::PopulationIterator it =
-          population_.asPop(++population_.infecEnd()); it != population_.end(); it++)
+      typename Model::PopulationType::InfectiveIterator it = ++population_.infecEnd();
+
+      cerr << "Starting CDF at individual " << it->getId() << endl;
+
+      for (; it != population_.infecPopEnd(); it++)
         {
-          cumulativePressure += model_.instantPressureOn(population_.asI(it),
+          cumulativePressure += model_.instantPressureOn(it,
               model_.getObsTime());
           pressureCDF_.insert(pair<double, const typename Model::Individual*> (
               cumulativePressure, &(*it)));
@@ -277,7 +280,16 @@ namespace EpiRisk
             {
               Events events;
               events.I = it->getI();
-              events.N = events.I + model_.ItoN(random_); /// Require rejection here!!!
+              FP_t d = 0;
+              // Condition d > obsTime - I for occult.
+              // Slightly funny 'for' construct -- effective for rejection sampling, though.
+              for(int i=1; d<population_.getObsTime() - events.I; ++i)
+                {
+                  d = model_.ItoN(random_);
+                  if((i % 1024) == 0) std::cerr << "WARNING: rejection iterations = "
+                                                << i << " for individual " << it->getId() << std::endl;
+                }
+              events.N = events.I + d;
               events.R = events.N + model_.NtoR();
 
               population_.updateEvents(*it,events);
@@ -287,8 +299,8 @@ namespace EpiRisk
             {
               Events events = it->getEvents();
               double Rcan = it->getN() + model_.NtoR();
-              events.R = Rcan >= population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
-
+              // If R is going to be < obsTime, set removal to be tomorrow -- fudgy!
+              events.R = Rcan > population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
               population_.updateEvents(*it, events);
             }
 
@@ -310,14 +322,15 @@ namespace EpiRisk
         {
           if (it->getN() > population_.getObsTime() && it->getN() < POSINF)
             {
-              eventQueue_.insert(shared_ptr<Notification> (new Notification(
-                  &(*it), it->getN())));
+              if(!eventQueue_.insert(shared_ptr<Notification> (new Notification(
+                  &(*it), it->getN()))).second) throw logic_error("Duplicate event time!");
+
             }
 
           if (it->getR() > population_.getObsTime() && it->getR() < POSINF)
             {
-              eventQueue_.insert(shared_ptr<Removal> (new Removal(&(*it),
-                  it->getR())));
+              if(!eventQueue_.insert(shared_ptr<Removal> (new Removal(&(*it),
+                  it->getR()))).second) throw logic_error("Duplicate event time!");
             }
         }
     }
@@ -457,9 +470,9 @@ namespace EpiRisk
       double currentTime = population_.getObsTime();
 
       // Create the PressureCDF
-      calcPressureCDF();
       if (simCensoredEvents) simulateCensoredEvents();
       initEventQueue();
+      calcPressureCDF();
 
       // Simulate forward until maxTime
       while (currentTime <= maxTime_ && !eventQueue_.empty())
@@ -504,11 +517,15 @@ namespace EpiRisk
 
           currentTime = event->getTime();
 
+#ifndef NDEBUG
+          cerr << "Time " << currentTime << endl;
+#endif
+
           // 2. Update populations
           if (Infection* infection = dynamic_cast<Infection*> (event.get()))
             {
 #ifndef NDEBUG
-              cout << "Infecting " << infection->getIndividual()->getId() << " at " << currentTime << endl;
+              cerr << "Infecting " << infection->getIndividual()->getId() << " at " << currentTime << endl;
 #endif
               infect(infection);
 
@@ -520,7 +537,7 @@ namespace EpiRisk
           else if (Notification* notification = dynamic_cast<Notification*> (event.get()))
             {
 #ifndef NDEBUG
-              cout << "Notifying " << notification->getIndividual()->getId() << " at " << currentTime << endl;
+              cerr << "Notifying " << notification->getIndividual()->getId() << " at " << currentTime << endl;
 #endif
               notify(notification);
 
@@ -528,7 +545,7 @@ namespace EpiRisk
           else if (Removal* removal = dynamic_cast<Removal*> (event.get()))
             {
 #ifndef NDEBUG
-              cout << "Removing " << removal->getIndividual()->getId() << " at " << currentTime << endl;
+              cerr << "Removing " << removal->getIndividual()->getId() << " at " << currentTime << endl;
 #endif
               remove(removal);
             }
@@ -549,23 +566,35 @@ namespace EpiRisk
     void
     GillespieSim<Model>::dumpPressureCDF() const
     {
-      cout << "================= Pressure Dump ==================" << endl;
+      cerr << "================= Pressure Dump ==================" << endl;
       for (typename PressureCDF::const_iterator it = pressureCDF_.begin(); it
           != pressureCDF_.end(); it++)
         {
-          cout << it->first << "\t" << it->second->getId() << endl;
+          cerr << it->first << "\t" << it->second->getId() << endl;
         }
-      cout << "==================================================" << endl;
+      cerr << "==================================================" << endl;
+      population_.dumpInfected();
+      cerr << "==================================================" << endl;
     }
 
   template<typename Model>
   void
   GillespieSim<Model>::checkPressureCDF() const
   {
-    for (typename PressureCDF::const_iterator it = pressureCDF_.begin(); it
-              != pressureCDF_.end(); it++)
+    double prevval;
+    typename PressureCDF::const_iterator it = pressureCDF_.begin();
+    if (it->first <= 0.0) throw logic_error("First pressure <= 0.0");
+    prevval = it->first;
+    it++;
+    for (int i=0; it != pressureCDF_.end(); it++, i++)
             {
-              if (it->first <= 0.0) throw logic_error("Pressure <= 0.0!");
+              if (it->first <= prevval) {
+                  std::stringstream msg;
+                  msg << "Pressure[i+1] <= Pressure[i] : ";
+                  msg << "i = " << i << ",  index = " << it->second->getId();
+                  throw logic_error(msg.str().c_str());
+              }
+              prevval = it->first;
             }
   }
 
