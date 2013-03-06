@@ -92,7 +92,7 @@ namespace EpiRisk
      */
     virtual
     double
-    background(const Individual& j) const = 0;
+    background(const Individual& j, const double t) const = 0;
 
     /*! Returns the infectivity function on an individual
      *
@@ -127,7 +127,7 @@ namespace EpiRisk
             }
           ++i;
         }
-      sumPressure += background(*j);
+      sumPressure += background(*j, time);
 
       return sumPressure;
     }

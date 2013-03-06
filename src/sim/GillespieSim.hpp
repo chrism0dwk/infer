@@ -270,6 +270,7 @@ namespace EpiRisk
     void
     GillespieSim<Model>::simulateCensoredEvents()
     {
+      cerr << "Simulating censored events" << endl;
       typename Model::PopulationType::InfectiveIterator stop =
           population_.infecLowerBound(population_.getObsTime());
       for (typename Model::PopulationType::InfectiveIterator it =
@@ -277,6 +278,7 @@ namespace EpiRisk
         {
           if (it->getN() > population_.getObsTime())
             {
+              cerr << "Simulating for individual " << it->getId() << endl;
               Events events;
               events.I = it->getI();
               events.N = events.I + model_.leftTruncatedItoN(random_, *it);
@@ -599,14 +601,14 @@ namespace EpiRisk
             "Cannot open file to serialize epidemic output.  Check your file path.");
 
       // HEADER
-      file << "id,I,N,R\n";
+      file << "id,I,N,R,type\n";
 
       // CONTENT
       for (typename Model::PopulationType::InfectiveIterator it =
           population_.infecBegin(); it != population_.infecEnd(); it++)
         {
           file << it->getId() << "," << it->getI() << "," << it->getN() << ","
-              << it->getR() << "\n";
+              << it->getR() << "," << (it->isDC() ? "DC" : "IP") << "\n";
         }
 
       file.close();

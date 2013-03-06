@@ -43,10 +43,10 @@ struct Settings
   string epidemic;
   string output;
 
-  double minTime, maxTime;
+  double minTime, maxTime, movtban;
   bool simCensoredEvents;
 
-  double epsilon;
+  double epsilon1, epsilon2;
   double gamma1;
   double gamma2;
   double delta;
@@ -76,9 +76,11 @@ struct Settings
 
     minTime = pt.get<double> ("fmdGillespieSim.options.mintime", 0);
     maxTime = pt.get<double> ("fmdGillespieSim.options.maxtime", (double)POSINF);
+    movtban = pt.get<double> ("fmdGillespieSim.options.movtban", 0);
     simCensoredEvents = pt.get<bool> ("fmdGillespieSim.options.simcensoredevents", true);
 
-    epsilon = pt.get<double> ("fmdGillespieSim.parameters.epsilon");
+    epsilon1 = pt.get<double> ("fmdGillespieSim.parameters.epsilon1");
+    epsilon2 = pt.get<double> ("fmdGillespieSim.parameters.epsilon2");
     gamma1 = pt.get<double> ("fmdGillespieSim.parameters.gamma1");
     gamma2 = pt.get<double> ("fmdGillespieSim.parameters.gamma2");
     delta = pt.get<double> ("fmdGillespieSim.parameters.delta");
@@ -188,7 +190,8 @@ main(int argc, char* argv[])
   parameters.gamma1 = Parameter(settings.gamma1, GammaPrior(1, 1), "gamma1");
   parameters.gamma2 = Parameter(settings.gamma2, GammaPrior(1, 1), "gamma2");
   parameters.delta = Parameter(settings.delta, GammaPrior(1, 1), "delta");
-  parameters.epsilon = Parameter(settings.epsilon, GammaPrior(1, 1), "epsilon");
+  parameters.epsilon1 = Parameter(settings.epsilon1, GammaPrior(1, 1), "epsilon1");
+  parameters.epsilon2 = Parameter(settings.epsilon2, GammaPrior(1, 1), "epsilon2");
   parameters.xi_p = Parameter(settings.xi_p, GammaPrior(1, 1), "xi_p");
   parameters.xi_s = Parameter(settings.xi_s, GammaPrior(1, 1), "xi_s");
   parameters.psi_c = Parameter(settings.psi_c, BetaPrior(2, 2), "psi_c");
@@ -203,6 +206,8 @@ main(int argc, char* argv[])
   parameters.a = Parameter(settings.a, GammaPrior(1, 1), "a");
   parameters.b = Parameter(settings.b, GammaPrior(1, 1), "b");
   parameters.ntor = Parameter(settings.ntor, GammaPrior(1,1), "ntor");
+  parameters.movtban = Parameter(settings.movtban, GammaPrior(1,1), "movtban");
+
   FmdModel model(myPopulation, parameters);
   Random random(seed);
 

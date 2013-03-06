@@ -93,9 +93,9 @@ FmdModel::betastar(const Individual& i, const Individual& j, const double time) 
 }
 
 double
-FmdModel::background(const Individual& j) const
+FmdModel::background(const Individual& j, const double t) const
 {
-  return params_.epsilon;
+  return params_.epsilon1 * (t > params_.movtban ? params_.epsilon2 : 1.0);
 }
 
 double

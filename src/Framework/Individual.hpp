@@ -212,6 +212,12 @@ namespace EpiRisk
       }
 
       bool
+      isDC() const
+      {
+        return isDC_;
+      }
+
+      bool
       isSAt(const double& time) const
       {
         // Returns true if *this is susceptible

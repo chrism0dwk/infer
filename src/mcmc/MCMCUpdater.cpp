@@ -344,15 +344,17 @@ namespace EpiRisk
       else
         logvars = random_->mvgauss(*stdCov_);
 
+
       // Log MRW proposal
-      for (size_t p = 0; p < params_->size(); ++p)
+      for (size_t p = 0; p < params_->size(); ++p) {
         (*params_)[p].setValue((*params_)[p].getValue() * exp(logvars[p]));
+      }
 
       // Calculate candidate posterior
-
       float logPiCan = likelihood_->Propose();
       for (size_t p = 0; p < params_->size(); ++p)
         logPiCan += log((*params_)[p].prior());
+
 
       // Proposal ratio
       float qRatio = 0.0;
@@ -361,7 +363,8 @@ namespace EpiRisk
 
       // Accept or reject
       float accept = logPiCan - logPiCur + qRatio;
-      if (log(random_->uniform()) < accept)
+
+      if (log(random_->uniform()) < accept and !isinf(logPiCan))
         {
           likelihood_->Accept();
           acceptance_++;
@@ -735,7 +738,7 @@ namespace EpiRisk
         {
           float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
-          if (accept < 0.44)
+          if (accept < 0.15)
             tuning_ *= exp(-deltan);
           else
             tuning_ *= exp(deltan);
@@ -801,12 +804,12 @@ namespace EpiRisk
         {
           float pickMove = random_->uniform(0.0f, 1.0f);
 
-          if (pickMove < 0.05f)
+          if (pickMove < 0.33f)
             {
               accept_[0] += UpdateI();
               calls_[0]++;
             }
-          else if (pickMove < 0.525f)
+          else if (pickMove < 0.67f)
             {
               accept_[1] += AddI();
               calls_[1]++;

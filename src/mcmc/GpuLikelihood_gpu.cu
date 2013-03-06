@@ -25,6 +25,8 @@
 #define __CUDACC__
 #endif
 
+#define ALPHA 0.3
+
 #include "GpuLikelihood.hpp"
 
 namespace EpiRisk
@@ -1137,15 +1139,12 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
     if (tid < knownInfecs)
       {
-        if (rns[tid] >= prob)
-          {
             int i = infecIdx[tid].ptr;
             float Ii = eventTimes[i];
             float Ni = eventTimes[eventTimesPitch + i];
             float d = Ni - Ii;
-            buff[threadIdx.x] = a * (logf(newGamma) - logf(oldGamma))
-                - (d * (newGamma - oldGamma));
-          }
+        buff[threadIdx.x] = (powf(newGamma, prob) / powf(oldGamma, prob - 1.0f) - newGamma) * d
+                          + a * (1 - prob) * log( newGamma / oldGamma );
       }
 
     _shmemReduce(buff);
@@ -1164,13 +1163,10 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
     if (tid < size)
       {
-        if (toCentre[tid] < prop)
-          {
             unsigned int i = index[tid].ptr;
             float notification = eventTimes[i + eventTimesPitch];
             float infection = eventTimes[i];
-            eventTimes[i] = notification - (notification - infection) * factor;
-          }
+            eventTimes[i] = notification - (notification - infection) * powf(factor,prop);
       }
   }
 
@@ -1672,7 +1668,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
         it++;
       }
 
-    devD_ = makeSparseDistance(coords, popSize_, 25.0f);
+    devD_ = makeSparseDistance(coords, popSize_, 10000.0f);
     dnnz_ = devD_->nnz;
 
     cerr << "About to allocate hostDRowPtr" << endl;
@@ -1894,7 +1890,11 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
         thrust::raw_pointer_cast(&devWorkspace_[0]), numBlocks);
     if(res != CUDPP_SUCCESS) throw logic_error("CUDPP failed");
 
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    if(hostComponents_->bgIntegral < 0.0f) cerr << "bgIntegral = " << hostComponents_->bgIntegral << endl;
     assert(hostComponents_->bgIntegral >= 0.0f);
+#endif
   }
 
   inline
@@ -2059,7 +2059,10 @@ _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*siz
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
         - 1) / THREADSPERBLOCK + 1;
 
+#ifndef NDEBUG
     cerr << "Moving idx " << idx << " from " <<  oldTime << " to " << newTime << endl;
+#endif
+
     // Integrated infection pressure
 _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&devInfecIdx_[0]), newTime,
       *devD_,

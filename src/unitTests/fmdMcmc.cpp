@@ -351,40 +351,40 @@ main(int argc, char* argv[])
   int gpuId = atoi(argv[8]);
 
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
-      (size_t) 3, obsTime, false, gpuId);
+      (size_t) 3, obsTime, true, gpuId);
 
   delete popDataImporter;
   delete epiDataImporter;
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(1e-7, GammaPrior(5e-5, 1), "epsilon1");
+  Parameter epsilon1(1.667e-6, GammaPrior(5e-5, 1), "epsilon1");
   Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
-  Parameter gamma1(0.003, GammaPrior(1, 1), "gamma1");
+  Parameter gamma1(4.904e-05, GammaPrior(1, 1), "gamma1");
   Parameter gamma2(1.0, GammaPrior(2, 4), "gamma2");
   Parameters xi(3);
   xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
-  xi[1] = Parameter(0.29, GammaPrior(1, 1), "xi_p");
-  xi[2] = Parameter(1.0, GammaPrior(1, 1), "xi_s");
+  xi[1] = Parameter(0.417851, GammaPrior(1, 1), "xi_p");
+  xi[2] = Parameter(11.395, GammaPrior(1, 1), "xi_s");
   Parameters psi(3);
-  psi[0] = Parameter(0.5, BetaPrior(15, 15), "psi_c");
-  psi[1] = Parameter(0.5, BetaPrior(15, 15), "psi_p");
-  psi[2] = Parameter(0.5, BetaPrior(15, 15), "psi_s");
+  psi[0] = Parameter(0.86, BetaPrior(15, 15), "psi_c");
+  psi[1] = Parameter(0.44, BetaPrior(15, 15), "psi_p");
+  psi[2] = Parameter(0.39, BetaPrior(15, 15), "psi_s");
   Parameters zeta(3);
   zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
-  zeta[1] = Parameter(0.08, GammaPrior(1, 1), "zeta_p");
-  zeta[2] = Parameter(0.99, GammaPrior(1, 1), "zeta_s");
+  zeta[1] = Parameter(1.070e-03, GammaPrior(1, 1), "zeta_p");
+  zeta[2] = Parameter(0.3368, GammaPrior(1, 1), "zeta_s");
   Parameters phi(3);
-  phi[0] = Parameter(0.5, BetaPrior(15, 15), "phi_c");
-  phi[1] = Parameter(0.5, BetaPrior(15, 15), "phi_p");
-  phi[2] = Parameter(0.5, BetaPrior(15, 15), "phi_s");
-  Parameter delta(0.57, GammaPrior(1, 1), "delta");
+  phi[0] = Parameter(0.4061, BetaPrior(15, 15), "phi_c");
+  phi[1] = Parameter(0.4365, BetaPrior(15, 15), "phi_p");
+  phi[2] = Parameter(0.3372, BetaPrior(15, 15), "phi_s");
+  Parameter delta(0.2431, GammaPrior(1, 1), "delta");
   Parameter nu(0.001, GammaPrior(1, 1), "nu");
   Parameter alpha(60, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
-  Parameter b(0.5, GammaPrior(2.4, 8), "b");
+  Parameter b(0.5, GammaPrior(4.0, 8), "b");
 
-  likelihood.SetMovtBan(23.0f);
+  likelihood.SetMovtBan(22.0f);
   likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta,
       nu, alpha, a, b);
 
@@ -398,9 +398,9 @@ main(int argc, char* argv[])
 
   UpdateBlock txDelta;
   txDelta.add(epsilon1);
-  //txDelta.add(epsilon2);
+  txDelta.add(epsilon2);
   txDelta.add(gamma1);
-  //txDelta.add(gamma2);
+  txDelta.add(gamma2);
   txDelta.add(delta);
   //txDelta.add(nu);
   //txDelta.add(alpha);
@@ -453,19 +453,19 @@ main(int argc, char* argv[])
   updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
   updateInfecTime->SetUpdateTuning(2.5);
-  updateInfecTime->SetReps(750);
+  updateInfecTime->SetReps(30);
 
-//  UpdateBlock bUpdate; bUpdate.add(b);
-//  Mcmc::InfectionTimeGammaCentred* updateBC =
-//      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-//  updateBC->SetParameters(bUpdate);
-//  updateBC->SetTuning(0.014);
-//
-//  Mcmc::InfectionTimeGammaNC* updateBNC =
-//      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-//  updateBNC->SetParameters(bUpdate);
-//  updateBNC->SetTuning(0.0007);
-//  updateBNC->SetNCRatio(ncratio);
+  UpdateBlock bUpdate; bUpdate.add(b);
+  Mcmc::InfectionTimeGammaCentred* updateBC =
+      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+  updateBC->SetParameters(bUpdate);
+  updateBC->SetTuning(0.014);
+
+  Mcmc::InfectionTimeGammaNC* updateBNC =
+      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+  updateBNC->SetParameters(bUpdate);
+  updateBNC->SetTuning(0.0007);
+  updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -509,7 +509,7 @@ main(int argc, char* argv[])
     cout << "Running MCMC" << endl;
     for(size_t k=0; k<atoi(argv[5]); ++k)
       {
-        if(k % 1 == 0)
+        if(k % 100 == 0)
           {
             cout << "Iteration " << k << endl;
             output.flush();

@@ -89,7 +89,8 @@ struct FmdParameters
   Parameter gamma1;
   Parameter gamma2;
   Parameter delta;
-  Parameter epsilon;
+  Parameter epsilon1;
+  Parameter epsilon2;
   Parameter xi_p;
   Parameter xi_s;
   Parameter psi_c;
@@ -104,6 +105,7 @@ struct FmdParameters
   Parameter b;
   Parameter latency;
   Parameter ntor;
+  Parameter movtban;
 };
 
 
@@ -120,7 +122,7 @@ public:
 
   double beta(const Individual& i, const Individual& j, const double time) const;
   double betastar(const Individual& i, const Individual& j, const double time) const;
-  double background(const Individual& j) const;
+  double background(const Individual& j, const double t) const;
   double hFunction(const Individual& j, const double time) const;
   double ItoN(Random& random) const;
   double NtoR() const;
