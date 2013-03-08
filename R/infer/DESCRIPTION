@@ -9,3 +9,4 @@ Description: This package performs Bayesian Inference on epidemic models, and he
 License: GPLv3
 Depends: Rcpp (>= 0.9.10), methods
 LinkingTo: Rcpp
+Packaged: 2013-03-07 00:41:57 UTC; cpjewell
