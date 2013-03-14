@@ -315,6 +315,10 @@ namespace EpiRisk
         doCompareProductVector_ = doCompareProductVector;
       }
       void
+      SetOccults(const bool doOccults) {
+	doOccults_ = doOccults;
+      }
+      void
       Update();
       std::map<std::string, float>
       GetAcceptance() const;
@@ -322,6 +326,7 @@ namespace EpiRisk
       ResetAcceptance();
     private:
       bool* doCompareProductVector_;
+      bool doOccults_;
       ublas::vector<float> calls_;
       ublas::vector<float> accept_;
       size_t reps_;

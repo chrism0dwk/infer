@@ -25,7 +25,7 @@
 #define __CUDACC__
 #endif
 
-#define ALPHA 0.3
+//#define ALPHA 0.3
 
 #include "GpuLikelihood.hpp"
 
@@ -139,7 +139,7 @@ namespace EpiRisk
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
     //return exp(nu*t) / ( alpha + exp(nu*t));
     //return nu*nu*t*exp(-nu*t);
-    return t < 4.0 ? 0.0f : 1.0f;
+    return t < alpha ? 0.0f : 1.0f;
   }
 
   __device__ float
@@ -152,7 +152,7 @@ namespace EpiRisk
     //float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
     //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
 
-    float integral = t - 4.0f;
+    float integral = t - alpha;
     return fmaxf(0.0f, integral);
   }
 
@@ -1295,8 +1295,10 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     cudaDeviceProp deviceProp;
     checkCudaError(cudaGetDeviceProperties(&deviceProp, deviceId));
 
+#ifndef NDEBUG
     std::cout << "Using GPGPU: " << deviceProp.name << ", id " << deviceId
         << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
+#endif
 
     checkCudaError(cudaSetDeviceFlags(cudaDeviceMapHost));
 
@@ -1315,26 +1317,9 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     SetSpecies();
     SetEvents();
 
-//    // Check symmetry of the distance matrix
-//    CsrMatrix onHost = *devD_;
-//    onHost.rowPtr = new int[onHost.n+1];
-//    onHost.colInd = new int[onHost.nnz];
-//    onHost.val = new float[onHost.nnz];
-//    checkCudaError(cudaMemcpy(onHost.rowPtr, devD_->rowPtr, (onHost.n+1)*sizeof(int), cudaMemcpyDeviceToHost));
-//    checkCudaError(cudaMemcpy(onHost.colInd, devD_->colInd, onHost.nnz*sizeof(int), cudaMemcpyDeviceToHost));
-//    checkCudaError(cudaMemcpy(onHost.val, devD_->val, onHost.nnz*sizeof(float), cudaMemcpyDeviceToHost));
-//    size_t nonsym = checkDistMatrixSymmetry(&onHost);
-//    delete[] onHost.rowPtr;
-//    delete[] onHost.colInd;
-//    delete[] onHost.val;
-//
-//    if(nonsym > 0)
-//      throw logic_error("Non symmetric distance matrix!");
-
     // Set up reference counter to covariate data
     covariateCopies_ = new size_t;
     *covariateCopies_ = 1;
-
 
     // Allocate product cache
     devProduct_ = new thrust::device_vector<float>;
@@ -1359,9 +1344,6 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     checkCudaError(
         cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
-
-    //checkCudaError(cudaMalloc((void**)&devComponents_, sizeof(LikelihoodComponents)));
-    //checkCudaError(cudaMemcpy(devComponents_, &hostComponents_, sizeof(LikelihoodComponents), cudaMemcpyHostToDevice));
 
     // Parameters
     checkCudaError(cudaMalloc(&devXi_, numSpecies_ * sizeof(float)));

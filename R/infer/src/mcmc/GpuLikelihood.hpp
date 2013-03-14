@@ -52,12 +52,6 @@
 
 #ifndef __CUDACC__
 #include "Parameter.hpp"
-#else
-//namespace EpiRisk
-//  {
-//    class Parameter;
-//    class Parameters;
-//  }
 #endif
 
 // CUDA defines

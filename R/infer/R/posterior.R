@@ -136,7 +136,7 @@ setMethod("[","HD5ParamProxy",
 			
 			if(!missing(j)) {
 				if(class(j) == "character") {
-					cols <- match(j,x@tags)
+					cols <- match(j,x@tags) - 1
 					if(any(is.na(cols))) stop("Invalid column specification")
 				}
 				else cols <- (0:(length(x@tags)-1))[j]

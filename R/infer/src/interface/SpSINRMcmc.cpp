@@ -82,9 +82,9 @@ public:
     _ids = population[0];
     _x = population[1];
     _y = population[2];
-    _sp1 = population[3];
-    _sp2 = population[4];
-    _sp3 = population[5];
+
+    for(int i=3; i<population.size(); ++i)
+      species_.push_back(population[i]);
     }
   virtual 
   ~PopRImporter() {};
@@ -99,9 +99,11 @@ public:
     record.id = std::string(_ids[_rownum]);
     record.data.x = _x[_rownum];
     record.data.y = _y[_rownum];
-    record.data.cattle = _sp1[_rownum];
-    record.data.pigs = _sp2[_rownum];
-    record.data.sheep = _sp3[_rownum];
+    record.data.cattle = species_[0][_rownum];
+    if(species_.size() > 1)
+      record.data.pigs = species_[1][_rownum];
+    if(species_.size() > 2)
+      record.data.sheep = species_[2][_rownum];
 
     _rownum++;
 
@@ -113,7 +115,7 @@ private:
   int _rownum;
   Rcpp::CharacterVector _ids;
   Rcpp::NumericVector _x, _y;
-  Rcpp::NumericVector _sp1, _sp2, _sp3;
+  std::vector<Rcpp::NumericVector> species_;
 };
 
 
@@ -176,36 +178,37 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   cout << "Starting..." << endl;
   try {
 
-    cout << "..." << endl;
   Rcpp::DataFrame _population(population);
-    cout << "..." << endl;
   Rcpp::DataFrame _epidemic(epidemic);
-    cout << "..." << endl;
   Rcpp::NumericVector _obsTime(obsTime);
-    cout << "..." << endl;
-  Rcpp::NumericVector _movtBan(movtBan);    cout << "..." << endl;
-  Rcpp::List _init(init);    cout << "..." << endl;
-  Rcpp::List _priorParms(priorParms);    cout << "..." << endl;
-  Rcpp::List _control(control);    cout << "..." << endl;
-  Rcpp::CharacterVector _outputfile(outputfile);    cout << "..." << endl;
+  Rcpp::NumericVector _movtBan(movtBan);
+  Rcpp::List _init(init);
+  Rcpp::List _priorParms(priorParms);
+  Rcpp::List _control(control);
+  Rcpp::CharacterVector _outputfile(outputfile);
   
-  Rcpp::IntegerVector numIter = _control["n.iter"];    cout << "..." << endl;
-  Rcpp::IntegerVector gpuId = _control["gpuid"];    cout << "..." << endl;
-  Rcpp::LogicalVector doMovtBan = _control["movtban"];    cout << "..." << endl;
-  Rcpp::CharacterVector occults = _control["occults"];    cout << "..." << endl;
-  Rcpp::LogicalVector doPowers = _control["powers"];    cout << "..." << endl;
-  Rcpp::IntegerVector seed = _control["seed"];    cout << "..." << endl;
-  Rcpp::NumericVector ncratio = _control["ncratio"];    cout << "..." << endl;
-  Rcpp::NumericVector tuneI = _control["tune.I"];    cout << "..." << endl;
-  Rcpp::IntegerVector repsI = _control["reps.I"];    cout << "..." << endl;
-  Rcpp::LogicalVector doLatentPeriodScale = _control["infer.latent.period.scale"];    cout << "..." << endl;
-  Rcpp::NumericVector dLimit = _control["dlimit"];    cout << "..." << endl;
+  Rcpp::IntegerVector numIter = _control["n.iter"];
+  Rcpp::IntegerVector gpuId = _control["gpuid"];
+  Rcpp::LogicalVector doMovtBan = _control["movtban"];
+  Rcpp::CharacterVector occults = _control["occults"];
+  Rcpp::LogicalVector doPowers = _control["powers"];
+  Rcpp::IntegerVector seed = _control["seed"];    
+  Rcpp::NumericVector ncratio = _control["ncratio"]; 
+  Rcpp::NumericVector tuneI = _control["tune.I"];    
+  Rcpp::IntegerVector repsI = _control["reps.I"];    
+  Rcpp::LogicalVector doLatentPeriodScale = _control["infer.latent.period.scale"];
+  Rcpp::NumericVector dLimit = _control["dlimit"];
 
   size_t nSpecies = _population.size() - 3;
   bool dcOnly = false;
+  bool doOccults = false;
+
   if(string(occults[0]) == "dconly") {
     dcOnly = true;
+    doOccults = true;
   }
+  else if(string(occults[0]) == "yes")
+    doOccults = true;
 
   // Set up likelihood
   PopRImporter* popRImporter = new PopRImporter(_population);
@@ -299,98 +302,99 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
-  // EpiRisk::Mcmc::Initialize();
+  EpiRisk::Mcmc::Initialize();
 
-  // EpiRisk::Mcmc::McmcRoot mcmc(likelihood, seed[0]);
+  EpiRisk::Mcmc::McmcRoot mcmc(likelihood, seed[0]);
 
-  // EpiRisk::UpdateBlock txDelta;
-  // txDelta.add(epsilon1);
-  // if(doMovtBan[0]) txDelta.add(epsilon2);
-  // txDelta.add(gamma1);
-  // txDelta.add(gamma2);
-  // txDelta.add(delta);
+  EpiRisk::UpdateBlock txDelta;
+  txDelta.add(epsilon1);
+  if(doMovtBan[0]) txDelta.add(epsilon2);
+  txDelta.add(gamma1);
+  txDelta.add(gamma2);
+  txDelta.add(delta);
 
-  // EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
-  //   (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
-  //         "txBase");
-  // updateDistance->SetParameters(txDelta);
+  EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
+    (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
+          "txBase");
+  updateDistance->SetParameters(txDelta);
 
-  // EpiRisk::UpdateBlock txPsi;
-  // EpiRisk::UpdateBlock txPhi;
+  EpiRisk::UpdateBlock txPsi;
+  EpiRisk::UpdateBlock txPhi;
 
-  // if(doPowers[0]) {
-  //   for(int i = 0; i<nSpecies; i++) {
-  //     txPsi.add(psi[i]);
-  //     txPhi.add(phi[i]);
-  //   }
+  if(doPowers[0]) {
+    for(int i = 0; i<nSpecies; i++) {
+      txPsi.add(psi[i]);
+      txPhi.add(phi[i]);
+    }
 
-  //   if(nSpecies > 1) {
-  //   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePsi =
-  //     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
-  //   updatePsi->SetParameters(txPsi);
+    if(nSpecies > 1) {
+    EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePsi =
+      (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
+    updatePsi->SetParameters(txPsi);
 
-  //   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePhi =
-  //     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
-  //   updatePhi->SetParameters(txPhi);
-  //   }
-  //   else {
-  //     EpiRisk::Mcmc::AdaptiveSingleMRW* updatePsi = 
-  // 	(EpiRisk::Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleLogMRW", "txPsi");
-  //     updatePsi->SetParameters(txPsi);
+    EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePhi =
+      (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
+    updatePhi->SetParameters(txPhi);
+    }
+    else {
+      EpiRisk::Mcmc::AdaptiveSingleMRW* updatePsi = 
+  	(EpiRisk::Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleLogMRW", "txPsi");
+      updatePsi->SetParameters(txPsi);
 
-  //     EpiRisk::Mcmc::AdaptiveSingleMRW* updatePhi = 
-  // 	(EpiRisk::Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "txPhi");
-  //     updatePhi->SetParameters(txPhi);
-  //   }
-  // }
+      EpiRisk::Mcmc::AdaptiveSingleMRW* updatePhi = 
+  	(EpiRisk::Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "txPhi");
+      updatePhi->SetParameters(txPhi);
+    }
+  }
 
-  // // Make decisions here based on number of species
+  // Make decisions here based on number of species
 
-  //   EpiRisk::UpdateBlock txInfec;
-  //   EpiRisk::UpdateBlock txSuscep;
+    EpiRisk::UpdateBlock txInfec;
+    EpiRisk::UpdateBlock txSuscep;
     
-  //   if(nSpecies > 1) {
+    if(nSpecies > 1) {
       
-  //     txInfec.add(gamma1);
-  //     txInfec.add(xi[1]);
-  //     txInfec.add(xi[2]);
+      txInfec.add(gamma1);
+      txInfec.add(xi[1]);
+      txInfec.add(xi[2]);
       
-  //     EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
-  // 	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
-  //     updateInfec->SetParameters(txInfec);
+      EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
+  	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+      updateInfec->SetParameters(txInfec);
       
-  //     txSuscep.add(gamma1);
-  //     txSuscep.add(zeta[1]);
-  //     txSuscep.add(zeta[2]);
-  //     EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
-  // 	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-  //     updateSuscep->SetParameters(txSuscep);
-  //   }
+      txSuscep.add(gamma1);
+      txSuscep.add(zeta[1]);
+      txSuscep.add(zeta[2]);
+      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
+  	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+      updateSuscep->SetParameters(txSuscep);
+    }
 
-  // EpiRisk::UpdateBlock infecPeriod;
-  // infecPeriod.add(a);
-  // infecPeriod.add(b);
-  // EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
-  //   (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-  //         "infecTimes");
-  // updateInfecTime->SetParameters(infecPeriod);
-  // updateInfecTime->SetUpdateTuning(tuneI[0]);
-  // updateInfecTime->SetReps(repsI[0]);
+  EpiRisk::UpdateBlock infecPeriod;
+  infecPeriod.add(a);
+  infecPeriod.add(b);
+  EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
+    (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+          "infecTimes");
+  updateInfecTime->SetParameters(infecPeriod);
+  updateInfecTime->SetUpdateTuning(tuneI[0]);
+  updateInfecTime->SetReps(repsI[0]);
+  updateInfecTime->SetOccults(doOccults);
 
-  // EpiRisk::UpdateBlock bUpdate;
-  // if(doLatentPeriodScale[0]) {
-  //   bUpdate.add(b);
-  //   EpiRisk::Mcmc::InfectionTimeGammaCentred* updateBC =
-  //     (EpiRisk::Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  //   updateBC->SetParameters(bUpdate);
-  //   updateBC->SetTuning(0.014);
+  EpiRisk::UpdateBlock bUpdate;
+  if(doLatentPeriodScale[0]) {
+    bUpdate.add(b);
+    EpiRisk::Mcmc::InfectionTimeGammaCentred* updateBC =
+      (EpiRisk::Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+    updateBC->SetParameters(bUpdate);
+    updateBC->SetTuning(0.014);
 
-  //   EpiRisk::Mcmc::InfectionTimeGammaNC* updateBNC =
-  //     (EpiRisk::Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  //   updateBNC->SetParameters(bUpdate);
-  //   updateBNC->SetTuning(0.0007);
-  //   updateBNC->SetNCRatio(ncratio[0]);
-  // }
+    EpiRisk::Mcmc::InfectionTimeGammaNC* updateBNC =
+      (EpiRisk::Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+    updateBNC->SetParameters(bUpdate);
+    updateBNC->SetTuning(0.0007);
+    updateBNC->SetNCRatio(ncratio[0]);
+  }
 
     //// Output ////
 
@@ -408,38 +412,39 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   output.AddParameter(phi[2]);  output.AddParameter(delta);
   output.AddParameter(b);
   
-  // boost::function< float () > getlikelihood = boost::bind(&EpiRisk::GpuLikelihood::GetLogLikelihood, &likelihood);
-  // output.AddSpecial("loglikelihood",getlikelihood);
-  // boost::function< float () > getnuminfecs = boost::bind(&EpiRisk::GpuLikelihood::GetNumInfecs, &likelihood);
-  // output.AddSpecial("numInfecs",getnuminfecs);
-  // boost::function< float () > getmeanI2N = boost::bind(&EpiRisk::GpuLikelihood::GetMeanI2N, &likelihood);
-  // output.AddSpecial("meanI2N", getmeanI2N);
-  // boost::function< float () > getmeanOccI = boost::bind(&EpiRisk::GpuLikelihood::GetMeanOccI, &likelihood);
-  // output.AddSpecial("meanOccI", getmeanOccI);
-  
+
+  boost::function< float () > getnuminfecs = boost::bind(&EpiRisk::GpuLikelihood::GetNumInfecs, &likelihood);
+  output.AddSpecial("numInfecs",getnuminfecs);
+  boost::function< float () > getmeanI2N = boost::bind(&EpiRisk::GpuLikelihood::GetMeanI2N, &likelihood);
+  output.AddSpecial("meanI2N", getmeanI2N);
+  boost::function< float () > getmeanOccI = boost::bind(&EpiRisk::GpuLikelihood::GetMeanOccI, &likelihood);
+  output.AddSpecial("meanOccI", getmeanOccI);
+   boost::function< float () > getlikelihood = boost::bind(&EpiRisk::GpuLikelihood::GetLogLikelihood, &likelihood);
+  output.AddSpecial("loglikelihood",getlikelihood);
+ 
   // Run the chain
-  cout << "Running MCMC" << endl;
+  Rcpp::Rcout << "Running MCMC" << std::endl;
   for(int k=0; k<numIter[0]; ++k)
     {
-      //mcmc.Update();
-      //output.write();
+      mcmc.Update();
+      output.write();
 
-      if(k % 1 == 0)
+      if(k % 500 == 0)
   	{
-  	  cout << "Iteration " << k << endl;
-  	  //output.flush();
+	  Rcpp::Rcout << "Iteration " << k << std::endl;
+  	  output.flush();
   	}
 
     }
   
   // Wrap up
-  //map<string, float> acceptance = mcmc.GetAcceptance();
+  map<string, float> acceptance = mcmc.GetAcceptance();
   
-  //for(map<string, float>::const_iterator it = acceptance.begin();
-  //    it != acceptance.end(); ++it)
-  //  {
-  //    cout << it->first << ": " << it->second << "\n";
-  //  }
+  for(map<string, float>::const_iterator it = acceptance.begin();
+     it != acceptance.end(); ++it)
+   {
+     Rcpp::Rcout << it->first << ": " << it->second << "\n";
+   }
   
   // cout << "Covariances\n";
   // cout << updateDistance->GetCovariance() << "\n";

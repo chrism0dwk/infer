@@ -58,7 +58,8 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
               else control$tmpdir <- as.character(control$tmpdir)
 
               outfile <- tempfile(pattern="berp.posterior",tmpdir=control$tmpdir,fileext=".hd5")
-              cat("Before call\n")
+              cat("Writing to", outfile, "\n")
+              
               .Call("SpSINRMcmc", population=model@population,
                     epidemic=model@epidemic,
                     obsTime=model@obsTime,
@@ -67,11 +68,11 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
                     priorParms=model@prior,
                     control=control,
                     outputfile=outfile)
-              cat("After call\n")
+
             }
             else stop("invalid algorithm type!")
             
-            #Posterior(outfile)
+            Posterior(outfile)
           }
 )
 

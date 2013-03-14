@@ -61,8 +61,8 @@ void PosteriorHDF5Writer::write() {
 		// Parameter tag attributes
 		hsize_t paramAttrDims(paramTags_.size());
 		H5::DataSpace* paramAttrSpace = new H5::DataSpace(1, &paramAttrDims);
-		H5::PredType paramTag_t = H5::PredType::C_S1;
-		paramTag_t.setSize(H5T_VARIABLE );
+		H5::StrType paramTag_t(H5::PredType::C_S1, H5T_VARIABLE);
+		//paramTag_t.setSize(H5T_VARIABLE );
 		H5::Attribute paramAttr(
 				file_->openDataSet("/posterior/parameters").createAttribute(
 						"tags", paramTag_t, *paramAttrSpace));
