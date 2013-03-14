@@ -118,6 +118,7 @@ namespace EpiRisk
       float tuning_;
     };
 
+
     //! Adaptive Multisite updater class
     template<class Transform>
       class AdaptiveMRW : public McmcUpdate
@@ -199,6 +200,15 @@ namespace EpiRisk
         EmpCovar<Transform>* empCovar_;
         typename EmpCovar<Transform>::CovMatrix* stdCov_;
       };
+
+    
+    class AdaptiveSingleMRW : public AdaptiveMRW<Identity>
+    {
+    public:
+      void
+      Update();
+    };
+
 
     //! Adaptive Multisite Linear Random Walk algorithm
     class AdaptiveMultiMRW : public AdaptiveMRW<Identity>

@@ -139,7 +139,8 @@ fi
 if test -z "${R_HOME}"; then
         AC_MSG_ERROR("could not determine R_HOME")
 else
-        CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
+        CPICFLAGS="`"${R_HOME}/bin/R" CMD config CPICFLAGS` -g"
+###	CPICFLAGS="${CPICFLAGS} `${R_HOME}/bin/R CMD config CXXFLAGS`"
         if test -z "${R_INCLUDE}"; then
                 R_INCLUDE=`"${R_HOME}/bin/R" CMD config --cppflags`
         else

@@ -222,6 +222,48 @@ namespace EpiRisk
     }
 
     void
+    AdaptiveSingleMRW::Update()
+    {
+      Parameter& param_((*params_)[0].getParameter());
+
+      FP_t oldValue = param_;
+      
+      // Adapt scalar
+      if(windowUpdates_ % WINDOWSIZE == 0)
+	{
+	  float accept = (float) windowAcceptance_ / (float) windowUpdates_;
+	  float deltan = min(0.5, 1.0 / sqrt(numUpdates_ / WINDOWSIZE));
+	  if (accept < 0.4) 
+	    adaptScalar_ *= exp(-deltan);
+	  else
+	    adaptScalar_ *= exp(deltan);
+	  windowUpdates_ = windowAcceptance_ = 0;
+	}
+
+      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      if(random_->uniform() < 0.95)
+	param_ += random_->gaussian(0, adaptScalar_);
+      else 
+	param_ += random_->gaussian(0, 0.01);
+
+      float logPiCan = likelihood_->Propose() + log(param_.prior());
+
+      if(log(random_->uniform()) < logPiCan - logPiCur)
+	{
+	  likelihood_->Accept();
+	  acceptance_++;
+	  windowAcceptance_++;
+	}
+      else {
+	likelihood_->Reject();
+	param_ = oldValue;
+      }
+
+      numUpdates_++;
+      windowUpdates_++;
+    }
+
+    void
     AdaptiveMultiMRW::Update()
     {
       // Save old values
@@ -820,7 +862,7 @@ namespace EpiRisk
               calls_[2]++;
             }
 
-          if (*doCompareProductVector_)
+          if (doCompareProductVector_)
             {
               float proposal = likelihood_->Propose();
 
@@ -1033,6 +1075,8 @@ namespace EpiRisk
       rv.insert(make_pair(tag_ + ":moveInfec", accept[0]));
       rv.insert(make_pair(tag_ + ":addInfec", accept[1]));
       rv.insert(make_pair(tag_ + ":delInfec", accept[2]));
+      
+      delete[] accept;
 
       return rv;
     }

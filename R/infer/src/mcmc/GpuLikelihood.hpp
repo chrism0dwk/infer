@@ -65,7 +65,7 @@
 
 // Model defines
 #define NUMEVENTS 3
-#define NUMSPECIES 3
+//#define NUMSPECIES 3
 
 namespace EpiRisk
 {
@@ -170,7 +170,7 @@ namespace EpiRisk
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
-        const float obsTime, const bool occultsOnlyDC = false, const int gpuId=0);
+		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
     GpuLikelihood(const GpuLikelihood& other);
     virtual
@@ -188,7 +188,7 @@ namespace EpiRisk
     void
     LoadDistanceMatrix(DistMatrixImporter& filename);
     void
-    CalcDistanceMatrix();
+    CalcDistanceMatrix(const float dLimit);
     void
     SetEvents();
     void
@@ -259,7 +259,7 @@ namespace EpiRisk
     const thrust::device_vector<float>&
     GetProdVector() const
     {
-      return devProduct_;
+      return *devProduct_;
     }
     float
     GetN(const int idx) const;
@@ -336,9 +336,9 @@ namespace EpiRisk
     size_t maxInfecs_;
     size_t occultsOnlyDC_;
 
-    thrust::host_vector<InfecIdx_t> hostInfecIdx_;
-    thrust::device_vector<InfecIdx_t> devInfecIdx_;
-    thrust::host_vector<InfecIdx_t> hostSuscOccults_;
+    thrust::host_vector<InfecIdx_t>* hostInfecIdx_;
+    thrust::device_vector<InfecIdx_t>* devInfecIdx_;
+    thrust::host_vector<InfecIdx_t>* hostSuscOccults_;
     const size_t numSpecies_;
     float logLikelihood_;
     const float obsTime_;
@@ -372,8 +372,8 @@ namespace EpiRisk
     size_t eventTimesPitch_;
     float* devSusceptibility_;
     float* devInfectivity_;
-    thrust::device_vector<float> devProduct_;
-    thrust::device_vector<float> devWorkspace_;
+    thrust::device_vector<float>* devProduct_;
+    thrust::device_vector<float>* devWorkspace_;
     int integralBuffSize_;
 
     // CUDAPP bits and pieces

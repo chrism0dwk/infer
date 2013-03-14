@@ -166,7 +166,7 @@ namespace EpiRisk
 
     // Set up occult susceptible vector
     for (size_t i = numKnownInfecs_; i < maxInfecs_; ++i)
-      hostSuscOccults_.push_back(i);
+      hostSuscOccults_->push_back(i);
 
     std::cout << "Population size: " << popSize_ << "\n";
     std::cout << "Num infecs: " << numKnownInfecs_ << "\n";
@@ -289,7 +289,7 @@ namespace EpiRisk
   size_t
   GpuLikelihood::GetNumInfecs() const
   {
-    return hostInfecIdx_.size();
+    return hostInfecIdx_->size();
   }
 
   size_t
@@ -307,7 +307,7 @@ namespace EpiRisk
   size_t
   GpuLikelihood::GetNumPossibleOccults() const
   {
-    return hostSuscOccults_.size();
+    return hostSuscOccults_->size();
   }
 
   size_t
@@ -327,7 +327,7 @@ namespace EpiRisk
   size_t
   GpuLikelihood::GetNumOccults() const
   {
-    return hostInfecIdx_.size() - numKnownInfecs_;
+    return hostInfecIdx_->size() - numKnownInfecs_;
   }
 
 } // namespace EpiRisk

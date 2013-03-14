@@ -42,7 +42,27 @@ lookupInfIdxNames <- function(theVector, tags)
 }
 
 
-							 
+
+
+# Constructor functions
+Posterior <- function(filename)
+{
+	new("Posterior", filename=filename)
+}
+
+HD5ParamProxy <- function(filename)
+{
+	new("HD5ParamProxy", filename=filename)
+}
+
+HD5InfecProxy <- function(filename)
+{
+	new("HD5InfecProxy", filename=filename)
+}
+
+
+
+.initPosterior <- function() {							 
 
 # Proxy classes -- these classes provide an interface to the posterior in
 #   the underlying disc storage.
@@ -57,10 +77,6 @@ setMethod("initialize","HD5ParamProxy",
 		}
 )
 
-HD5ParamProxy <- function(filename)
-{
-	new("HD5ParamProxy", filename=filename)
-}
 
 
 setClass("HD5InfecProxy",representation(filename="character",tags="character",length="numeric"))
@@ -74,15 +90,7 @@ setMethod("initialize","HD5InfecProxy",
 		}
 )
 
-HD5InfecProxy <- function(filename)
-{
-	new("HD5InfecProxy", filename=filename)
-}
 
-Posterior <- function(filename)
-{
-	new("Posterior", filename=filename)
-}
 
 setClass("Posterior",representation(filename="character", model="character", param="HD5ParamProxy",infec="HD5InfecProxy"))
 setMethod("initialize", "Posterior", function(.Object, filename) {
@@ -108,8 +116,10 @@ setMethod("dim", "HD5InfecProxy", function(x) c(x@length, length(x@tags)))
 setMethod("length", "HD5ParamProxy", function(x) dim(x)[1])
 setMethod("length", "HD5InfecProxy", function(x) dim(x)[1])
 setMethod("length", "Posterior", function(x) dim(x@param)[1])
+setGeneric("nrow")
 setMethod("nrow", "HD5ParamProxy", function(x) dim(x)[1])
 setMethod("nrow", "HD5InfecProxy", function(x) dim(x)[1])
+setGeneric("ncol")
 setMethod("ncol", "HD5ParamProxy", function(x) dim(x)[2])
 setMethod("ncol", "HD5InfecProxy", function(x) dim(x)[2])
 
@@ -164,11 +174,12 @@ setMethod("[","HD5InfecProxy",
 )
 
 # Coercion
+setGeneric("as.data.frame")
 setMethod("as.data.frame","HD5ParamProxy", function(x) x[])
 setMethod("as.data.frame","HD5InfecProxy", function(x) x[])
 
 # Summary methods
-#setGeneric("summary", function(object) standardGeneric("summary"))
+setGeneric("summary")
 setMethod("summary","Posterior", 
 		function(object) {
 			cat("Model:", object@model, "\n")
@@ -195,3 +206,8 @@ setMethod("summary","HD5InfecProxy",
 		function(object) {
 			"To be implemented -- tell me what you want to know about!"
 		})
+
+
+} # .initPosterior
+
+

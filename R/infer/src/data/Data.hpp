@@ -35,6 +35,7 @@
 #include "Individual.hpp"
 #include "DataImporter.hpp"
 
+namespace EpiRisk {
 struct TestCovars {
   double x;
   double y;
@@ -68,10 +69,15 @@ private:
 
 public:
   PopDataImporter(const string filename);
+  PopDataImporter();
   virtual ~PopDataImporter();
+  virtual
   void open();
+  virtual
   void close();
+  virtual
   Record next();
+  virtual
   void reset();
 };
 
@@ -84,10 +90,15 @@ private:
 
 public:
   EpiDataImporter(const string filename);
+  EpiDataImporter();
   virtual ~EpiDataImporter();
+  virtual
   void open();
+  virtual
   void close();
+  virtual
   Record next();
+  virtual
   void reset();
 };
 
@@ -106,7 +117,7 @@ public:
   void reset();
 };
 
-
+}
 
 
 #endif /* IMPORTERS_HPP_ */

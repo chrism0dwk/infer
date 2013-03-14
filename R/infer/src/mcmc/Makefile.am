@@ -3,7 +3,7 @@ INCLUDES = -I. -I../data -I../Framework -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_
 NVCC = @CUDA_HOME@/bin/nvcc -gencode arch=compute_11,code=sm_11 -gencode arch=compute_12,code=sm_12 -gencode arch=compute_13,code=sm_13 -gencode arch=compute_20,code=sm_20
 
 PARAMS = @CPICFLAGS@ -fPIC
-NVPARAMS = @DEVICEOPTS@ -Xcompiler @CPICFLAGS@
+NVPARAMS = @DEVICEOPTS@ -Xcompiler "@CPICFLAGS@"
 
 OBJS = SmpSirMcmc.o GpuLikelihood.o Mcmc.o McmcFactory.o MCMCUpdater.o McmcLikelihood.o PosteriorHDF5Writer.o PosteriorHDF5Reader.o PosteriorWriter.o 
 

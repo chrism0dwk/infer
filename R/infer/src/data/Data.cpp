@@ -33,6 +33,7 @@
 #include "Data.hpp"
 #include "stlStrTok.hpp"
 
+namespace EpiRisk {
 
 gsl_rng* localrng = gsl_rng_alloc(gsl_rng_mt19937);
 
@@ -41,6 +42,8 @@ PopDataImporter::PopDataImporter(const string filename) : filename_(filename)
 {
 
 }
+
+PopDataImporter::PopDataImporter() { }
 
 PopDataImporter::~PopDataImporter()
 {
@@ -110,6 +113,8 @@ EpiDataImporter::EpiDataImporter(const string filename) : filename_(filename)
 {
 
 }
+
+EpiDataImporter::EpiDataImporter() { }
 
 EpiDataImporter::~EpiDataImporter()
 {
@@ -241,3 +246,4 @@ DistMatrixImporter::reset()
 }
 
 
+} // namespace EpiRisk

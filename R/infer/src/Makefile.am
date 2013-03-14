@@ -1,4 +1,4 @@
-SUBDIRS = interface mcmc sim Framework
+SUBDIRS = interface mcmc sim Framework data
 #data Framework mcmc sim
 INCLUDES = -I. -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
 
@@ -9,11 +9,13 @@ MCMCOBJS =  mcmc/SmpSirMcmc.o mcmc/GpuLikelihood.o mcmc/GpuLikelihood_gpu.o mcmc
 
 FRAMEWORKOBJS = Framework/Random.o Framework/SpatMetaPop.o Framework/SmpIndividual.o Framework/stlStrTok.o
 
-IFACEOBJS = interface/posterior.o interface/SmpIface.o
+IFACEOBJS = interface/posterior.o interface/SmpIface.o interface/SpSINRMcmc.o
 
 SIMOBJS = sim/SmpSirSim.o
 
-OBJS = $(IFACEOBJS) $(FRAMEWORKOBJS) $(SIMOBJS) $(MCMCOBJS) 
+DATAOBJS = data/Data.o
+
+OBJS = $(IFACEOBJS) $(FRAMEWORKOBJS) $(SIMOBJS) $(MCMCOBJS) $(DATAOBJS) 
 
 
 #linker options
