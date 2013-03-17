@@ -6,7 +6,9 @@ exportClasses(Posterior,
               SpatPointSINR)
 
 export(Posterior,
-       SpatPointSINR)
+       SpatPointSINR,
+       read.posterior,
+       write.posterior)
 	   
 exportMethods(show,
               names,
@@ -18,4 +20,5 @@ exportMethods(show,
               "$",
               as.data.frame,
               summary,
-              berp.fit)
+              berp.fit,
+              berp.sim)

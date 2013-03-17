@@ -157,6 +157,12 @@ namespace EpiRisk
   }
 
   __device__ float
+  _K(const float dsq, const float delta)
+  {
+    return delta / powf(delta*delta + dsq, 1.5);
+  }
+
+  __device__ float
   _atomicAdd(float* address, float val)
   {
     unsigned int* address_as_ui = (unsigned int*) address;
@@ -572,7 +578,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
                     - _H(fminf(Ni, Ij) - Ii, nu, alpha));
 
             // Apply distance kernel and suscep
-            betaij *= delta / (delta * delta + distance.val[jj]);
+            betaij *= _K(distance.val[jj], delta);
             betaij *= susceptibility[distance.colInd[jj]];
             threadSum += betaij;
           }
@@ -654,8 +660,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
                   idxOnj += _h(Ij - Ii, nu, alpha);
                 else if (Ni < Ij and Ij <= Ri)
                   idxOnj += gamma2 * _h(Ij - Ii, nu, alpha);
-                threadProdCache[threadIdx.x] += idxOnj * infectivity[i] * delta
-                    / (delta * delta + distance.val[ii]);
+                threadProdCache[threadIdx.x] += idxOnj * infectivity[i] * _K(distance.val[ii],delta);
               }
           }
         __syncthreads();
@@ -758,7 +763,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         IdxOnj *= infectivity[i];
 
         buff[threadIdx.x] = (IdxOnj + jOnIdx)
-            * (delta / (delta * delta + distance.val[begin + tid]));
+	  * _K(distance.val[begin+tid], delta);
 
         // Reduce buffer into output
         _shmemReduce(buff);
@@ -817,8 +822,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             if (newTime < Ij and Ij <= Ni)
               idxOnj += _h(Ij - newTime, nu, alpha);
 
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
-                / (delta * delta + distance.val[begin + tid]);
+            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta);
             prodCache[j] += idxOnj;
 
             // Recalculate instantaneous pressure on idx
@@ -828,9 +832,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             else if (Nj < newTime and newTime <= Rj)
               jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
 
-            jOnIdx *= susceptibility[i] * infectivity[j] * delta
-                / (delta * delta + distance.val[begin + tid]);
-
+            jOnIdx *= susceptibility[i] * infectivity[j] * _K(distance.val[begin+tid],delta);
             buff[threadIdx.x] = jOnIdx * gamma1;
 
           }
@@ -902,7 +904,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         IdxOnj *= infectivity[i];
 
         buff[threadIdx.x] = (IdxOnj + jOnIdx)
-            * (delta / (delta * delta + distance.val[begin + tid]));
+	  * _K(distance.val[begin+tid], delta);
 
         // Reduce buffer into output
         _shmemReduce(buff);
@@ -970,7 +972,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         IdxOnj *= infectivity[i];
 
         buff[threadIdx.x] = (IdxOnj + jOnIdx)
-            * (delta / (delta * delta + distance.val[begin + tid]));
+	  * _K(distance.val[begin+tid], delta);
 
         // Reduce buffer into output
         _shmemReduce(buff);
@@ -1022,8 +1024,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             else if (Ni < Ij and Ij <= Ri)
               idxOnj += gamma2 * _h(Ij - newTime, nu, alpha);
 
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
-                / (delta * delta + distance.val[begin + tid]);
+            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta);
             prodCache[j] += idxOnj;
 
             // Calculate instantaneous pressure on idx
@@ -1033,9 +1034,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             else if (Nj < newTime and newTime <= Rj)
               jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
 
-            jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * delta
-                / (delta * delta + distance.val[begin + tid]);
-
+            jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * _K(distance.val[begin+tid],delta);
 
             buff[threadIdx.x] = jOnIdx;
 
@@ -1088,8 +1087,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             else if (Ni < Ij and Ij <= Ri)
               idxOnj -= gamma2 * _h(Ij - Ii, nu, alpha);
 
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * delta
-                / (delta * delta + distance.val[begin + tid]);
+            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta);
             prodCache[j] += idxOnj;
           }
       }
@@ -1741,9 +1739,11 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     Population::const_iterator it = hostPopulation_.begin();
     for (size_t i = 0; i < hostPopulation_.size(); ++i)
       {
-        speciesMatrix[i] = it->cattle;
-        speciesMatrix[i + hostPopulation_.size()] = it->pigs;
-        speciesMatrix[i + hostPopulation_.size() * 2] = it->sheep;
+	speciesMatrix[i] = it->cattle;
+	if(numSpecies_ > 1)
+	  speciesMatrix[i + hostPopulation_.size()] = it->pigs;
+	if(numSpecies_ > 2)
+	  speciesMatrix[i + hostPopulation_.size() * 2] = it->sheep;
         ++it;
       }
 
@@ -1830,6 +1830,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     int dimGrid((maxInfecs_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
 _calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, animalsInfPowPitch_,devAnimals_,animalsPitch_,devPsi_);
                         	    	    checkCudaError(cudaGetLastError());
+				 
   }
 
   inline
@@ -1856,6 +1857,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, an
     int dimGrid((popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
 _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,animalsSuscPowPitch_, devAnimals_,animalsPitch_,devPhi_);
                         	    	    checkCudaError(cudaGetLastError());
+
+					   
   }
 
   inline
@@ -2368,6 +2371,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
             devAnimalsSuscPow_ + animalsSuscPowPitch_ * k);
         result[k] = thrust::reduce(p, p + popSize_);
       }
+
+    cerr << result[0] << "\t" << result[1] << "\t" << result[2] << endl;
   }
 
   float

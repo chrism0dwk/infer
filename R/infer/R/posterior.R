@@ -50,6 +50,16 @@ Posterior <- function(filename)
 	new("Posterior", filename=filename)
 }
 
+read.posterior <- function(filename)
+  {
+    Posterior(filename);
+  }
+
+write.posterior <- function(posterior, filename, ...)
+  {
+    file.copy(posterior@filename, filename, ...)
+  }
+
 HD5ParamProxy <- function(filename)
 {
 	new("HD5ParamProxy", filename=filename)

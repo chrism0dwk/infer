@@ -176,7 +176,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 {
 
   cout << "Starting..." << endl;
-  try {
+  //try {
 
   Rcpp::DataFrame _population(population);
   Rcpp::DataFrame _epidemic(epidemic);
@@ -263,12 +263,12 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     startval = _init["phi_2"]; prior = _priorParms["phi_2"];
     phi[1] = EpiRisk::Parameter(startval[0], BetaPrior(prior[0], prior[1]), "phi_2");
   }
-  else {
-    xi[1] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "xi_2");
-    psi[1] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_2");
-    zeta[1] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "zeta_2");
-    psi[1] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_2");
-  }
+  // else {
+  //   xi[1] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "xi_2");
+  //   psi[1] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_2");
+  //   zeta[1] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "zeta_2");
+  //   psi[1] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_2");
+  // }
   if (nSpecies > 2) {
     startval = _init["xi_3"]; prior = _priorParms["xi_3"];
     xi[2] = EpiRisk::Parameter(startval[0], GammaPrior(prior[0], prior[1]), "xi_3");
@@ -279,12 +279,12 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     startval = _init["phi_3"]; prior = _priorParms["phi_3"];
     phi[2] = EpiRisk::Parameter(startval[0], BetaPrior(prior[0], prior[1]), "phi_3");
   }
-  else {
-    xi[2] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "xi_3");
-    psi[2] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_3");
-    zeta[2] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "zeta_3");
-    psi[2] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_3");
-  }
+  // else {
+  //   xi[2] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "xi_3");
+  //   psi[2] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_3");
+  //   zeta[2] = EpiRisk::Parameter(1.0f, GammaPrior(1, 1), "zeta_3");
+  //   psi[2] = EpiRisk::Parameter(0.0f, BetaPrior(1, 1), "psi_3");
+  // }
 
   startval = _init["delta"]; prior = _priorParms["delta"];
   EpiRisk::Parameter delta(startval[0], GammaPrior(prior[0], prior[1]), "delta");
@@ -355,18 +355,17 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     if(nSpecies > 1) {
       
       txInfec.add(gamma1);
-      txInfec.add(xi[1]);
-      txInfec.add(xi[2]);
-      
+      for(int i=1; i<nSpecies; ++i)
+	txInfec.add(xi[i]);
       EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
-  	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+       	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
       updateInfec->SetParameters(txInfec);
       
       txSuscep.add(gamma1);
-      txSuscep.add(zeta[1]);
-      txSuscep.add(zeta[2]);
+      for(int i=1; i<nSpecies; ++i)
+	txSuscep.add(zeta[i]);
       EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
-  	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
       updateSuscep->SetParameters(txSuscep);
     }
 
@@ -404,12 +403,15 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   output.AddParameter(epsilon1); output.AddParameter(epsilon2);
   output.AddParameter(gamma1);
   output.AddParameter(gamma2);
-  output.AddParameter(xi[1]);   output.AddParameter(xi[2]);
-  output.AddParameter(psi[0]);  output.AddParameter(psi[1]);
-  output.AddParameter(psi[2]);
-  output.AddParameter(zeta[1]); output.AddParameter(zeta[2]);
-  output.AddParameter(phi[0]);  output.AddParameter(phi[1]);
-  output.AddParameter(phi[2]);  output.AddParameter(delta);
+  for(int i=1; i<nSpecies; ++i)
+    output.AddParameter(xi[i]);
+  for(int i=0; i<nSpecies; ++i)
+    output.AddParameter(psi[i]);
+  for(int i=1; i<nSpecies; ++i)
+    output.AddParameter(zeta[i]);
+  for(int i=0; i<nSpecies; ++i)
+    output.AddParameter(phi[i]);
+  output.AddParameter(delta);
   output.AddParameter(b);
   
 
@@ -422,6 +424,9 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
    boost::function< float () > getlikelihood = boost::bind(&EpiRisk::GpuLikelihood::GetLogLikelihood, &likelihood);
   output.AddSpecial("loglikelihood",getlikelihood);
  
+  float sums[3];
+  likelihood.GetSumSusceptibilityPow(sums);
+
   // Run the chain
   Rcpp::Rcout << "Running MCMC" << std::endl;
   for(int k=0; k<numIter[0]; ++k)
@@ -453,19 +458,19 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   // cout << updateInfec->GetCovariance() << "\n";
   // cout << updateSuscep->GetCovariance() << "\n";
 
-  }
-  catch (std::exception& __ex__)
-    {
-      forward_exception_to_r(__ex__);
-    }
-  catch (H5::Exception& e)
-    {
-      ::Rf_error(e.getCDetailMsg());
-    }
-  catch (...)
-    {
-      ::Rf_error("c++ exception (unknown reason)");
-    }
+  // }
+  // catch (std::exception& __ex__)
+  //   {
+  //     forward_exception_to_r(__ex__);
+  //   }
+  // catch (H5::Exception& e)
+  //   {
+  //     ::Rf_error(e.getCDetailMsg());
+  //   }
+  // catch (...)
+  //   {
+  //     ::Rf_error("c++ exception (unknown reason)");
+  //   }
   
   cout << "Finishing..." << endl;
 
