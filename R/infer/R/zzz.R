@@ -9,5 +9,5 @@
     .initClasses()
     .initFittingMethods()
     .initPosterior()
-
+    .initSimMethods()
   }

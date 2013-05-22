@@ -6,7 +6,7 @@ EXT = cpp
 OBJS = SmpSirSim.o
 
 #compiler/preprocessor options
-PARAMS = @CPICFLAGS@
+PARAMS = @CPICFLAGS@ @AM_CXXFLAGS@
 
 #linker options
 LD_PARAMS = @RPATHFLAG@

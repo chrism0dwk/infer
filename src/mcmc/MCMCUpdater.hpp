@@ -118,6 +118,7 @@ namespace EpiRisk
       float tuning_;
     };
 
+
     //! Adaptive Multisite updater class
     template<class Transform>
       class AdaptiveMRW : public McmcUpdate
@@ -199,6 +200,15 @@ namespace EpiRisk
         EmpCovar<Transform>* empCovar_;
         typename EmpCovar<Transform>::CovMatrix* stdCov_;
       };
+
+    
+    class AdaptiveSingleMRW : public AdaptiveMRW<Identity>
+    {
+    public:
+      void
+      Update();
+    };
+
 
     //! Adaptive Multisite Linear Random Walk algorithm
     class AdaptiveMultiMRW : public AdaptiveMRW<Identity>
@@ -305,6 +315,10 @@ namespace EpiRisk
         doCompareProductVector_ = doCompareProductVector;
       }
       void
+      SetOccults(const bool doOccults) {
+	doOccults_ = doOccults;
+      }
+      void
       Update();
       std::map<std::string, float>
       GetAcceptance() const;
@@ -312,6 +326,7 @@ namespace EpiRisk
       ResetAcceptance();
     private:
       bool* doCompareProductVector_;
+      bool doOccults_;
       ublas::vector<float> calls_;
       ublas::vector<float> accept_;
       size_t reps_;

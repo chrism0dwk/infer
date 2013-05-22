@@ -39,7 +39,7 @@ setMethod("berp.sim","SpatPointSINR", function(model, control, params) {
   }
   else stop("invalid algorithm type")
 
-  SpPointSINR(pop, simepi)
+  SpatPointSINR(pop, simepi)
 })
 
 

@@ -190,9 +190,20 @@ namespace EpiRisk
     void
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
-    SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1, Parameter& gamma2,
-        Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi,
-        Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b);
+    SetParameters(Parameter& epsilon1, 
+		  Parameter& epsilon2, 
+		  Parameter& gamma1, 
+		  Parameter& gamma2,
+		  Parameters& xi, 
+		  Parameters& psi, 
+		  Parameters& zeta, 
+		  Parameters& phi,
+		  Parameter& delta, 
+		  Parameter& omega, 
+		  Parameter& nu, 
+		  Parameter& alpha, 
+		  Parameter& a, 
+		  Parameter& b);
     void
     RefreshParameters();
     void
@@ -276,6 +287,15 @@ namespace EpiRisk
     friend std::ostream&
     operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
+    void
+    PrintLikelihoodComponents() const;
+    void
+    PrintParameters() const;
+    void
+    PrintEventTimes() const;
+    void
+    PrintDistMatrix() const;
+
   private:
 
     // Helper methods
@@ -340,8 +360,6 @@ namespace EpiRisk
     float I1Time_;
     unsigned int I1Idx_;
 
-
-
     LikelihoodComponents* hostComponents_;
     LikelihoodComponents* devComponents_;
 
@@ -384,6 +402,7 @@ namespace EpiRisk
     float* gamma1_;
     float* gamma2_;
     float* delta_;
+    float* omega_;
     float* nu_;
     float* alpha_;
     float* a_;

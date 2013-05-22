@@ -139,8 +139,9 @@ fi
 if test -z "${R_HOME}"; then
         AC_MSG_ERROR("could not determine R_HOME")
 else
-        CPICFLAGS="`"${R_HOME}/bin/R" CMD config CPICFLAGS` -g"
-###	CPICFLAGS="${CPICFLAGS} `${R_HOME}/bin/R CMD config CXXFLAGS`"
+        CPICFLAGS="`"${R_HOME}/bin/R" CMD config CPICFLAGS`"
+	CXXFLAGS="${CPICFLAGS} `${R_HOME}/bin/R CMD config CXXFLAGS`"
+	CXXFLAGS="${CXXFLAGS} -DNDEBUG"
         if test -z "${R_INCLUDE}"; then
                 R_INCLUDE=`"${R_HOME}/bin/R" CMD config --cppflags`
         else
@@ -155,6 +156,14 @@ else
         AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
 fi
 
+
+# Set CXXFLAGS for compilation
+DEBUG_FLAGS="-DNDEBUG"
+if test -z "${CXXFLAGS}"; then
+   	AM_CXXFLAGS="`"${R_HOME}/bin/R" CMD config CXXFLAGS` ${DEBUG_FLAGS}"
+else
+	AM_CXXFLAGS=${CXXFLAGS}
+fi
 
 # Set platform-dependent constants
 DEVICEOPTS="-O3 -use_fast_math"
@@ -214,6 +223,7 @@ AC_SUBST([R_INCLUDE])
 AC_SUBST([R_LIB])
 AC_SUBST([RPATHFLAG])
 AC_SUBST([CPICFLAGS])
+AC_SUBST([AM_CXXFLAGS])
 # Generate Makefiles
 AC_CONFIG_FILES([src/Makefile src/interface/Makefile src/data/Makefile src/sim/Makefile src/mcmc/Makefile src/Framework/Makefile])
 AC_OUTPUT

@@ -6,6 +6,7 @@
  */
 
 #include <vector>
+#include <cstring>
 
 #include "types.hpp"
 #include "PosteriorHDF5Writer.hpp"
@@ -14,10 +15,14 @@ namespace EpiRisk {
 
 PosteriorHDF5Writer::PosteriorHDF5Writer(std::string filename,
 		GpuLikelihood& likelihood) :
-		PosteriorWriter(likelihood), isFirstWrite_(true) {
+  PosteriorWriter(likelihood), isFirstWrite_(true), file_(NULL) {
 	// Open HDF5 file here
 	file_ = new H5::H5File(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
+	if(!file_) {
+	  stringstream msg;
+	  msg << "Cannot open file '" << filename << "' in " << __PRETTY_FUNCTION__;
+	  throw runtime_error(msg.str().c_str());
+	}
 	// Create posterior group
 	H5::Group posterior(file_->createGroup("/posterior"));
 
@@ -30,6 +35,7 @@ PosteriorHDF5Writer::~PosteriorHDF5Writer() {
 		delete paramTable_;
 		delete infecTable_;
 	}
+	file_->close();
 	delete file_;
 }
 
@@ -55,32 +61,43 @@ void PosteriorHDF5Writer::write() {
 		// Parameter tag attributes
 		hsize_t paramAttrDims(paramTags_.size());
 		H5::DataSpace* paramAttrSpace = new H5::DataSpace(1, &paramAttrDims);
-		H5::PredType paramTag_t = H5::PredType::C_S1;
-		paramTag_t.setSize(H5T_VARIABLE );
+		H5::StrType paramTag_t(H5::PredType::C_S1, H5T_VARIABLE);
+		//paramTag_t.setSize(H5T_VARIABLE );
 		H5::Attribute paramAttr(
 				file_->openDataSet("/posterior/parameters").createAttribute(
 						"tags", paramTag_t, *paramAttrSpace));
 
-		const char** tags = new const char*[paramTags_.size()];
-		for (int i = 0; i < paramTags_.size(); ++i)
-			tags[i] = paramTags_[i].c_str();
-
+		char** tags = new char*[paramTags_.size()];
+		for (int i = 0; i < paramTags_.size(); ++i) {
+		  cout << "Tag: " << paramTags_[i].c_str() << endl;
+		  tags[i] = new char[paramTags_[i].length() + 1];
+		  strcpy(tags[i], paramTags_[i].c_str());
+		}
 		paramAttr.write(paramTag_t, tags);
-		delete tags;
+
+		for(int i = 0; i < paramTags_.size(); ++i) delete[] tags[i];
+		delete[] tags;
 
 		// Farm IDs
 		hsize_t idDim(likelihood_.GetPopulationSize());
 		H5::DataSpace idSpace(1, &idDim);
 		H5::DataSet idSet = posterior.createDataSet("ids", paramTag_t, idSpace);
 
-		const char** ids = new const char*[likelihood_.GetPopulationSize()];
+		char** ids = new char*[likelihood_.GetPopulationSize()];
 		std::vector<std::string> idVec;
 		likelihood_.GetIds(idVec);
-		for (int i = 0; i < likelihood_.GetPopulationSize(); ++i)
-			ids[i] = idVec[i].c_str();
+		for (int i = 0; i < likelihood_.GetPopulationSize(); ++i) {
+		  ids[i] = new char[idVec[i].length() + 1];
+		  strcpy(ids[i], idVec[i].c_str());
+		}
 
 		idSet.write(ids, paramTag_t);
-		delete ids;
+		for(int i = 0; i < likelihood_.GetPopulationSize(); ++i) delete[] ids[i];
+		delete[] ids;
+
+		// Clean up
+		delete paramAttrSpace;
+		
 
 		// Initialise parameter array
 		valueBuff_.resize(paramTags_.size());

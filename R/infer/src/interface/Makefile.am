@@ -2,10 +2,10 @@ INCLUDES = -I. -I../data -I../Framework -I../sim -I../mcmc -I@CUDA_HOME@/include
 
 EXT = cpp
 
-OBJS = posterior.o SmpIface.o SpSINRMcmc.o
+OBJS = posterior.o SmpIface.o SpSINRMcmc.o RData.o
 
 #compiler/preprocessor options
-PARAMS = @CPICFLAGS@
+PARAMS = @CPICFLAGS@ @AM_CXXFLAGS@
 
 #linker options
 LD_PARAMS = @RPATHFLAG@

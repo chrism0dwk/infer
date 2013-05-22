@@ -222,6 +222,48 @@ namespace EpiRisk
     }
 
     void
+    AdaptiveSingleMRW::Update()
+    {
+      Parameter& param_((*params_)[0].getParameter());
+
+      FP_t oldValue = param_;
+      
+      // Adapt scalar
+      if(windowUpdates_ % WINDOWSIZE == 0)
+	{
+	  float accept = (float) windowAcceptance_ / (float) windowUpdates_;
+	  float deltan = min(0.5, 1.0 / sqrt(numUpdates_ / WINDOWSIZE));
+	  if (accept < 0.4) 
+	    adaptScalar_ *= exp(-deltan);
+	  else
+	    adaptScalar_ *= exp(deltan);
+	  windowUpdates_ = windowAcceptance_ = 0;
+	}
+
+      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      if(random_->uniform() < 0.95)
+	param_ += random_->gaussian(0, adaptScalar_);
+      else 
+	param_ += random_->gaussian(0, 0.01);
+
+      float logPiCan = likelihood_->Propose() + log(param_.prior());
+
+      if(log(random_->uniform()) < logPiCan - logPiCur)
+	{
+	  likelihood_->Accept();
+	  acceptance_++;
+	  windowAcceptance_++;
+	}
+      else {
+	likelihood_->Reject();
+	param_ = oldValue;
+      }
+
+      numUpdates_++;
+      windowUpdates_++;
+    }
+
+    void
     AdaptiveMultiMRW::Update()
     {
       // Save old values
@@ -384,11 +426,15 @@ namespace EpiRisk
     void
     InfectivityMRW::SetParameters(UpdateBlock& params)
     {
-
+      if(params.size() < 2) {
+	string msg = "Cannot be used on < 2 species in ";
+	msg += __FUNCTION__;
+	throw data_exception(msg.c_str());
+      }
       params_ = &params;
-      constants_.resize(3, 0.0);
-      transformedGroup_.add(params[1]);
-      transformedGroup_.add(params[2]);
+      constants_.resize(params_->size(), 0.0);
+      for(int i=1; i<params_->size(); ++i)
+	transformedGroup_.add(params[i]);
 
       InitCovariance(transformedGroup_);
 
@@ -406,22 +452,23 @@ namespace EpiRisk
       likelihood_->GetSumInfectivityPow(&constants_[0]);
 
       // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
-      float R = (*params_)[0].getValue()
-          * (constants_[0] + (*params_)[1].getValue() * constants_[1]
-              + (*params_)[2].getValue() * constants_[2]);
+      float R = constants_[0];
+      for(int i=1; i<params_->size(); ++i)
+	R += (*params_)[i].getValue() * constants_[i];
+      R *= (*params_)[0].getValue();
 
       // Current posterior
-      float logPiCur = likelihood_->GetCurrentValue()
-          + log((*params_)[0].prior()) + log((*params_)[1].prior())
-          + log((*params_)[2].prior());
+      float logPiCur = likelihood_->GetCurrentValue();
+      for(int i=0; i<params_->size(); ++i)
+	logPiCur += log((*params_)[i].prior());
 
       // Make proposal
       ublas::vector<float> transform(params_->size());
       transform(0) = (*params_)[0].getValue() * constants_[0];
-      transform(1) = (*params_)[0].getValue() * (*params_)[1].getValue()
-          * constants_[1];
-      transform(2) = (*params_)[0].getValue() * (*params_)[2].getValue()
-          * constants_[2];
+      for(int i=1; i<params_->size(); ++i)
+	transform(i) = (*params_)[0].getValue() * (*params_)[i].getValue()
+          * constants_[i];
+
 
       // Sample transformed posterior
       ublas::vector<float> sample = ublas::vector_range<ublas::vector<float> >(
@@ -462,9 +509,11 @@ namespace EpiRisk
       else
         logvars = random_->mvgauss(*stdCov_);
 
-      transform(1) *= exp(logvars(0));
-      transform(2) *= exp(logvars(1));
-      transform(0) = R - transform(1) - transform(2);
+      transform(0) = R;
+      for(int i=1; i<params_->size(); ++i) {
+	transform(i) *= exp(logvars(i-1));
+	transform(0) -= transform(i);
+      }
 
       // Reject if we get a neg value
       if (transform(0) < 0.0f)
@@ -478,19 +527,20 @@ namespace EpiRisk
 
       // Transform back
       (*params_)[0].setValue(transform(0) / constants_[0]);
-      (*params_)[1].setValue(
-          transform(1) / ((*params_)[0].getValue() * constants_[1]));
-      (*params_)[2].setValue(
-          transform(2) / ((*params_)[0].getValue() * constants_[2]));
+      for(int i=1; i<params_->size(); ++i)
+	(*params_)[i].setValue(transform(i) / ((*params_)[0].getValue() * constants_[i]));
+
 
       // Calculate candidate posterior
-      float logPiCan = likelihood_->Propose() + log((*params_)[0].prior())
-          + log((*params_)[1].prior()) + log((*params_)[2].prior());
+      float logPiCan = likelihood_->Propose();
+      for(int i=0; i<params_->size(); ++i)
+	logPiCan += log((*params_)[i].prior());
+
 
       // q-Ratio
-      float qRatio = log(
-          transform(1) / (oldParams[0] * oldParams[1] * constants_[1]))
-          + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
+      float qRatio = 0.0f;;
+      for(int i=1; i<params_->size(); ++i)
+	qRatio += log(transform(i) / (oldParams[0] * oldParams[i] * constants_[i]));
 
       // Accept/reject
       if (log(random_->uniform()) < logPiCan - logPiCur + qRatio)
@@ -514,11 +564,15 @@ namespace EpiRisk
     void
     SusceptibilityMRW::SetParameters(UpdateBlock& params)
     {
-
+      if(params.size() < 2) {
+	string msg = __FUNCTION__;
+	msg += " cannot be used on < 2 species";
+	throw data_exception(msg.c_str());
+      }
       params_ = &params;
-      constants_.resize(3, 0.0);
-      transformedGroup_.add(params[1]);
-      transformedGroup_.add(params[2]);
+      constants_.resize(params_->size(), 0.0);
+      for(int i=1; i < params_->size(); ++i)
+	transformedGroup_.add(params[i]);
 
       InitCovariance(transformedGroup_);
     }
@@ -535,22 +589,22 @@ namespace EpiRisk
       likelihood_->GetSumSusceptibilityPow(&constants_[0]);
 
       // Calculate sum of infectious pressure: gamma*(cattle + xi_s*sheep + xi_p*pigs)
-      float R = (*params_)[0].getValue()
-          * (constants_[0] + (*params_)[1].getValue() * constants_[1]
-              + (*params_)[2].getValue() * constants_[2]);
+      float R = constants_[0];
+      for(int i=1; i<params_->size(); ++i)
+	R += (*params_)[i].getValue() * constants_[i];
+      R *= (*params_)[0].getValue();
 
       // Current posterior
-      float logPiCur = likelihood_->GetCurrentValue()
-          + log((*params_)[0].prior()) + log((*params_)[1].prior())
-          + log((*params_)[2].prior());
+      float logPiCur = likelihood_->GetCurrentValue();
+      for(int i=0; i<params_->size(); ++i)
+	logPiCur += log((*params_)[i].prior());
 
       // Make proposal
       ublas::vector<float> transform(params_->size());
       transform(0) = (*params_)[0].getValue() * constants_[0];
-      transform(1) = (*params_)[0].getValue() * (*params_)[1].getValue()
-          * constants_[1];
-      transform(2) = (*params_)[0].getValue() * (*params_)[2].getValue()
-          * constants_[2];
+      for(int i=1; i<params_->size(); ++i)
+	transform(i) = (*params_)[0].getValue() * (*params_)[i].getValue()
+          * constants_[i];
 
       // Sample transformed posterior
       ublas::vector<float> sample = ublas::vector_range<ublas::vector<float> >(
@@ -588,10 +642,11 @@ namespace EpiRisk
       else
         logvars = random_->mvgauss(*stdCov_);
 
-      // Use indep gaussians here
-      transform(1) *= exp(logvars(0)); //exp(random_.gaussian(0,0.8));
-      transform(2) *= exp(logvars(1)); //exp(random_.gaussian(0,0.1));
-      transform(0) = R - transform(1) - transform(2);
+      transform(0) = R;
+      for(int i=1; i<params_->size(); ++i) {
+	transform(i) *= exp(logvars(i-1));
+	transform(0) -= transform(i);
+      }
 
       // Reject if we get a neg value
       if (transform(0) < 0.0f)
@@ -605,19 +660,19 @@ namespace EpiRisk
 
       // Transform back
       (*params_)[0].setValue(transform(0) / constants_[0]);
-      (*params_)[1].setValue(
-          transform(1) / ((*params_)[0].getValue() * constants_[1]));
-      (*params_)[2].setValue(
-          transform(2) / ((*params_)[0].getValue() * constants_[2]));
+      for(int i=1; i<params_->size(); ++i)
+	(*params_)[i].setValue(transform(i) / ((*params_)[0].getValue() * constants_[i]));
+
 
       // Calculate candidate posterior
-      float logPiCan = likelihood_->Propose() + log((*params_)[0].prior())
-          + log((*params_)[1].prior()) + log((*params_)[2].prior());
+      float logPiCan = likelihood_->Propose();
+      for(int i=0; i<params_->size(); ++i)
+	logPiCan += log((*params_)[i].prior());
 
       // q-Ratio
-      float qRatio = log(
-          transform(1) / (oldParams[0] * oldParams[1] * constants_[1]))
-          + log(transform(2) / (oldParams[0] * oldParams[2] * constants_[2]));
+      float qRatio = 0.0f;
+      for(int i=1; i<params_->size(); ++i)
+	qRatio += log(transform(i) / (oldParams[0] * oldParams[i] * constants_[i]));
 
       // Accept/reject
       if (log(random_->uniform()) < logPiCan - logPiCur + qRatio)
@@ -632,7 +687,7 @@ namespace EpiRisk
             (*params_)[i].setValue(oldParams[i]);
           likelihood_->Reject();
         }
-
+      
       ++numUpdates_;
       ++windowUpdates_;
 
@@ -778,7 +833,7 @@ namespace EpiRisk
     }
 
     InfectionTimeUpdate::InfectionTimeUpdate() :
-        reps_(1), ucalls_(0), doCompareProductVector_(NULL), updateTuning_(TUNEIN)
+      reps_(1), ucalls_(0), doCompareProductVector_(NULL), doOccults_(false), updateTuning_(TUNEIN)
     {
       calls_.resize(3);
       accept_.resize(3);
@@ -802,7 +857,9 @@ namespace EpiRisk
     {
       for (size_t infec = 0; infec < reps_; ++infec)
         {
-          float pickMove = random_->uniform(0.0f, 1.0f);
+          float pickMove;
+	  if(doOccults_) pickMove = random_->uniform(0.0f, 1.0f);
+	  else pickMove = 0.0f;
 
           if (pickMove < 0.33f)
             {
@@ -820,7 +877,7 @@ namespace EpiRisk
               calls_[2]++;
             }
 
-          if (*doCompareProductVector_)
+          if (doCompareProductVector_)
             {
               float proposal = likelihood_->Propose();
 
@@ -1033,6 +1090,8 @@ namespace EpiRisk
       rv.insert(make_pair(tag_ + ":moveInfec", accept[0]));
       rv.insert(make_pair(tag_ + ":addInfec", accept[1]));
       rv.insert(make_pair(tag_ + ":delInfec", accept[2]));
+      
+      delete[] accept;
 
       return rv;
     }

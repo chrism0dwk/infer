@@ -52,12 +52,6 @@
 
 #ifndef __CUDACC__
 #include "Parameter.hpp"
-#else
-//namespace EpiRisk
-//  {
-//    class Parameter;
-//    class Parameters;
-//  }
 #endif
 
 // CUDA defines
@@ -65,7 +59,7 @@
 
 // Model defines
 #define NUMEVENTS 3
-#define NUMSPECIES 3
+//#define NUMSPECIES 3
 
 namespace EpiRisk
 {
@@ -170,7 +164,7 @@ namespace EpiRisk
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
-        const float obsTime, const bool occultsOnlyDC = false, const int gpuId=0);
+		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
     GpuLikelihood(const GpuLikelihood& other);
     virtual
@@ -188,7 +182,7 @@ namespace EpiRisk
     void
     LoadDistanceMatrix(DistMatrixImporter& filename);
     void
-    CalcDistanceMatrix();
+    CalcDistanceMatrix(const float dLimit);
     void
     SetEvents();
     void
@@ -196,9 +190,20 @@ namespace EpiRisk
     void
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
-    SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1, Parameter& gamma2,
-        Parameters& xi, Parameters& psi, Parameters& zeta, Parameters& phi,
-        Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b);
+    SetParameters(Parameter& epsilon1, 
+		  Parameter& epsilon2, 
+		  Parameter& gamma1, 
+		  Parameter& gamma2,
+		  Parameters& xi, 
+		  Parameters& psi, 
+		  Parameters& zeta, 
+		  Parameters& phi,
+		  Parameter& delta, 
+		  Parameter& omega, 
+		  Parameter& nu, 
+		  Parameter& alpha, 
+		  Parameter& a, 
+		  Parameter& b);
     void
     RefreshParameters();
     void
@@ -259,7 +264,7 @@ namespace EpiRisk
     const thrust::device_vector<float>&
     GetProdVector() const
     {
-      return devProduct_;
+      return *devProduct_;
     }
     float
     GetN(const int idx) const;
@@ -281,6 +286,15 @@ namespace EpiRisk
 
     friend std::ostream&
     operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+
+    void
+    PrintLikelihoodComponents() const;
+    void
+    PrintParameters() const;
+    void
+    PrintEventTimes() const;
+    void
+    PrintDistMatrix() const;
 
   private:
 
@@ -336,17 +350,15 @@ namespace EpiRisk
     size_t maxInfecs_;
     size_t occultsOnlyDC_;
 
-    thrust::host_vector<InfecIdx_t> hostInfecIdx_;
-    thrust::device_vector<InfecIdx_t> devInfecIdx_;
-    thrust::host_vector<InfecIdx_t> hostSuscOccults_;
+    thrust::host_vector<InfecIdx_t>* hostInfecIdx_;
+    thrust::device_vector<InfecIdx_t>* devInfecIdx_;
+    thrust::host_vector<InfecIdx_t>* hostSuscOccults_;
     const size_t numSpecies_;
     float logLikelihood_;
     const float obsTime_;
     float movtBan_;
     float I1Time_;
     unsigned int I1Idx_;
-
-
 
     LikelihoodComponents* hostComponents_;
     LikelihoodComponents* devComponents_;
@@ -372,8 +384,8 @@ namespace EpiRisk
     size_t eventTimesPitch_;
     float* devSusceptibility_;
     float* devInfectivity_;
-    thrust::device_vector<float> devProduct_;
-    thrust::device_vector<float> devWorkspace_;
+    thrust::device_vector<float>* devProduct_;
+    thrust::device_vector<float>* devWorkspace_;
     int integralBuffSize_;
 
     // CUDAPP bits and pieces
@@ -390,6 +402,7 @@ namespace EpiRisk
     float* gamma1_;
     float* gamma2_;
     float* delta_;
+    float* omega_;
     float* nu_;
     float* alpha_;
     float* a_;

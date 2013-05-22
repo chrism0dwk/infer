@@ -13,6 +13,7 @@
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
 #include "PosteriorHDF5Writer.hpp"
+#include "RData.hpp"
 
 #include "SpSINRMcmc.hpp"
 
@@ -72,98 +73,6 @@ public:
   }
 };
 
-
-
-
-class PopRImporter : public EpiRisk::PopDataImporter
-{
-public:
-  PopRImporter(Rcpp::DataFrame population) : _rownum(0) { 
-    _ids = population[0];
-    _x = population[1];
-    _y = population[2];
-
-    for(int i=3; i<population.size(); ++i)
-      species_.push_back(population[i]);
-    }
-  virtual 
-  ~PopRImporter() {};
-  void open() {};
-  void close() {};
-  Record 
-  next() { 
-    Record record;
-    
-    if(_rownum >= _ids.size()) throw EpiRisk::fileEOF();
-    
-    record.id = std::string(_ids[_rownum]);
-    record.data.x = _x[_rownum];
-    record.data.y = _y[_rownum];
-    record.data.cattle = species_[0][_rownum];
-    if(species_.size() > 1)
-      record.data.pigs = species_[1][_rownum];
-    if(species_.size() > 2)
-      record.data.sheep = species_[2][_rownum];
-
-    _rownum++;
-
-    return record;
-  };
-  void reset() { _rownum = 0; };
-
-private:
-  int _rownum;
-  Rcpp::CharacterVector _ids;
-  Rcpp::NumericVector _x, _y;
-  std::vector<Rcpp::NumericVector> species_;
-};
-
-
-class EpiRImporter : public EpiRisk::EpiDataImporter
-{
-public:
-  EpiRImporter(Rcpp::DataFrame epidemic) : _rownum(0)
-  {
-    _ids = epidemic["id"];
-    _i = epidemic["i"];
-    _n = epidemic["n"];
-    _r = epidemic["r"];
-    _type = epidemic["type"];
-  }
-  virtual
-  ~EpiRImporter() {}
-  void open() {};
-  void close() {};
-  Record
-  next() {
-    Record record;
-
-    if(_rownum >= _ids.size()) throw EpiRisk::fileEOF();
-
-    record.id = std::string(_ids[_rownum]);
-
-    if (_type[_rownum] == "DC") record.data.I = EpiRisk::POSINF;
-    else record.data.I = _i[_rownum];
-
-    record.data.N = _n[_rownum];
-    record.data.R = _r[_rownum];
-    record.data.type = _type[_rownum];
-
-    _rownum++;
-
-    return record;
-  }
-  void
-  reset() { _rownum = 0; }
-
-private:
-  int _rownum;
-  Rcpp::CharacterVector _ids;
-  Rcpp::NumericVector _i;
-  Rcpp::NumericVector _n;
-  Rcpp::NumericVector _r;
-  Rcpp::CharacterVector _type;
-};
 
 RcppExport SEXP SpSINRMcmc(const SEXP population, 
 			   const SEXP epidemic,
@@ -227,14 +136,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::NumericVector startval =_init["epsilon1"];
   EpiRisk::Parameter epsilon1(startval[0], GammaPrior(prior[0], prior[1]), "epsilon1");
 
-  if(doMovtBan[0]) { 
-    startval = _init["epsilon2"]; 
-    prior = _priorParms["epsilon2"];
-  }
-  else {
-    startval[0] = 1.0;
-    prior[0] = 1.0; prior[1] = 1.0;
-  }
+  startval = _init["epsilon2"]; prior = _priorParms["epsilon2"]; 
   EpiRisk::Parameter epsilon2(startval[0], GammaPrior(prior[0], prior[1]), "epsilon2");
   startval = _init["gamma1"]; prior = _priorParms["gamma1"];
   EpiRisk::Parameter gamma1(startval[0], GammaPrior(prior[0], prior[1]), "gamma1");
@@ -288,6 +190,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   startval = _init["delta"]; prior = _priorParms["delta"];
   EpiRisk::Parameter delta(startval[0], GammaPrior(prior[0], prior[1]), "delta");
+  EpiRisk::Parameter omega(1.5, GammaPrior(6,4), "omega");
   EpiRisk::Parameter nu(0.001, GammaPrior(1, 1), "nu");
   startval = _init["alpha"];
   EpiRisk::Parameter alpha(startval[0], GammaPrior(1, 1), "alpha");
@@ -297,8 +200,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   EpiRisk::Parameter b(startval[0], GammaPrior(prior[0], prior[1]), "b");
 
   likelihood.SetMovtBan(_movtBan[0]);
-  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta,
-      nu, alpha, a, b);
+  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta,omega, nu, alpha, a, b);
 
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
@@ -312,7 +214,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   txDelta.add(gamma1);
   txDelta.add(gamma2);
   txDelta.add(delta);
-
+  txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txBase");
@@ -412,6 +314,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   for(int i=0; i<nSpecies; ++i)
     output.AddParameter(phi[i]);
   output.AddParameter(delta);
+  output.AddParameter(omega);
   output.AddParameter(b);
   
 

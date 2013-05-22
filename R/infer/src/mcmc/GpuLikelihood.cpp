@@ -246,7 +246,7 @@ namespace EpiRisk
   void
   GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1,
       Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
-      Parameters& phi, Parameter& delta, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
+			       Parameters& phi, Parameter& delta, Parameter& omega, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
   {
 
     epsilon1_ = epsilon1.GetValuePtr();
@@ -254,6 +254,7 @@ namespace EpiRisk
     gamma1_ = gamma1.GetValuePtr();
     gamma2_ = gamma2.GetValuePtr();
     delta_ = delta.GetValuePtr();
+    omega_ = omega.GetValuePtr();
     nu_ = nu.GetValuePtr();
     alpha_ = alpha.GetValuePtr();
     a_ = a.GetValuePtr();
@@ -329,6 +330,9 @@ namespace EpiRisk
   {
     return hostInfecIdx_->size() - numKnownInfecs_;
   }
+
+  
+  
 
 } // namespace EpiRisk
 

@@ -9,7 +9,7 @@ MCMCOBJS =  mcmc/SmpSirMcmc.o mcmc/GpuLikelihood.o mcmc/GpuLikelihood_gpu.o mcmc
 
 FRAMEWORKOBJS = Framework/Random.o Framework/SpatMetaPop.o Framework/SmpIndividual.o Framework/stlStrTok.o
 
-IFACEOBJS = interface/posterior.o interface/SmpIface.o interface/SpSINRMcmc.o
+IFACEOBJS = interface/posterior.o interface/SmpIface.o interface/SpSINRMcmc.o interface/RData.o
 
 SIMOBJS = sim/SmpSirSim.o
 
