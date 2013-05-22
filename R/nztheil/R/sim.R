@@ -42,6 +42,29 @@ setMethod("berp.sim","SpatPointSINR", function(model, control, params) {
   SpatPointSINR(pop, simepi)
 })
 
+setMethod("berp.sim","NZTheileriaSI", function(model, control, params) {
+
+  if(missing(control)) control <- list(algorithm="Gillespie")
+  else if(is.null(control$algorithm)) control$algorithm <- "Gillespie"
+
+  simepi <- NULL
+
+  if(control$algorithm == "Gillespie") {
+
+    if(is.null(control$mintime)) control$mintime <- model@obsTime
+    else control$mintime <- as.numeric(control$mintime)
+
+    simepi <- .Call("NZTheileriaSim", population=model@population,
+                    contact=model@contact,
+                    obstime=model@obsTime,
+                    params=params,
+                    control=control)
+  }
+  else stop("invalid algorithm type")
+
+  simepi
+})
+
 
 
 

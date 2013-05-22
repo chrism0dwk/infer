@@ -1,12 +1,12 @@
-Package: infer
+Package: nztheil
 Type: Package
-Title: Inference For Epidemic-related Risk
+Title: NZ Theileria simulation and inference
 Version: 1.2
-Date: 2013-01-08
+Date: 2013-05-22
 Author: Chris Jewell (c) 2013
 Maintainer: Chris Jewell <c.p.jewell@massey.ac.nz>
 Description: This package performs Bayesian Inference on epidemic models, and hence provides real-time risk prediction for disease outbreaks.
 License: GPLv3
 Depends: Rcpp (>= 0.9.10), methods
 LinkingTo: Rcpp
-Packaged: 2013-03-07 00:41:57 UTC; cpjewell
+Packaged: 2013-05-22 00:41:57 UTC; cpjewell

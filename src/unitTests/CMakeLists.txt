@@ -5,10 +5,10 @@ ${CMAKE_SOURCE_DIR}/src/data ${CMAKE_SOURCE_DIR}/src/mcmc ${CMAKE_SOURCE_DIR}/sr
 ${Boost_INCLUDE_DIRS} ${GSL_INCLUDE_DIR} ${CMAKE_INCLUDE_PATH})
 link_directories(${GSL_LINK_DIRECTORIES} ${Boost_LIBRARY_DIRS} ${CMAKE_LIBRARY_PATH})
 
-set(fmdMcmc_SOURCES fmdMcmc.cpp)
-add_executable(fmdMcmc ${fmdMcmc_SOURCES})
-target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood posteriorwriter)
+set(theileriaMcmc_SOURCES theileriaMcmc.cpp)
+add_executable(theileriaMcmc ${theileriaMcmc_SOURCES})
+target_link_libraries(theileriaMcmc data parameter mcmc gpulikelihood posteriorwriter)
 
-set(fmdSim_SOURCES fmdSim.cpp fmdModel.cpp)
-add_executable(fmdSim ${fmdSim_SOURCES})
-target_link_libraries(fmdSim data stlstrtok random gsl gslcblas boost_program_options)
+set(fmdSim_SOURCES theileriaSim.cpp fmdModel.cpp)
+add_executable(theileriaSim ${theileriaSim_SOURCES})
+target_link_libraries(theileriaSim data stlstrtok random gsl gslcblas boost_program_options)

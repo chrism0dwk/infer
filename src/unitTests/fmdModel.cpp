@@ -31,39 +31,37 @@
 #include "fmdModel.hpp"
 
 
-FmdModel::FmdModel(Population<TestCovars>& population, FmdParameters& parameters)
-  : Model< Population<TestCovars> >(population), params_(parameters)
+
+
+TheileriaModel::TheileriaModel(Population<TestCovars>& population, TheileriaParameters& parameters)
+  : Model< Population<TheileriaCovars> >(population), params_(parameters)
 {
 
 }
 
-FmdModel::~FmdModel()
+TheileriaModel::~TheileriaModel()
 {
 }
 
 double
-FmdModel::infectivity(const Individual& i, const double time) const
+TheileriaModel::infectivity(const Individual& i, const double time) const
 {
 
-  double infectivity = powf(i.getCovariates().cattle,params_.psi_c) +
-                       params_.xi_p*powf(i.getCovariates().pigs,params_.psi_p) +
-                       params_.xi_s*powf(i.getCovariates().sheep,params_.psi_s);
+  double infectivity = 1;
 
   return infectivity;
 }
 
 double
-FmdModel::susceptibility(const Individual& j) const
+TheileriaModel::susceptibility(const Individual& j) const
 {
-  double susceptibility = powf(j.getCovariates().cattle,params_.phi_c) +
-                          params_.zeta_p*powf(j.getCovariates().pigs,params_.phi_p) +
-                          params_.zeta_s*powf(j.getCovariates().sheep,params_.phi_s);
+  double susceptibility = j.getCovariates().ticks;
 
   return susceptibility;
 }
 
 double
-FmdModel::distance(const Individual& i, const Individual& j) const
+TheileriaModel::distance(const Individual& i, const Individual& j) const
 {
   double dx = i.getCovariates().x - j.getCovariates().x;
   double dy = i.getCovariates().y - j.getCovariates().y;
@@ -73,17 +71,17 @@ FmdModel::distance(const Individual& i, const Individual& j) const
 }
 
 double
-FmdModel::beta(const Individual& i, const Individual& j, const double time) const
+TheileriaModel::beta(const Individual& i, const Individual& j, const double time) const
 {
   double dist = distance(i,j);
   if ( dist <= 25.0 ) {
-      return params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / (params_.delta*params_.delta + dist*dist);
+      return params_.phi * infectivity(i,time) * susceptibility(j) * params_.delta / (params_.delta*params_.delta + dist*dist)^1.5;
   }
   else return 0.0;
 }
 
 double
-FmdModel::betastar(const Individual& i, const Individual& j, const double time) const
+TheileriaModel::betastar(const Individual& i, const Individual& j, const double time) const
 {
   double dist = distance(i,j);
   if ( dist <= 25.0 ) {
@@ -93,13 +91,13 @@ FmdModel::betastar(const Individual& i, const Individual& j, const double time) 
 }
 
 double
-FmdModel::background(const Individual& j, const double t) const
+TheileriaModel::background(const Individual& j, const double t) const
 {
   return params_.epsilon1 * (t > params_.movtban ? params_.epsilon2 : 1.0);
 }
 
 double
-FmdModel::hFunction(const Individual& j, const double time) const
+TheileriaModel::hFunction(const Individual& j, const double time) const
 {
   assert(time >= 0.0);
 	if(time - j.getI() < params_.latency) return 0.0;
@@ -108,19 +106,19 @@ FmdModel::hFunction(const Individual& j, const double time) const
 
 
 double
-FmdModel::ItoN(Random& random) const
+TheileriaModel::ItoN(Random& random) const
 {
   return random.gamma(params_.a, params_.b);
 }
 
 double
-FmdModel::NtoR() const
+TheileriaModel::NtoR() const
 {
   return params_.ntor;
 }
 
 double
-FmdModel::leftTruncatedItoN(Random& random, const Individual& j) const
+TheileriaModel::leftTruncatedItoN(Random& random, const Individual& j) const
 {
   EpiRisk::FP_t d = population_.getObsTime() - j.getI();
   EpiRisk::FP_t s = gsl_cdf_gamma_P(d, params_.a, 1.0/params_.b);
