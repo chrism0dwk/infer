@@ -383,9 +383,10 @@ main(int argc, char* argv[])
   Parameter alpha(60, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.5, GammaPrior(4.0, 8), "b");
+  Parameter omega(1.5, GammaPrior(1,1), "omega");
 
   likelihood.SetMovtBan(22.0f);
-  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta,
+  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
       nu, alpha, a, b);
 
   // Set up MCMC algorithm
