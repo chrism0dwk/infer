@@ -351,7 +351,7 @@ main(int argc, char* argv[])
   int gpuId = atoi(argv[8]);
 
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
-      (size_t) 3, obsTime, true, gpuId);
+      (size_t) 1, obsTime, false, gpuId);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -362,30 +362,22 @@ main(int argc, char* argv[])
   Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
   Parameter gamma1(4.904e-05, GammaPrior(1, 1), "gamma1");
   Parameter gamma2(1.0, GammaPrior(2, 4), "gamma2");
-  Parameters xi(3);
-  xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi_c");
-  xi[1] = Parameter(0.417851, GammaPrior(1, 1), "xi_p");
-  xi[2] = Parameter(11.395, GammaPrior(1, 1), "xi_s");
-  Parameters psi(3);
-  psi[0] = Parameter(0.86, BetaPrior(15, 15), "psi_c");
-  psi[1] = Parameter(0.44, BetaPrior(15, 15), "psi_p");
-  psi[2] = Parameter(0.39, BetaPrior(15, 15), "psi_s");
-  Parameters zeta(3);
-  zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta_c");
-  zeta[1] = Parameter(1.070e-03, GammaPrior(1, 1), "zeta_p");
-  zeta[2] = Parameter(0.3368, GammaPrior(1, 1), "zeta_s");
-  Parameters phi(3);
-  phi[0] = Parameter(0.4061, BetaPrior(15, 15), "phi_c");
-  phi[1] = Parameter(0.4365, BetaPrior(15, 15), "phi_p");
-  phi[2] = Parameter(0.3372, BetaPrior(15, 15), "phi_s");
+  Parameters xi(1);
+  xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi1");
+  Parameters psi(1);
+  psi[0] = Parameter(0.0, BetaPrior(15, 15), "psi1");
+  Parameters zeta(1);
+  zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta1");
+  Parameters phi(1);
+  phi[0] = Parameter(1.0, BetaPrior(15, 15), "phi1");
   Parameter delta(0.2431, GammaPrior(1, 1), "delta");
-  Parameter nu(0.001, GammaPrior(1, 1), "nu");
-  Parameter alpha(60, GammaPrior(1, 1), "alpha");
+  Parameter nu(0.05, GammaPrior(1, 1), "nu");
+  Parameter alpha(100, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.5, GammaPrior(4.0, 8), "b");
   Parameter omega(1.5, GammaPrior(1,1), "omega");
 
-  likelihood.SetMovtBan(22.0f);
+  likelihood.SetMovtBan(0.0f);
   likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
       nu, alpha, a, b);
 
@@ -399,9 +391,7 @@ main(int argc, char* argv[])
 
   UpdateBlock txDelta;
   txDelta.add(epsilon1);
-  txDelta.add(epsilon2);
   txDelta.add(gamma1);
-  txDelta.add(gamma2);
   txDelta.add(delta);
   //txDelta.add(nu);
   //txDelta.add(alpha);
@@ -409,41 +399,6 @@ main(int argc, char* argv[])
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txDistance");
   updateDistance->SetParameters(txDelta);
-
-  UpdateBlock txPsi;
-  txPsi.add(psi[0]);
-  txPsi.add(psi[1]);
-  txPsi.add(psi[2]);
-  Mcmc::AdaptiveMultiLogMRW* updatePsi =
-      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
-  updatePsi->SetParameters(txPsi);
-
-  UpdateBlock txPhi;
-  txPhi.add(phi[0]);
-  txPhi.add(phi[1]);
-  txPhi.add(phi[2]);
-  Mcmc::AdaptiveMultiLogMRW* updatePhi =
-      (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
-  updatePhi->SetParameters(txPhi);
-
-  UpdateBlock txInfec;
-  txInfec.add(gamma1);
-  txInfec.add(xi[1]);
-  txInfec.add(xi[2]);
-
-  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
-      "InfectivityMRW", "txInfec");
-  updateInfec->SetParameters(txInfec);
-
-  UpdateBlock txSuscep;
-  txSuscep.add(gamma1);
-  txSuscep.add(zeta[1]);
-  txSuscep.add(zeta[2]);
-  Mcmc::SusceptibilityMRW* updateSuscep =
-      (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-  updateSuscep->SetParameters(txSuscep);
-
-  // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
@@ -475,14 +430,14 @@ main(int argc, char* argv[])
     PosteriorHDF5Writer output(outputFile, likelihood);
     output.AddParameter(epsilon1); output.AddParameter(epsilon2);
     output.AddParameter(gamma1);
-    output.AddParameter(gamma2);  output.AddParameter(xi[0]);
-    output.AddParameter(xi[1]);   output.AddParameter(xi[2]);
-    output.AddParameter(psi[0]);  output.AddParameter(psi[1]);
-    output.AddParameter(psi[2]);  output.AddParameter(zeta[0]);
-    output.AddParameter(zeta[1]); output.AddParameter(zeta[2]);
-    output.AddParameter(phi[0]);  output.AddParameter(phi[1]);
-    output.AddParameter(phi[2]);  output.AddParameter(delta);
-    output.AddParameter(nu);      output.AddParameter(alpha);
+    output.AddParameter(gamma2);
+    output.AddParameter(xi[0]);
+    output.AddParameter(psi[0]);
+    output.AddParameter(zeta[0]);
+    output.AddParameter(phi[0]);
+    output.AddParameter(delta);
+    output.AddParameter(nu);
+    output.AddParameter(alpha);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
@@ -494,17 +449,6 @@ main(int argc, char* argv[])
     boost::function< float () > getmeanOccI = boost::bind(&GpuLikelihood::GetMeanOccI, &likelihood);
     output.AddSpecial("meanOccI", getmeanOccI);
 
-    // Output the population id index
-    string idxfn = outputFile + ".stridx";
-    ofstream idxfile; idxfile.open(idxfn.c_str(), ios::out);
-    std::vector<std::string> ids; likelihood.GetIds(ids);
-    for(std::vector<std::string>::const_iterator it = ids.begin();
-    		it != ids.end();
-    		it++)
-    {
-    	idxfile << *it << "\n";
-    }
-    idxfile.close();
 
     // Run the chain
     cout << "Running MCMC" << endl;
@@ -530,10 +474,6 @@ main(int argc, char* argv[])
 
     cout << "Covariances\n";
     cout << updateDistance->GetCovariance() << "\n";
-    cout << updatePsi->GetCovariance() << "\n";
-    cout << updatePhi->GetCovariance() << "\n";
-    cout << updateInfec->GetCovariance() << "\n";
-    cout << updateSuscep->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 

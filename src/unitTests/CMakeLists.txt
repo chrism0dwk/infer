@@ -9,6 +9,6 @@ set(theileriaMcmc_SOURCES theileriaMcmc.cpp)
 add_executable(theileriaMcmc ${theileriaMcmc_SOURCES})
 target_link_libraries(theileriaMcmc data parameter mcmc gpulikelihood posteriorwriter)
 
-set(fmdSim_SOURCES theileriaSim.cpp fmdModel.cpp)
+set(theileriaSim_SOURCES theileriaSim.cpp fmdModel.cpp)
 add_executable(theileriaSim ${theileriaSim_SOURCES})
 target_link_libraries(theileriaSim data stlstrtok random gsl gslcblas boost_program_options)

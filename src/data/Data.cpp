@@ -83,17 +83,13 @@ PopDataImporter::next()
   getline(dataFile_,row);
 
   stlStrTok(tokens,row,",");
-  if (tokens.size() != 8) throw EpiRisk::fileEOF();
+  if (tokens.size() != 4) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
   record.data.x = atof(tokens[1].c_str()) / 1000;
   record.data.y = atof(tokens[2].c_str()) / 1000;
   record.data.cattle = atof(tokens[3].c_str());
-  record.data.pigs = atof(tokens[4].c_str());
-  record.data.sheep = atof(tokens[5].c_str());
-  record.data.goats = atof(tokens[6].c_str());
-  record.data.deer = atof(tokens[7].c_str());
-
+  
   return record;
 }
 

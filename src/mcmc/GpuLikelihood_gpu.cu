@@ -150,10 +150,12 @@ namespace EpiRisk
   {
     // Returns a logistic 'h' function
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
-    //return exp(nu*t) / ( alpha + exp(nu*t));
+    if(t >= 0) 
+      return exp(nu*t) / ( alpha + exp(nu*t));
+    else
+      return 0.0;
     //return nu*nu*t*exp(-nu*t);
     
-    return t < alpha ? 0.0f : 1.0f;
   }
 
   __device__ float
@@ -163,10 +165,10 @@ namespace EpiRisk
 
     //float integral = 1.0f / nu * logf( (1.0f + expf(nu*(t - alpha))) / (1.0f + expf(-nu*alpha)));
 
-    //float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
+    float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
     //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
     
-    float integral = t - alpha;
+    //float integral = t - alpha;
     return fmaxf(0.0f, integral);
   }
 
