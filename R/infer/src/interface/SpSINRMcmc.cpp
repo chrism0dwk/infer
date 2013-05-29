@@ -99,6 +99,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::IntegerVector numIter = _control["n.iter"];
   Rcpp::IntegerVector gpuId = _control["gpuid"];
   Rcpp::LogicalVector doMovtBan = _control["movtban"];
+  Rcpp::LogicalVector doNDiff = _control["ndiff"];
   Rcpp::CharacterVector occults = _control["occults"];
   Rcpp::LogicalVector doPowers = _control["powers"];
   Rcpp::IntegerVector seed = _control["seed"];    
@@ -136,7 +137,12 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::NumericVector startval =_init["epsilon1"];
   EpiRisk::Parameter epsilon1(startval[0], GammaPrior(prior[0], prior[1]), "epsilon1");
 
-  startval = _init["epsilon2"]; prior = _priorParms["epsilon2"]; 
+  if(doNDiff[0])
+    startval = _init["epsilon2"]; 
+  else
+    startval = 1.0;
+
+  prior = _priorParms["epsilon2"]; 
   EpiRisk::Parameter epsilon2(startval[0], GammaPrior(prior[0], prior[1]), "epsilon2");
   startval = _init["gamma1"]; prior = _priorParms["gamma1"];
   EpiRisk::Parameter gamma1(startval[0], GammaPrior(prior[0], prior[1]), "gamma1");
@@ -212,7 +218,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   txDelta.add(epsilon1);
   if(doMovtBan[0]) txDelta.add(epsilon2);
   txDelta.add(gamma1);
-  txDelta.add(gamma2);
+  if(doNDiff) txDelta.add(gamma2);
   txDelta.add(delta);
   txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =

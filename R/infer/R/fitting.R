@@ -26,6 +26,9 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
               
               if(is.null(control$movtban)) control$movtban <- FALSE
               else control$movtban <- as.logical(control$movtban)
+
+              if(is.null(control$ndiff)) control$ndiff <- TRUE
+              else control$ndiff <- as.logical(control$ndiff)
               
               if(is.null(control$gpuid)) control$gpuid <- -1
               else control$gpuid <- as.integer(control$gpuid)
