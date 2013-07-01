@@ -28,6 +28,7 @@
 #include <fstream>
 
 #include <boost/numeric/ublas/matrix_sparse.hpp>
+#include <boost/numeric/ublas/io.hpp>
 using namespace boost::numeric;
 
 #include "Data.hpp"
@@ -57,9 +58,7 @@ namespace EpiRisk
             covars.I = obsTime_; //EpiRisk::POSINF;
             covars.N = obsTime_; //EpiRisk::POSINF;
             covars.R = obsTime_; //EpiRisk::POSINF;
-            covars.cattle = record.data.cattle;
-            covars.pigs = record.data.pigs;
-            covars.sheep = record.data.sheep;
+            covars.ticks = record.data.ticks;
             idMap_.insert(make_pair(covars.id, idx));
             idx++;
             hostPopulation_.push_back(covars);
@@ -183,6 +182,9 @@ namespace EpiRisk
 
   }
 
+
+
+
   void
   GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
   {
@@ -204,13 +206,13 @@ namespace EpiRisk
               try
                 {
                   Dimport->operator()(i->second, j->second) =
-                      record.data.distance * record.data.distance;
+                      record.data.val * record.data.val;
                 }
               catch (std::exception& e)
                 {
                   cerr << "Inserting distance |" << i->second << " - "
                       << j->second << "| = "
-                      << record.data.distance * record.data.distance
+                      << record.data.val * record.data.val
                       << " failed" << endl;
                   throw e;
                 }
@@ -224,6 +226,8 @@ namespace EpiRisk
       {
         throw e;
       }
+
+    importer.close();
 
     // Set up distance matrix
     dnnz_ = Dimport->nnz();
@@ -242,37 +246,143 @@ namespace EpiRisk
     delete Dimport;
   }
 
+#define CONTACTIMPORTOFFSET 1.1111f
+ void
+  GpuLikelihood::LoadContact(ContactDataImporter& importer)
+  {
+    typedef ublas::compressed_matrix<float,ublas::row_major> Import_t;
+    Import_t Cimport(hostPopulation_.size(), hostPopulation_.size());
+    size_t nnz = 0;
+    try
+      {
+	importer.open();
+	
+	  while(1)
+	    {
+	      ContactDataImporter::Record record = importer.next();
+	      map<string, size_t>::const_iterator i = idMap_.find(record.id);
+	      map<string, size_t>::const_iterator j = idMap_.find(record.data.j);
+	      if (i == idMap_.end() or j == idMap_.end()) {
+		cerr << "Key pair not found in population" << endl;
+		throw range_error("Key pair not found in population");
+	      }
+	      // Fwd insert
+	      Cimport(i->second, j->second) = record.data.val + CONTACTIMPORTOFFSET;
+	      //cout << "nnz=" << Cimport.nnz() << endl;
+	      if(Cimport(j->second,i->second) == 0.0f) {
+		//cout << "Symmetricising" << endl;
+		Cimport(j->second, i->second) = CONTACTIMPORTOFFSET;
+		//cout << "nnz(s)=" << Cimport.nnz() << endl;
+	      }
+	      nnz++;
+	    }
+      }
+    catch (EpiRisk::fileEOF& e) {
+      cout << "Imported " << nnz << " contact elements.  Contact size: " << Cimport.nnz() << endl;
+    }
+
+    //    for(Import_t::iterator1 i1 = Cimport.begin1(); i1 != Cimport.end1(); ++i1)
+    //  for(Import_t::iterator2 i2 = i1.begin(); i2 != i1.end(); ++i2)
+    //	*i2 -= CONTACTIMPORTOFFSET;
+    
+
+
+    // Upload data to the GPU
+    devC_ = new CsrMatrix;
+
+    // This is the forward i -> j matrix (i=row, j=col)
+    Cimport.complete_index1_data();
+    for(int i=0; i<Cimport.nnz(); ++i)
+      Cimport.value_data().begin()[i] -= CONTACTIMPORTOFFSET;
+    cout << "Step 1" << endl;
+    
+    // for(int i=0; i<Cimport.size1(); ++i) cout << "\t" << hostPopulation_[i].id;
+    // cout << endl;
+    // for(int i=0; i<Cimport.size1(); ++i) {
+    //   cout << hostPopulation_[i].id << "\t";
+    //   for(int j=0; j<Cimport.size2(); ++j) {
+    // 	cout.precision(4);
+    // 	cout << Cimport(i,j) << "\t";
+    //   }
+    //   cout << endl;
+    // }
+
+    // This is the reverse i <- j matrix (i=row, j=col) -- basically transpose the contents of the sparse matrix
+    ublas::vector<float> valtr(Cimport.nnz());
+    
+    for(size_t i=0; i<Cimport.size1(); ++i)
+      for(size_t j=Cimport.index1_data()[i]; j<Cimport.index1_data()[i+1]; ++j)
+    	{
+    	  float val = Cimport.value_data()[j];
+    	  size_t ti = Cimport.index2_data()[j]; // Column becomes the row
+    	  size_t tj;
+    	  for(tj = Cimport.index1_data()[ti];
+    	      tj < Cimport.index1_data()[ti+1];
+    	      ++tj) {
+    	    if(Cimport.index2_data()[tj] == i) break; // Find where column in transposed matrix = i.
+    	  }
+    	  if(tj == Cimport.index1_data()[ti+1]) throw runtime_error("Contact matrix not symmetric in construction");
+    	  valtr[tj] = val;
+    	}
+
+
+    cout << "Step 2" << endl;
+
+   
+    cout << "Finished grooming contact matrix, nnz=" << Cimport.nnz() << endl;    
+
+    // Set dimensions
+    devC_->nnz = Cimport.nnz(); devC_->n = hostPopulation_.size(); devC_->m = hostPopulation_.size();
+
+    cout << "Cimport index1 size: " << Cimport.index1_data().size() << endl;
+    cout << "Cimport index2 size: " << Cimport.index2_data().size() << endl;
+    cout << "Cimport size1: " << Cimport.size1() << endl;
+    cout << "Cimport size2: " << Cimport.size2() << endl;
+
+
+    // Upload data to GPU
+    checkCudaError(cudaMalloc(&devC_->rowPtr, Cimport.index1_data().size() * sizeof(int)));
+    checkCudaError(cudaMalloc(&devC_->colInd, devC_->nnz * sizeof(int)));
+    checkCudaError(cudaMalloc(&devC_->val, devC_->nnz * sizeof(float)));
+    checkCudaError(cudaMalloc(&devC_->valtr, devC_->nnz * sizeof(float)));
+
+    ublas::vector<int> tmpInt(Cimport.index1_data().size());
+    for(int i=0; i<Cimport.index1_data().size(); ++i) tmpInt[i] = Cimport.index1_data()[i];
+    checkCudaError(cudaMemcpy(devC_->rowPtr, &(tmpInt[0]), Cimport.index1_data().size() * sizeof(int), cudaMemcpyHostToDevice));
+
+    tmpInt.resize(Cimport.index2_data().size());
+    for(int i=0; i<Cimport.index2_data().size(); ++i) tmpInt[i] = Cimport.index2_data()[i];
+    checkCudaError(cudaMemcpy(devC_->colInd, &(tmpInt[0]), devC_->nnz * sizeof(int),cudaMemcpyHostToDevice));
+
+    float* val = Cimport.value_data().begin();    
+    checkCudaError(cudaMemcpy(devC_->val, val, devC_->nnz * sizeof(float), cudaMemcpyHostToDevice));
+
+    val = valtr.data().begin();
+    checkCudaError(cudaMemcpy(devC_->valtr, val, devC_->nnz * sizeof(float), cudaMemcpyHostToDevice));
+
+    hostCRowPtr_ = new int[Cimport.index1_data().size()];
+    for(int i=0; i<Cimport.index1_data().size(); ++i) hostCRowPtr_[i] = Cimport.index1_data()[i];
+
+    cout << "Returning" << endl;
+  }
+
 
   void
-  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1,
-      Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
-			       Parameters& phi, Parameter& delta, Parameter& omega, Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
+  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& gamma1,
+			       Parameter& delta, Parameter& omega, Parameter& p, 
+			       Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
   {
 
     epsilon1_ = epsilon1.GetValuePtr();
-    epsilon2_ = epsilon2.GetValuePtr();
     gamma1_ = gamma1.GetValuePtr();
-    gamma2_ = gamma2.GetValuePtr();
     delta_ = delta.GetValuePtr();
     omega_ = omega.GetValuePtr();
+    p_ = p.GetValuePtr();
     nu_ = nu.GetValuePtr();
     alpha_ = alpha.GetValuePtr();
     a_ = a.GetValuePtr();
     b_ = b.GetValuePtr();
 
-    xi_.clear();
-    psi_.clear();
-    zeta_.clear();
-    phi_.clear();
-    for (size_t p = 0; p < numSpecies_; ++p)
-      {
-        xi_.push_back(xi[p].GetValuePtr());
-        psi_.push_back(psi[p].GetValuePtr());
-        zeta_.push_back(zeta[p].GetValuePtr());
-        phi_.push_back(phi[p].GetValuePtr());
-      }
-
-    RefreshParameters();
   }
 
   void

@@ -325,6 +325,13 @@ struct Settings
   }
 };
 
+
+
+
+
+
+
+
 int
 main(int argc, char* argv[])
 {
@@ -333,10 +340,10 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 9)
+  if (argc != 10)
     {
       cerr
-          << "Usage: fmdMcmc <pop file> <epi file> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu>"
+          << "Usage: fmdMcmc <pop file> <epi file> <contact matrix> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu>"
           << endl;
       return EXIT_FAILURE;
     }
@@ -346,40 +353,36 @@ main(int argc, char* argv[])
 
   PopDataImporter* popDataImporter = new PopDataImporter(argv[1]);
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
-  float obsTime = atof(argv[4]);
-  size_t seed = atoi(argv[6]);
-  int gpuId = atoi(argv[8]);
+  ContactDataImporter* contactDataImporter = new ContactDataImporter(argv[3]);
 
-  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
-      (size_t) 1, obsTime, false, gpuId);
+  float obsTime = atof(argv[5]);
+  size_t seed = atoi(argv[7]);
+  int gpuId = atoi(argv[9]);
+  cout << "GPU: " << gpuId << endl;
+  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *contactDataImporter,
+			   (size_t) 1, obsTime, 90.0f, false, gpuId);
 
+  delete contactDataImporter;
   delete popDataImporter;
   delete epiDataImporter;
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(1.667e-6, GammaPrior(5e-5, 1), "epsilon1");
-  Parameter epsilon2(1.0, GammaPrior(1,1), "epsilon2");
-  Parameter gamma1(4.904e-05, GammaPrior(1, 1), "gamma1");
-  Parameter gamma2(1.0, GammaPrior(2, 4), "gamma2");
-  Parameters xi(1);
-  xi[0] = Parameter(1.0, GammaPrior(1, 1), "xi1");
-  Parameters psi(1);
-  psi[0] = Parameter(0.0, BetaPrior(15, 15), "psi1");
-  Parameters zeta(1);
-  zeta[0] = Parameter(1.0, GammaPrior(1, 1), "zeta1");
-  Parameters phi(1);
-  phi[0] = Parameter(1.0, BetaPrior(15, 15), "phi1");
-  Parameter delta(0.2431, GammaPrior(1, 1), "delta");
+  Parameter epsilon1(1e-8, GammaPrior(5e-5, 1), "epsilon1");
+  Parameter gamma1(1, GammaPrior(1, 1), "gamma1");
+  Parameter delta(10, GammaPrior(1, 1), "delta");
+  Parameter omega(1.5, GammaPrior(1,1), "omega");
+  Parameter p(0.5, BetaPrior(1,1), "p");
   Parameter nu(0.05, GammaPrior(1, 1), "nu");
   Parameter alpha(100, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
-  Parameter b(0.5, GammaPrior(4.0, 8), "b");
-  Parameter omega(1.5, GammaPrior(1,1), "omega");
+  Parameter b(0.1, GammaPrior(4.0, 40), "b");
+
 
   likelihood.SetMovtBan(0.0f);
-  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
+  likelihood.SetParameters(epsilon1, gamma1, delta, omega, p,
       nu, alpha, a, b);
+
 
   // Set up MCMC algorithm
   cout << "Initializing MCMC" << endl;
@@ -387,7 +390,7 @@ main(int argc, char* argv[])
 
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
-  float ncratio = atof(argv[7]);
+  float ncratio = atof(argv[8]);
 
   UpdateBlock txDelta;
   txDelta.add(epsilon1);
@@ -398,7 +401,14 @@ main(int argc, char* argv[])
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txDistance");
+  //Mcmc::AdaptiveSingleMRW* updateDistance =
+  //  (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","delta");
   updateDistance->SetParameters(txDelta);
+
+  UpdateBlock updP;
+  updP.add(p);
+  Mcmc::AdaptiveSingleMRW* updateP = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","p");
+  updateP->SetParameters(updP);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
@@ -406,36 +416,34 @@ main(int argc, char* argv[])
   Mcmc::InfectionTimeUpdate* updateInfecTime =
       (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
           "infecTimes");
-  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
+  //updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
   updateInfecTime->SetUpdateTuning(2.5);
-  updateInfecTime->SetReps(30);
+  updateInfecTime->SetReps(0);
+  updateInfecTime->SetOccults(false);
 
   UpdateBlock bUpdate; bUpdate.add(b);
-  Mcmc::InfectionTimeGammaCentred* updateBC =
-      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  updateBC->SetParameters(bUpdate);
-  updateBC->SetTuning(0.014);
+  //Mcmc::InfectionTimeGammaCentred* updateBC =
+  //    (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+  //updateBC->SetParameters(bUpdate);
+  //updateBC->SetTuning(0.014);
 
-  Mcmc::InfectionTimeGammaNC* updateBNC =
-      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  updateBNC->SetParameters(bUpdate);
-  updateBNC->SetTuning(0.0007);
-  updateBNC->SetNCRatio(ncratio);
+  //Mcmc::InfectionTimeGammaNC* updateBNC =
+  //    (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+  //updateBNC->SetParameters(bUpdate);
+  //updateBNC->SetTuning(0.0007);
+  //updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
     // Make output directory
-    string outputFile(argv[3]);
+    string outputFile(argv[4]);
     PosteriorHDF5Writer output(outputFile, likelihood);
-    output.AddParameter(epsilon1); output.AddParameter(epsilon2);
+    output.AddParameter(epsilon1);
     output.AddParameter(gamma1);
-    output.AddParameter(gamma2);
-    output.AddParameter(xi[0]);
-    output.AddParameter(psi[0]);
-    output.AddParameter(zeta[0]);
-    output.AddParameter(phi[0]);
     output.AddParameter(delta);
+    output.AddParameter(omega);
+    output.AddParameter(p);
     output.AddParameter(nu);
     output.AddParameter(alpha);
     output.AddParameter(b);
@@ -452,7 +460,7 @@ main(int argc, char* argv[])
 
     // Run the chain
     cout << "Running MCMC" << endl;
-    for(size_t k=0; k<atoi(argv[5]); ++k)
+    for(size_t k=0; k<atoi(argv[6]); ++k)
       {
         if(k % 100 == 0)
           {
@@ -473,7 +481,7 @@ main(int argc, char* argv[])
       }
 
     cout << "Covariances\n";
-    cout << updateDistance->GetCovariance() << "\n";
+    //cout << updateDistance->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 

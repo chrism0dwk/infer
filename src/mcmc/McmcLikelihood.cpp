@@ -69,6 +69,7 @@ namespace EpiRisk
   {
     lastMove_ = DELETE;
     proposal_->DeleteInfectionTime(idx);
+
     return proposal_->GetLogLikelihood();
   }
 

@@ -1,5 +1,5 @@
 #CMake top level file for project 'InFER'
-project(infer-fmd)
+project(infer-theileria)
 
 cmake_minimum_required(VERSION 2.8)
 set(CMAKE_MODULE_PATH ${infer-fmd_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
@@ -27,11 +27,14 @@ find_package(CUDA REQUIRED)
 find_package(Boost 1.47.0 REQUIRED)
 find_package(GSL REQUIRED)
 
+#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=gnu++0x")
+
 set(LIBS ${LIBS} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
 
 configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h @ONLY)
 
-install(PROGRAMS ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmc ${CMAKE_BINARY_DIR}/src/unitTests/fmdSim DESTINATION bin)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmc DESTINATION bin)
+# ${CMAKE_BINARY_DIR}/src/unitTests/fmdSim DESTINATION bin)
 
 
 add_subdirectory(src)

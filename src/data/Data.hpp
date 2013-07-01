@@ -38,17 +38,7 @@
 struct TestCovars {
   double x;
   double y;
-  double cattle;
-  double pigs;
-  double sheep;
-  double goats;
-  double deer;
-  double cattleinf;
-  double pigsinf;
-  double sheepinf;
-  double cattlesusc;
-  double pigssusc;
-  double sheepsusc;
+  double ticks;
 };
 
 
@@ -56,7 +46,7 @@ struct COOMatrixElement
 {
   string i;
   string j;
-  float distance;
+  float val;
 };
 
 
@@ -94,7 +84,7 @@ public:
 
 class DistMatrixImporter : public EpiRisk::DataImporter<COOMatrixElement>
 {
-private:
+protected:
   ifstream matrixFile_;
   string filename_;
 public:
@@ -106,7 +96,11 @@ public:
   void reset();
 };
 
-
+class ContactDataImporter : public DistMatrixImporter
+{
+public:
+  ContactDataImporter(const string filename) : DistMatrixImporter(filename) {};
+};
 
 
 #endif /* IMPORTERS_HPP_ */

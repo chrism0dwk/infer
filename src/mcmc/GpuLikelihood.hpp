@@ -61,8 +61,14 @@
 #define NUMEVENTS 3
 //#define NUMSPECIES 3
 
+
 namespace EpiRisk
 {
+
+void
+__checkCudaError(const cudaError_t err, const char* file, const int line);
+#define checkCudaError(err) __checkCudaError(err, __FILE__, __LINE__)
+
 
 // Data structures
 
@@ -71,10 +77,12 @@ namespace EpiRisk
     int* rowPtr;
     int* colInd;
     float* val;
+    float* valtr;
     int nnz;
     int n;
     int m;
   };
+
 
   struct InfecIdx_t
   {
@@ -162,7 +170,7 @@ namespace EpiRisk
     };
 
     explicit
-    GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
+    GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic, ContactDataImporter& contact,
         const size_t nSpecies,
 		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
@@ -178,6 +186,8 @@ namespace EpiRisk
     void
     LoadEpidemic(EpiDataImporter& importer);
     void
+    LoadContact(ContactDataImporter& importer);
+    void
     SortPopulation();
     void
     LoadDistanceMatrix(DistMatrixImporter& filename);
@@ -191,21 +201,16 @@ namespace EpiRisk
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
     SetParameters(Parameter& epsilon1, 
-		  Parameter& epsilon2, 
 		  Parameter& gamma1, 
-		  Parameter& gamma2,
-		  Parameters& xi, 
-		  Parameters& psi, 
-		  Parameters& zeta, 
-		  Parameters& phi,
 		  Parameter& delta, 
 		  Parameter& omega, 
+		  Parameter& p,
 		  Parameter& nu, 
 		  Parameter& alpha, 
 		  Parameter& a, 
 		  Parameter& b);
-    void
-    RefreshParameters();
+    // void
+    // RefreshParameters();
     void
     SetMovtBan(const float movtBanTime);
     float
@@ -224,14 +229,14 @@ namespace EpiRisk
     GetIds(std::vector<std::string>& ids) const;
     size_t
     GetNumOccults() const;
-    void
-    CalcSusceptibilityPow();
-    void
-    CalcSusceptibility();
-    void
-    CalcInfectivityPow();
-    void
-    CalcInfectivity();
+    // void
+    // CalcSusceptibilityPow();
+    // void
+    // CalcSusceptibility();
+    // void
+    // CalcInfectivityPow();
+    // void
+    // CalcInfectivity();
     void
     UpdateI1();
     void
@@ -288,6 +293,8 @@ namespace EpiRisk
     operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
     void
+    PrintProdVector() const;
+    void
     PrintLikelihoodComponents() const;
     void
     PrintParameters() const;
@@ -316,9 +323,7 @@ namespace EpiRisk
       float I;
       float N;
       float R;
-      float cattle;
-      float pigs;
-      float sheep;
+      float ticks;
     };
 
     map<string, size_t> idMap_;
@@ -371,8 +376,10 @@ namespace EpiRisk
     size_t animalsPitch_;
 
     CsrMatrix* devD_;
+    CsrMatrix* devC_;  // Rows are contactors, cols are contactees
 
     int* hostDRowPtr_;
+    int* hostCRowPtr_;
     size_t dnnz_; //CRS
     curandGenerator_t cuRand_;
 
@@ -398,25 +405,14 @@ namespace EpiRisk
 
     // Parameters
     float* epsilon1_;
-    float* epsilon2_;
     float* gamma1_;
-    float* gamma2_;
     float* delta_;
     float* omega_;
+    float* p_;
     float* nu_;
     float* alpha_;
     float* a_;
     float* b_;
-
-    PointerVector<float> xi_;
-    PointerVector<float> psi_;
-    PointerVector<float> zeta_;
-    PointerVector<float> phi_;
-
-    float* devXi_;
-    float* devPsi_;
-    float* devZeta_;
-    float* devPhi_;
 
     // GPU BLAS handles
     cublasStatus_t blasStat_;

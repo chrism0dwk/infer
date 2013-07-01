@@ -88,7 +88,7 @@ PopDataImporter::next()
   record.id = tokens[0];
   record.data.x = atof(tokens[1].c_str()) / 1000;
   record.data.y = atof(tokens[2].c_str()) / 1000;
-  record.data.cattle = atof(tokens[3].c_str());
+  record.data.ticks = atof(tokens[3].c_str());
   
   return record;
 }
@@ -222,18 +222,15 @@ DistMatrixImporter::next()
   record.data.j = tokens[1];
   stringstream s;
   s << tokens[2];
-  s >> record.data.distance;
+  s >> record.data.val;
 
   return record;
 }
-
 
 void
 DistMatrixImporter::reset()
 {
   matrixFile_.seekg(0);
   string row;
-  getline(matrixFile_,row);
-}
-
-
+  getline(matrixFile_,row); 
+} 
