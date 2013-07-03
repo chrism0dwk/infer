@@ -357,6 +357,7 @@ main(int argc, char* argv[])
 
   float obsTime = atof(argv[5]);
   size_t seed = atoi(argv[7]);
+  float ncratio = atof(argv[8]);
   int gpuId = atoi(argv[9]);
   cout << "GPU: " << gpuId << endl;
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *contactDataImporter,
@@ -368,15 +369,15 @@ main(int argc, char* argv[])
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(1e-8, GammaPrior(5e-5, 1), "epsilon1");
-  Parameter gamma1(1, GammaPrior(1, 1), "gamma1");
+  Parameter epsilon1(1e-12, GammaPrior(5e-5, 1), "epsilon1");
+  Parameter gamma1(0.01, GammaPrior(1, 1), "gamma1");
   Parameter delta(10, GammaPrior(1, 1), "delta");
-  Parameter omega(1.5, GammaPrior(1,1), "omega");
-  Parameter p(0.5, BetaPrior(1,1), "p");
+  Parameter omega(1.2, GammaPrior(1,1), "omega");
+  Parameter p(0.01, GammaPrior(1,1), "p");
   Parameter nu(0.05, GammaPrior(1, 1), "nu");
-  Parameter alpha(100, GammaPrior(1, 1), "alpha");
+  Parameter alpha(0, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
-  Parameter b(0.1, GammaPrior(4.0, 40), "b");
+  Parameter b(0.05, GammaPrior(25, 500), "b");
 
 
   likelihood.SetMovtBan(0.0f);
@@ -390,11 +391,10 @@ main(int argc, char* argv[])
 
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
-  float ncratio = atof(argv[8]);
-
   UpdateBlock txDelta;
-  txDelta.add(epsilon1);
+  //txDelta.add(epsilon1);
   txDelta.add(gamma1);
+  txDelta.add(p);
   txDelta.add(delta);
   //txDelta.add(nu);
   //txDelta.add(alpha);
@@ -405,11 +405,6 @@ main(int argc, char* argv[])
   //  (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","delta");
   updateDistance->SetParameters(txDelta);
 
-  UpdateBlock updP;
-  updP.add(p);
-  Mcmc::AdaptiveSingleMRW* updateP = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","p");
-  updateP->SetParameters(updP);
-
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
   infecPeriod.add(b);
@@ -418,21 +413,21 @@ main(int argc, char* argv[])
           "infecTimes");
   //updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetUpdateTuning(2.5);
-  updateInfecTime->SetReps(0);
-  updateInfecTime->SetOccults(false);
+  updateInfecTime->SetUpdateTuning(4.0);
+  updateInfecTime->SetReps(800);
+  updateInfecTime->SetOccults(true);
 
-  UpdateBlock bUpdate; bUpdate.add(b);
-  //Mcmc::InfectionTimeGammaCentred* updateBC =
+   UpdateBlock bUpdate; bUpdate.add(b);
+  // Mcmc::InfectionTimeGammaCentred* updateBC =
   //    (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  //updateBC->SetParameters(bUpdate);
-  //updateBC->SetTuning(0.014);
+  // updateBC->SetParameters(bUpdate);
+  // updateBC->SetTuning(0.014);
 
-  //Mcmc::InfectionTimeGammaNC* updateBNC =
+  // Mcmc::InfectionTimeGammaNC* updateBNC =
   //    (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  //updateBNC->SetParameters(bUpdate);
-  //updateBNC->SetTuning(0.0007);
-  //updateBNC->SetNCRatio(ncratio);
+  // updateBNC->SetParameters(bUpdate);
+  // updateBNC->SetTuning(0.0007);
+  // updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -481,7 +476,7 @@ main(int argc, char* argv[])
       }
 
     cout << "Covariances\n";
-    //cout << updateDistance->GetCovariance() << "\n";
+    cout << updateDistance->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 

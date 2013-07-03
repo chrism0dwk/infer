@@ -266,6 +266,7 @@ namespace EpiRisk
 		cerr << "Key pair not found in population" << endl;
 		throw range_error("Key pair not found in population");
 	      }
+	      if ( i == j ) continue;
 	      // Fwd insert
 	      Cimport(i->second, j->second) = record.data.val + CONTACTIMPORTOFFSET;
 	      //cout << "nnz=" << Cimport.nnz() << endl;
@@ -296,16 +297,6 @@ namespace EpiRisk
       Cimport.value_data().begin()[i] -= CONTACTIMPORTOFFSET;
     cout << "Step 1" << endl;
     
-    // for(int i=0; i<Cimport.size1(); ++i) cout << "\t" << hostPopulation_[i].id;
-    // cout << endl;
-    // for(int i=0; i<Cimport.size1(); ++i) {
-    //   cout << hostPopulation_[i].id << "\t";
-    //   for(int j=0; j<Cimport.size2(); ++j) {
-    // 	cout.precision(4);
-    // 	cout << Cimport(i,j) << "\t";
-    //   }
-    //   cout << endl;
-    // }
 
     // This is the reverse i <- j matrix (i=row, j=col) -- basically transpose the contents of the sparse matrix
     ublas::vector<float> valtr(Cimport.nnz());
@@ -325,11 +316,6 @@ namespace EpiRisk
     	  valtr[tj] = val;
     	}
 
-
-    cout << "Step 2" << endl;
-
-   
-    cout << "Finished grooming contact matrix, nnz=" << Cimport.nnz() << endl;    
 
     // Set dimensions
     devC_->nnz = Cimport.nnz(); devC_->n = hostPopulation_.size(); devC_->m = hostPopulation_.size();

@@ -60,7 +60,20 @@ namespace EpiRisk
   {
     lastMove_ = ADD;
     proposal_->AddInfectionTime(idx, inTime);
+    // float fast = proposal_->GetLogLikelihood();
 
+    // cout << "Adding idx " << idx << endl;
+    // cout << "Fast likelihood: " << fast << endl;
+    // proposal_->PrintLikelihoodComponents();
+    // cout << "====================" << endl;
+
+    // proposal_->FullCalculate();
+    // float slow = proposal_->GetLogLikelihood();
+    // cout << "Slow likelihood: " << slow << endl;
+    // proposal_->PrintLikelihoodComponents();
+    // if(fabs(slow-fast) > 0.0f) cout << "****************************************" << endl; 
+
+    // cout << "====================" << endl;
     return proposal_->GetLogLikelihood();
   }
 
@@ -69,7 +82,23 @@ namespace EpiRisk
   {
     lastMove_ = DELETE;
     proposal_->DeleteInfectionTime(idx);
+    // float fast = proposal_->GetLogLikelihood();
 
+
+    // cout << "Deleting idx " << idx << endl;
+    // cout << "Fast likelihood: " << fast << endl;
+    // proposal_->PrintLikelihoodComponents();
+    // cout << "====================" << endl;
+
+
+    // proposal_->FullCalculate();
+    // float slow = proposal_->GetLogLikelihood();
+    // cout << "Slow likelihood: " << slow << endl;
+    // proposal_->PrintLikelihoodComponents();
+
+    // if(fabs(slow-fast)/fast > 1e-6f) cout << "****************************************" << endl; 
+
+    // cout << "====================" << endl;
     return proposal_->GetLogLikelihood();
   }
 
@@ -133,7 +162,21 @@ namespace EpiRisk
   {
     lastMove_ = INFECTIME;
     proposal_->UpdateInfectionTime(idx, inTime);
+    // float fast = proposal_->GetLogLikelihood();
+    // proposal_->FullCalculate();
+    // float slow = proposal_->GetLogLikelihood();
+    // float diff = fast - slow;
 
+    // cout << "Moving idx " << idx << endl;
+    // cout << "Fast likelihood: " << fast << endl;
+    // proposal_->PrintLikelihoodComponents();
+    // cout << "====================" << endl;
+
+    // cout << "Slow likelihood: " << slow << endl;
+    // proposal_->PrintLikelihoodComponents();
+    // if(diff > 0.0f) cout << "****************************************" << endl; 
+
+    // cout << "====================" << endl;
     return proposal_->GetLogLikelihood();
   }
 
@@ -194,7 +237,7 @@ namespace EpiRisk
       {
         float curr = current[i];
         float prop = proposal[i];
-        if (fabs((curr - prop)/curr) > 1e-6)
+        if (fabs((curr - prop)/curr) > 1e-8)
           {
             cerr << i << ":\t" << curr << "\t" << prop << "\t" << curr - prop << endl;
           }

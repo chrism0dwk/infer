@@ -21,6 +21,8 @@
 #include <thrust/find.h>
 #include <gsl/gsl_cdf.h>
 
+#include <assert.h>
+
 #ifndef __CUDACC__
 #define __CUDACC__
 #endif
@@ -150,10 +152,12 @@ namespace EpiRisk
   {
     // Returns a logistic 'h' function
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
-    if(t >= 0) 
-      return exp(nu*t) / ( alpha + exp(nu*t));
+    if(t >= 0) {
+      float rv = exp(nu*t) / ( alpha + exp(nu*t));
+      return rv;
+    }
     else
-      return 0.0;
+      return 0.0f;
     //return nu*nu*t*exp(-nu*t);
     
   }
@@ -167,7 +171,7 @@ namespace EpiRisk
 
     float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
     //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
-    
+
     //float integral = t - alpha;
     return fmaxf(0.0f, integral);
   }
@@ -176,7 +180,7 @@ namespace EpiRisk
     __device__ __host__ float
     operator()(const float dsq, const float delta, const float omega)
     {
-      return delta / powf(delta*delta + dsq, omega);
+      return 0.0001f;//delta / powf(delta*delta + dsq, omega);
     }
   };
     
@@ -184,7 +188,7 @@ namespace EpiRisk
     __device__ __host__ float
     operator()(const float d, const float delta, const float omega)
     {
-      return d;
+      return 0.01f;//d;
     }
   };
 
@@ -920,7 +924,7 @@ namespace EpiRisk
 
         // Add pressure from idx on j
         float IdxOnj = _H(fminf(Ri, Ij) - fminf(newTime, Ij), nu, alpha);
-	IdxOnj = op(distance.val[begin+tid], delta, omega);
+	IdxOnj *= op(distance.val[begin+tid], delta, omega);
         IdxOnj *= susceptibility[j];
 
         buff[threadIdx.x] = (IdxOnj + jOnIdx) * p;
@@ -1070,8 +1074,8 @@ namespace EpiRisk
   _delInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
 			   const float newTime, const CsrMatrix distance, float* eventTimes,
 			   const int eventTimesPitch, const float* susceptibility,
-			   const float gamma1, const float delta, const float p, 
-			   const float omega, const float nu, const float alpha,
+			   const float gamma1, const float delta, const float omega, 
+			   const float p, const float nu, const float alpha,
 			   float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -1513,6 +1517,7 @@ namespace EpiRisk
     addReduce_ = other.addReduce_;
 
     cudaDeviceSynchronize();
+
   }
 
   // Assignment constructor
@@ -1830,15 +1835,15 @@ namespace EpiRisk
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
 									     devAnimals_,
-									     *epsilon1_, *gamma1_,*delta_,*omega_,
-									     *p_,*nu_, *alpha_, 
+									     *epsilon1_, 1.0f,*delta_,*omega_,
+									     *gamma1_,*nu_, *alpha_, 
 									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _calcProduct<Identity,false><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devAnimals_,
-    									*epsilon1_,*gamma1_,*delta_,*omega_,
-    									1.0f - *p_,*nu_,*alpha_, 
+    									*epsilon1_,1.0f,*delta_,*omega_,
+    									*p_,*nu_,*alpha_, 
     									thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -1859,7 +1864,7 @@ namespace EpiRisk
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
 									     devAnimals_,
-									     *delta_,*omega_,*p_,*nu_,*alpha_, 
+									     *delta_,*omega_,*gamma1_,*nu_,*alpha_, 
 									     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -1867,7 +1872,7 @@ namespace EpiRisk
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devAnimals_,
-    									*delta_,*omega_,1.0f - *p_,*nu_, *alpha_, 
+    									*delta_,*omega_,*p_,*nu_, *alpha_, 
     									thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     
@@ -1898,7 +1903,6 @@ namespace EpiRisk
     CalcBgIntegral();
 
     cudaDeviceSynchronize();
-    hostComponents_->integral *= *gamma1_;
     logLikelihood_ = hostComponents_->logProduct
       - (hostComponents_->integral + hostComponents_->bgIntegral);
 
@@ -1934,7 +1938,6 @@ namespace EpiRisk
     CalcBgIntegral();
 
     cudaDeviceSynchronize();
-    hostComponents_->integral *= *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
       - (hostComponents_->integral + hostComponents_->bgIntegral);
@@ -2031,31 +2034,31 @@ namespace EpiRisk
 
     // Integrated infection pressure
     _updateInfectionTimeIntegral<DistanceKernel,true><<<blocksPerGridD, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, 
-												    thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
-												    newTime,
-												    *devD_,
-												    devEventTimes_, 
-												    eventTimesPitch_, 
-												    devSusceptibility_,
-												    *delta_, 
-												    *omega_, 
-												    *p_, 
-												    *nu_, 
-												    *alpha_, 
-												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    												    thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    												    newTime,
+    												    *devD_,
+    												    devEventTimes_, 
+    												    eventTimesPitch_, 
+    												    devAnimals_,
+    												    *delta_, 
+    												    *omega_, 
+    												    *gamma1_, 
+    												    *nu_, 
+    												    *alpha_, 
+    												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _updateInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, 
-												    thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
-												    newTime,
-												    *devC_,
-												    devEventTimes_, 
-												    eventTimesPitch_, 
-												    devSusceptibility_,
-												    *delta_, 
-												    *omega_, 
-												    1.0f - *p_, 
-												    *nu_, 
-												    *alpha_, 
-												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    												    thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    												    newTime,
+    												    *devC_,
+    												    devEventTimes_, 
+    												    eventTimesPitch_, 
+    												    devAnimals_,
+    												    *delta_, 
+    												    *omega_, 
+    												    *p_, 
+    												    *nu_, 
+    												    *alpha_, 
+    												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     cudaDeviceSynchronize();
     if(maxBpG > 1) {
@@ -2078,28 +2081,29 @@ namespace EpiRisk
 												   *devD_,
 												   devEventTimes_, 
 												   eventTimesPitch_,
-												   devSusceptibility_, 
+												   devAnimals_, 
 												   *epsilon1_, 
-												   *gamma1_, 
+												   1.0f, 
 												   *delta_, 
 												   *omega_, 
-												   *p_,
+												   *gamma1_,
 												   *nu_, 
 												   *alpha_, 
 												   I1Idx_, 
 												   thrust::raw_pointer_cast(&(*devProduct_)[0]));
+
      _updateInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, 
      												   thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
      												   newTime, 
      												   *devC_,
      												   devEventTimes_, 
      												   eventTimesPitch_,
-     												   devSusceptibility_, 
+     												   devAnimals_, 
      												   *epsilon1_, 
-     												   *gamma1_, 
+     												   1.0f, 
      												   *delta_, 
      												   *omega_, 
-     												   1.0f - *p_,
+     												   *p_,
      												   *nu_, 
      												   *alpha_, 
      												   I1Idx_, 
@@ -2126,7 +2130,7 @@ namespace EpiRisk
     //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost)); // CUDA_MEMCPY
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral * *gamma1_;
+      + hostComponents_->integral;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (newTime - oldTime);
     }
@@ -2190,40 +2194,44 @@ namespace EpiRisk
 
     unsigned int addIdx = devInfecIdx_->size() - 1;
 
-    int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
+    int blocksPerGridD = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
 			 - 1) / THREADSPERBLOCK + 1;
-    _addInfectionTimeIntegral<DistanceKernel,true><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
+    int blocksPerGridC = (hostCRowPtr_[i + 1] - hostCRowPtr_[i] + THREADSPERBLOCK - 1) / THREADSPERBLOCK + 1;
+    int maxBpG = max(blocksPerGridD,blocksPerGridC);
+
+    thrust::fill(devWorkspace_->begin(), devWorkspace_->end(), 0.0f);
+
+    _addInfectionTimeIntegral<DistanceKernel,true><<<blocksPerGridD, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
 														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
 														 newTime,
 														 *devD_, 
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devSusceptibility_,
+														 devAnimals_,
+														 *delta_, 
+														 *omega_, 
+														 *gamma1_,
+														 *nu_, 
+														 *alpha_, 
+														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    _addInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
+														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
+														 newTime,
+														 *devC_, 
+														 devEventTimes_, 
+														 eventTimesPitch_, 
+														 devAnimals_,
 														 *delta_, 
 														 *omega_, 
 														 *p_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-    _addInfectionTimeIntegral<Identity,false><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
-														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
-														 newTime,
-														 *devD_, 
-														 devEventTimes_, 
-														 eventTimesPitch_, 
-														 devSusceptibility_,
-														 *delta_, 
-														 *omega_, 
-														 1.0f - *p_,
-														 *nu_, 
-														 *alpha_, 
-														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
 
     checkCudaError(cudaGetLastError());
-    cudaDeviceSynchronize();
-    if(blocksPerGrid > 1) {
+    if(maxBpG > 1) {
       CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), maxBpG);
       if (res != CUDPP_SUCCESS)
 	throw std::runtime_error(
 				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
@@ -2231,42 +2239,42 @@ namespace EpiRisk
     else {
       checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 #ifndef NDEBUG
-      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
+      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGridD << endl;
 #endif
     }
 
-    _addInfectionTimeProduct<DistanceKernel,true><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
+    _addInfectionTimeProduct<DistanceKernel,true><<<blocksPerGridD, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
 														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
 														newTime,
 														*devD_, 
 														devEventTimes_,
 														eventTimesPitch_,
-														devSusceptibility_,
+														devAnimals_,
 														*epsilon1_,
-														*gamma1_,
+														1.0f,
 														*delta_, 
 														*omega_, 
-														*p_,
+														*gamma1_,
 														*nu_, 
 														*alpha_, 
 														I1Idx_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
-    _addInfectionTimeProduct<Identity,false><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
-														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
-														newTime,
-														*devD_, 
-														devEventTimes_,
-														eventTimesPitch_,
-														devSusceptibility_,
-														*epsilon1_,
-														*gamma1_,
-														*delta_, 
-														*omega_, 
-														1.0f - *p_,
-														*nu_, 
-														*alpha_, 
-														I1Idx_, 
-														thrust::raw_pointer_cast(&(*devProduct_)[0]));
+    _addInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
+    														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    														newTime,
+    														*devC_, 
+    														devEventTimes_,
+    														eventTimesPitch_,
+    														devAnimals_,
+    														*epsilon1_,
+    														1.0f,
+    														*delta_, 
+    														*omega_, 
+    														*p_,
+    														*nu_, 
+    														*alpha_, 
+    														I1Idx_, 
+    														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
     // Update the population
@@ -2285,7 +2293,7 @@ namespace EpiRisk
     // Collect results and update likelihood
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral * *gamma1_;
+      + hostComponents_->integral;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (newTime - Ni);
     }
@@ -2335,39 +2343,44 @@ namespace EpiRisk
     float notification = hostPopulation_[i].N;
     float oldI = eventTimesPtr[i];
 
-    int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
+    int blocksPerGridD = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
 			 - 1) / THREADSPERBLOCK + 1;
-    _delInfectionTimeIntegral<DistanceKernel,true><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
+    int blocksPerGridC = (hostCRowPtr_[i + 1] - hostCRowPtr_[i] + THREADSPERBLOCK
+			 - 1) / THREADSPERBLOCK + 1;
+    int maxBpG = max(blocksPerGridD, blocksPerGridC);
+
+    thrust::fill(devWorkspace_->begin(), devWorkspace_->end(), 0.0f);
+    _delInfectionTimeIntegral<DistanceKernel,true><<<blocksPerGridD, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
 														 notification,
 														 *devD_,
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devSusceptibility_,
+														 devAnimals_,
+														 *delta_, 
+														 *omega_, 
+														 *gamma1_,
+														 *nu_, 
+														 *alpha_, 
+														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    _delInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
+														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
+														 notification,
+														 *devC_,
+														 devEventTimes_, 
+														 eventTimesPitch_, 
+														 devAnimals_,
 														 *delta_, 
 														 *omega_, 
 														 *p_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-    _delInfectionTimeIntegral<Identity,false><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
-														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
-														 notification,
-														 *devD_,
-														 devEventTimes_, 
-														 eventTimesPitch_, 
-														 devSusceptibility_,
-														 *delta_, 
-														 *omega_, 
-														 1.0f - *p_,
-														 *nu_, 
-														 *alpha_, 
-														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     cudaDeviceSynchronize();
-    if(blocksPerGrid > 1) {
+    if(maxBpG > 1) {
       CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), maxBpG);
       if (res != CUDPP_SUCCESS)
 	throw std::runtime_error(
 				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
@@ -2375,34 +2388,34 @@ namespace EpiRisk
     else {
       checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 #ifndef NDEBUG
-      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
+      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGridD << endl;
 #endif
     }
-    _delInfectionTimeProduct<DistanceKernel,true><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
+    _delInfectionTimeProduct<DistanceKernel,true><<<blocksPerGridD, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
 														notification,
 														*devD_, 
 														devEventTimes_, 
 														eventTimesPitch_,
-														devSusceptibility_, 
-														*gamma1_, 
+														devAnimals_, 
+														1.0f, 
 														*delta_, 
 														*omega_,
-														*p_,
+														*gamma1_,
 														*nu_, 
 														*alpha_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
-    _delInfectionTimeProduct<Identity,false><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
+    _delInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
 														notification,
-														*devD_, 
+														*devC_, 
 														devEventTimes_, 
 														eventTimesPitch_,
-														devSusceptibility_, 
-														*gamma1_, 
+														devAnimals_, 
+														1.0f, 
 														*delta_, 
 														*omega_,
-														1.0f - *p_,
+														*p_,
 														*nu_, 
 														*alpha_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
@@ -2433,7 +2446,7 @@ namespace EpiRisk
     //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral * *gamma1_;
+      + hostComponents_->integral;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (notification - oldI);
     }

@@ -912,6 +912,11 @@ namespace EpiRisk
               *doCompareProductVector_ = false;
             }
         }
+      
+      // Clear FP error
+      likelihood_->Propose();
+      likelihood_->Accept();
+
       ucalls_++;
     }
 
