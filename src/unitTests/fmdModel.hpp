@@ -89,6 +89,7 @@ struct FmdParameters
   Parameter gamma1;
   Parameter gamma2;
   Parameter delta;
+  Parameter omega;
   Parameter epsilon1;
   Parameter epsilon2;
   Parameter xi_p;

@@ -50,6 +50,7 @@ struct Settings
   double gamma1;
   double gamma2;
   double delta;
+  double omega;
   double xi_p, xi_s;
   double psi_c, psi_p, psi_s;
   double zeta_p, zeta_s;
@@ -84,6 +85,7 @@ struct Settings
     gamma1 = pt.get<double> ("fmdGillespieSim.parameters.gamma1");
     gamma2 = pt.get<double> ("fmdGillespieSim.parameters.gamma2");
     delta = pt.get<double> ("fmdGillespieSim.parameters.delta");
+    omega = pt.get<double> ("fmdGillespieSim.parameters.omega");
     xi_p = pt.get<double> ("fmdGillespieSim.parameters.xi_p");
     xi_s = pt.get<double> ("fmdGillespieSim.parameters.xi_s");
     psi_c = pt.get<double> ("fmdGillespieSim.parameters.psi_c");
@@ -190,6 +192,7 @@ main(int argc, char* argv[])
   parameters.gamma1 = Parameter(settings.gamma1, GammaPrior(1, 1), "gamma1");
   parameters.gamma2 = Parameter(settings.gamma2, GammaPrior(1, 1), "gamma2");
   parameters.delta = Parameter(settings.delta, GammaPrior(1, 1), "delta");
+  parameters.omega = Parameter(settings.omega, GammaPrior(1, 1), "omega");
   parameters.epsilon1 = Parameter(settings.epsilon1, GammaPrior(1, 1), "epsilon1");
   parameters.epsilon2 = Parameter(settings.epsilon2, GammaPrior(1, 1), "epsilon2");
   parameters.xi_p = Parameter(settings.xi_p, GammaPrior(1, 1), "xi_p");

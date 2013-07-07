@@ -77,7 +77,7 @@ FmdModel::beta(const Individual& i, const Individual& j, const double time) cons
 {
   double dist = distance(i,j);
   if ( dist <= 25.0 ) {
-      return params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / (params_.delta*params_.delta + dist*dist);
+    return params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
   }
   else return 0.0;
 }
@@ -87,7 +87,7 @@ FmdModel::betastar(const Individual& i, const Individual& j, const double time) 
 {
   double dist = distance(i,j);
   if ( dist <= 25.0 ) {
-      return params_.gamma2 * params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / (params_.delta*params_.delta + dist*dist);
+    return params_.gamma2 * params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
   }
   else return 0.0;
 }

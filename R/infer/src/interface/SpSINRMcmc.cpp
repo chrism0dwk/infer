@@ -218,7 +218,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   txDelta.add(epsilon1);
   if(doMovtBan[0]) txDelta.add(epsilon2);
   txDelta.add(gamma1);
-  if(doNDiff) txDelta.add(gamma2);
+  if(doNDiff[0]) txDelta.add(gamma2);
   txDelta.add(delta);
   txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
