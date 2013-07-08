@@ -25,8 +25,8 @@ PopRImporter::next()
   tmp.data.y = y_[rowptr_];
 
   tmp.data.cattle = sp_[0][rowptr_];
-  if(sp_.size() <= 2) tmp.data.pigs = sp_[1][rowptr_];
-  if(sp_.size() <= 3) tmp.data.sheep = sp_[2][rowptr_];
+  if(sp_.size() >= 2) tmp.data.pigs = sp_[1][rowptr_];
+  if(sp_.size() >= 3) tmp.data.sheep = sp_[2][rowptr_];
 
   rowptr_++;
   
