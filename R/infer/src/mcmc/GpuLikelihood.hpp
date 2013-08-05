@@ -295,7 +295,10 @@ namespace EpiRisk
     PrintEventTimes() const;
     void
     PrintDistMatrix() const;
-
+    void
+    DumpSpecies() const;
+    void
+    DumpInfSusc() const;
   private:
 
     // Helper methods

@@ -262,18 +262,22 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     
     if(nSpecies > 1) {
       
-      txInfec.add(gamma1);
+      //txInfec.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
 	txInfec.add(xi[i]);
-      EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
-       	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+      //EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
+      // 	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txInfec");
       updateInfec->SetParameters(txInfec);
       
-      txSuscep.add(gamma1);
+      //txSuscep.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
 	txSuscep.add(zeta[i]);
-      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
-	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+      //      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
+      //	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
       updateSuscep->SetParameters(txSuscep);
     }
 

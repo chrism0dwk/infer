@@ -1279,12 +1279,16 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
   	    	    checkCudaError(cudaGetLastError());
 
     cudaDeviceSynchronize();
+    if(blocksPerGrid > 1) {
     CUDPPResult res = cudppReduce(addReduce_,
         (float*) ((char*) devComponents_
 		  + offsetof(LikelihoodComponents,logProduct)), thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
     if (res != CUDPP_SUCCESS)
       throw std::runtime_error(
           "cudppReduce failed in GpuLikelihood::ReduceProductVector()");
+    }
+    else
+      checkCudaError(cudaMemcpy(&(devComponents_->logProduct), thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 
     cudaDeviceSynchronize();
 
@@ -1525,6 +1529,9 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     addReduce_ = other.addReduce_;
 
     cudaDeviceSynchronize();
+    
+
+
   }
 
 // Assignment constructor
@@ -1917,9 +1924,13 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     _bgIntegral<<<numBlocks, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devWorkspace_)[0]), devEventTimes_, popSize_, *epsilon1_, *epsilon2_, movtBan_, I1Time_);
 
     cudaDeviceSynchronize();
+    if(numBlocks > 1) {
     CUDPPResult res = cudppReduce(addReduce_, &devComponents_->bgIntegral,
 				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), numBlocks);
     if(res != CUDPP_SUCCESS) throw logic_error("CUDPP failed");
+    }
+    else
+      checkCudaError(cudaMemcpy(&devComponents_->bgIntegral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 
 #ifndef NDEBUG
     cudaDeviceSynchronize();
@@ -2226,26 +2237,26 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     unsigned int addIdx = devInfecIdx_->size() - 1;
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
-        - 1) / THREADSPERBLOCK + 1;
+			 - 1) / THREADSPERBLOCK + 1;
     _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime,
-      *devD_, devEventTimes_, eventTimesPitch_, devSusceptibility_,
+												 *devD_, devEventTimes_, eventTimesPitch_, devSusceptibility_,
 												 devInfectivity_, *gamma2_, *delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-			    cudaDeviceSynchronize();
-			    if(blocksPerGrid > 1) {
-    CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
-			    }
-			    else {
-			      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
+    checkCudaError(cudaGetLastError());
+    cudaDeviceSynchronize();
+    if(blocksPerGrid > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+    }
+    else {
+      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 #ifndef NDEBUG
-			      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
+      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
 #endif
-			    }
-
+    }
+    
     _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime,
     *devD_, devEventTimes_, eventTimesPitch_,
     devSusceptibility_, devInfectivity_, *epsilon1_, *epsilon2_, *gamma1_, *gamma2_,
@@ -2320,26 +2331,27 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     float oldI = eventTimesPtr[i];
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
-        - 1) / THREADSPERBLOCK + 1;
+			 - 1) / THREADSPERBLOCK + 1;
     _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), notification,
-      *devD_,
-      devEventTimes_, eventTimesPitch_, devSusceptibility_,
+												 *devD_,
+												 devEventTimes_, eventTimesPitch_, devSusceptibility_,
 												 devInfectivity_, *gamma2_, *delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-			    cudaDeviceSynchronize();
-			    if(blocksPerGrid > 1) {
-    CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
-			    }
-			    else {
-			      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
+    checkCudaError(cudaGetLastError());
+    cudaDeviceSynchronize();
+    if(blocksPerGrid > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+    }
+    else {
+      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 #ifndef NDEBUG
-			      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
+      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
 #endif
-			    }
+    }
+    
     _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), notification,
     *devD_, devEventTimes_, eventTimesPitch_,
     devSusceptibility_, devInfectivity_, *gamma1_, *gamma2_,
@@ -2657,6 +2669,46 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     delete[] myCSR->val;
     delete myCSR;
   }
+
+
+  void
+  GpuLikelihood::DumpSpecies() const
+  {
+
+    float* species = new float[popSize_*numSpecies_];
+    checkCudaError(cudaMemcpy2D(species, popSize_*sizeof(float),
+				devAnimals_, animalsPitch_ * sizeof(float), 
+				popSize_ * sizeof(float),
+				numSpecies_, cudaMemcpyDeviceToHost));
+
+    for(int i=0; i<popSize_; ++i) {
+      cerr << hostPopulation_[i].id << "\t";
+      for(int s=0; s<numSpecies_; ++s)
+	cerr << species[i + s*popSize_] << "\t";
+      cerr << endl;
+    }
+
+    delete[] species;
+  }
+
+  void
+  GpuLikelihood::DumpInfSusc() const
+  {
+    float* infectivity = new float[maxInfecs_];
+    checkCudaError(cudaMemcpy(infectivity, devInfectivity_, maxInfecs_*sizeof(float), cudaMemcpyDeviceToHost)); 
+    float* susceptibility = new float[popSize_];
+    checkCudaError(cudaMemcpy(susceptibility, devSusceptibility_, popSize_*sizeof(float), cudaMemcpyDeviceToHost));
+
+    for(int i=0; i<popSize_; ++i) {
+      cerr << hostPopulation_[i].id << "\t" << susceptibility[i];
+      if(i < maxInfecs_) cerr << "\t" << infectivity[i];
+      cerr << endl;
+    }
+
+    delete[] infectivity;
+    delete[] susceptibility;
+  }
+
 
 } // namespace EpiRisk
 

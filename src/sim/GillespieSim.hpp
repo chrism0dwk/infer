@@ -315,15 +315,20 @@ namespace EpiRisk
           if (it->getN() > population_.getObsTime() && it->getN() < POSINF)
             {
               if(!eventQueue_.insert(shared_ptr<Notification> (new Notification(
-                  &(*it), it->getN()))).second) throw logic_error("Duplicate event time!");
-
+										&(*it), it->getN()))).second) {
+		eventQueue_.insert(shared_ptr<Notification> (new Notification(&(*it), it->getN()+0.00001)));
+		cerr << "WARNING: Duplicate N event time!" << endl;;
+	      }
             }
 
           if (it->getR() > population_.getObsTime() && it->getR() < POSINF)
             {
               if(!eventQueue_.insert(shared_ptr<Removal> (new Removal(&(*it),
-                  it->getR()))).second) throw logic_error("Duplicate event time!");
-            }
+								      it->getR()))).second) {
+		eventQueue_.insert(shared_ptr<Removal> (new Removal(&(*it), it->getR()+0.00001)));
+		cerr << "WARNING: Duplicate R event time!" << endl;
+	      }
+	    }
         }
     }
 
@@ -466,6 +471,7 @@ namespace EpiRisk
       initEventQueue();
       calcPressureCDF();
 
+      cerr << "Beta max: " << beta_max() << endl;
       // Simulate forward until maxTime
       while (currentTime <= maxTime_ && !eventQueue_.empty())
         {
