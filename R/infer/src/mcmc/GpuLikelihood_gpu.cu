@@ -581,7 +581,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         float Ni = eventTimes[i + eventTimesPitch];
         float Ri = eventTimes[i + eventTimesPitch * 2];
 
-        float threadSum = 0.0f;
+        float betai = 0.0f;
+	// Distance part
         for (int jj = begin + lane; jj < end; jj += 32)
           {
             // Integrated infection pressure
@@ -594,9 +595,20 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             // Apply distance kernel and suscep
             betaij *= _K(distance.val[jj], delta, omega);
             betaij *= susceptibility[distance.colInd[jj]];
-            threadSum += betaij;
+            betai += betaij;
           }
-        buff[threadIdx.x] = threadSum * infectivity[i];
+
+	// Epsilon part -- only infectives are calculated here
+	float ei = 0.0f;
+	for (int j=lane; j<infecSize; j += 32)
+	  {
+	    float Ij = eventTimes[j];
+	    float epsilonij = _H(fminf(Ni, Ij) - fminf(Ii,Ij), nu, alpha);
+	    epsilonij *= susceptibility[j] * epsilon1;
+	    ei += epsilonij;
+	  }
+	
+        buff[threadIdx.x] = (betai + ei) * infectivity[i];
       }
 
     // Reduce all warp sums and write to global memory.
@@ -660,6 +672,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
         float Ij = eventTimes[j];
 
+	// Distance part
         for (int ii = begin + lane; ii < end; ii += 32)
           {
             int i = distance.colInd[ii];
@@ -677,6 +690,16 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
                 threadProdCache[threadIdx.x] += idxOnj * infectivity[i] * _K(distance.val[ii],delta,omega);
               }
           }
+	
+	// Epsilon part
+	for (int ii = lane; ii < infecSize; ii += 32)
+	  {
+	    int i = infecIdx[ii].ptr;
+	    float Ii = eventTimes[i]; float Ni = eventTimes[eventTimesPitch + i];
+	    float ej = 0.0f;
+	    if (Ii < Ij and Ij <= Ni)
+	      threadProdCache[threadIdx.x] += _h(Ij - Ii, nu, alpha) * infectivity[i] * epsilon1;
+	  }
         __syncthreads();
 
         // Reduce semi-products into productCache
@@ -694,9 +717,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         // Write out to global memory
         if (lane == 0)
           {
-            float epsilon = Ij < movtBan ? epsilon1 : (epsilon1*epsilon2);
             prodCache[j] = threadProdCache[threadIdx.x] * susceptibility[j]
-                * gamma1 + epsilon;
+                * gamma1;
           }
       }
   }
