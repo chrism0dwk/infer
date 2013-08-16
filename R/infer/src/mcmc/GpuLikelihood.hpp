@@ -161,6 +161,20 @@ namespace EpiRisk
       float integral;
     };
 
+    struct Parameters
+    {
+      float epsilon1;
+      float epsilon2;
+      float gamma1;
+      float gamma2;
+      float delta;
+      float omega;
+      float alpha;
+      float nu;
+      float a;
+      float b;
+    };
+
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
@@ -410,6 +424,7 @@ namespace EpiRisk
     float* alpha_;
     float* a_;
     float* b_;
+    Parameters paramVals_;
 
     PointerVector<float> xi_;
     PointerVector<float> psi_;
