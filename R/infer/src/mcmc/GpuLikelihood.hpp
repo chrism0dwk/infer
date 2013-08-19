@@ -80,11 +80,13 @@ namespace EpiRisk
   {
     unsigned int ptr;
     int dc;
+    __host__ __device__
     InfecIdx_t(const unsigned int Ptr, const int DC=-1)
     {
       ptr = Ptr;
       dc = DC;
     }
+    __host__ __device__
     InfecIdx_t() : ptr(NULL), dc(-1)
     {
     }
@@ -208,10 +210,10 @@ namespace EpiRisk
 		  Parameter& epsilon2, 
 		  Parameter& gamma1, 
 		  Parameter& gamma2,
-		  Parameters& xi, 
-		  Parameters& psi, 
-		  Parameters& zeta, 
-		  Parameters& phi,
+		  EpiRisk::Parameters& xi, 
+		  EpiRisk::Parameters& psi, 
+		  EpiRisk::Parameters& zeta, 
+		  EpiRisk::Parameters& phi,
 		  Parameter& delta, 
 		  Parameter& omega, 
 		  Parameter& nu, 
@@ -313,6 +315,8 @@ namespace EpiRisk
     DumpSpecies() const;
     void
     DumpInfSusc() const;
+    void
+    DumpProductVector() const;
   private:
 
     // Helper methods

@@ -697,7 +697,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	for (int ii = lane; ii < infecSize; ii += 32)
 	  {
 	    int i = infecIdx[ii].ptr;
-	    float Ii = eventTimes[i]; float Ni = eventTimes[eventTimesPitch + i];
+	    float Ii = eventTimes[i];
+	    float Ni = eventTimes[eventTimesPitch + i];
 	    if (Ii < Ij and Ij <= Ni)
 	      threadProdCache[threadIdx.x] += _h(Ij - Ii, p) * infectivity[i] * p.epsilon1;
 	  }
@@ -1161,8 +1162,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	    const GpuLikelihood::Parameters p,
 	    float* output)
   {
-    extern
-      __shared__ float buff[];
+    __shared__ float buff[THREADSPERBLOCK];
     
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     buff[threadIdx.x] = 0.0f;
@@ -1340,17 +1340,16 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
   GpuLikelihood::ReduceProductVector()
   {
     // Reduces the device-side product vector into the device-side components struct
-
     cudaDeviceSynchronize();
     int blocksPerGrid = (devProduct_->size() + THREADSPERBLOCK - 1)
         / THREADSPERBLOCK;
 
-_reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(float)>>>
-  (thrust::raw_pointer_cast(&(*devProduct_)[0]),
+    _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(float)>>>
+      (thrust::raw_pointer_cast(&(*devProduct_)[0]),
        devProduct_->size(),
        I1Idx_,
-   thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-  	    	    checkCudaError(cudaGetLastError());
+       thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    checkCudaError(cudaGetLastError());
 
     cudaDeviceSynchronize();
     if(blocksPerGrid > 1) {
@@ -2075,8 +2074,11 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 
     // Calculate remaining epsilon pressure on infectives
     // \sum_{S} s_j \sum_{I} H(N_i - I_i)
-    thrust::device_vector<InfecIdx_t> devSuscOccults(*hostSuscOccults_);
-    double sumSuscep = indirectedSum(thrust::raw_pointer_cast(&devSuscOccults[0]), devSuscOccults.size(), devSusceptibility_);
+    InfecIdx_t* devSuscOccults;
+    checkCudaError(cudaMalloc(&devSuscOccults, sizeof(InfecIdx_t) * hostSuscOccults_->size()));
+    checkCudaError(cudaMemcpy(devSuscOccults, thrust::raw_pointer_cast(&(*hostSuscOccults_)[0]), sizeof(InfecIdx_t) * hostSuscOccults_->size(), cudaMemcpyHostToDevice));
+
+    double sumSuscep = indirectedSum(devSuscOccults, hostSuscOccults_->size(), devSusceptibility_);
 
     int buffSize = (devInfecIdx_->size() + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
     _sumHFunc<<<buffSize,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
@@ -2085,6 +2087,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 					    eventTimesPitch_,
 					    paramVals_,
 					    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    checkCudaError(cudaGetLastError());
     if(buffSize > 1) {
       CUDPPResult res = cudppReduce(addReduce_,
 				    &devComponents_->bgIntegral,
@@ -2096,7 +2099,9 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     else checkCudaError(cudaMemcpy(&devComponents_->bgIntegral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToHost));
     
     cudaDeviceSynchronize(); // Possibly not needed
-    devComponents_->bgIntegral *= sumSuscep;
+    hostComponents_->bgIntegral *= sumSuscep * paramVals_.epsilon1;
+
+    checkCudaError(cudaFree(devSuscOccults));
   }
 
   void
@@ -2117,10 +2122,9 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     UpdateI1();
     CalcIntegral();
     CalcProduct();
-    CalcBgIntegral();
+    //CalcBgIntegral();
 
     cudaDeviceSynchronize();
-    hostComponents_->integral *= *gamma1_;
     logLikelihood_ = hostComponents_->logProduct
         - (hostComponents_->integral + hostComponents_->bgIntegral);
 
@@ -2157,10 +2161,9 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     UpdateI1();
     CalcIntegral();
     CalcProduct();
-    CalcBgIntegral();
+    //CalcBgIntegral();
 
     cudaDeviceSynchronize();
-    hostComponents_->integral *= *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
         - (hostComponents_->integral + hostComponents_->bgIntegral);
@@ -2885,6 +2888,18 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     delete[] susceptibility;
   }
 
+  void
+  GpuLikelihood::DumpProductVector() const
+  {
+    thrust::host_vector<float> pv = *devProduct_;
+    cerr << "====================\n";
+    cerr << "PRODUCT VECTOR\n";
+    cerr << "====================\n";
+    for(int i=0; i<hostInfecIdx_->size(); ++i) {
+      cerr << (*hostInfecIdx_)[i].ptr << "\t" << pv[(*hostInfecIdx_)[i].ptr] << "\n";
+    }
+    cerr << "====================" << endl;
+  }
 
 } // namespace EpiRisk
 

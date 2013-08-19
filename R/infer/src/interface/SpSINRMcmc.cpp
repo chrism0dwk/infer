@@ -346,7 +346,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     {
       mcmc.Update();
       output.write();
-
+      likelihood.PrintLikelihoodComponents();
+      likelihood.DumpProductVector();
       if(k % 500 == 0)
   	{
 	  Rcpp::Rcout << "Iteration " << k << std::endl;
