@@ -2060,8 +2060,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 							devInfectivity_,
 							paramVals_, 
 							thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-    checkCudaError(cudaGetLastError());
-    cudaDeviceSynchronize();
+    //checkCudaError(cudaGetLastError());
     if(integralBuffSize > 1) {
       CUDPPResult res = cudppReduce(addReduce_, 
 				    &devComponents_->integral,
@@ -2070,7 +2069,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
       if (res != CUDPP_SUCCESS)
         throw std::runtime_error("cudppReduce failed in GpuLikelihood::CalcIntegral()");
     }
-    else checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
+    else checkCudaError(cudaMemcpyAsync(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 
     // Calculate remaining epsilon pressure on infectives
     // \sum_{S} s_j \sum_{I} H(N_i - I_i)
@@ -2096,9 +2095,9 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
       if (res != CUDPP_SUCCESS)
 	throw std::runtime_error("cudppReduce failed in GpuLikelihood::CalcIntegral()");
     }
-    else checkCudaError(cudaMemcpy(&devComponents_->bgIntegral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToHost));
+    else checkCudaError(cudaMemcpyAsync(&devComponents_->bgIntegral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToHost));
     
-    cudaDeviceSynchronize(); // Possibly not needed
+    cudaDeviceSynchronize();
     hostComponents_->bgIntegral *= sumSuscep * paramVals_.epsilon1;
 
     checkCudaError(cudaFree(devSuscOccults));
