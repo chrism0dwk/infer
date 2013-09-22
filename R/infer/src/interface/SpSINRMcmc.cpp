@@ -19,6 +19,18 @@
 
 #define RNUM(x) Rcpp::NumericVector(x)
 
+
+static void chkIntFn(void *dummy)
+{
+  R_CheckUserInterrupt();
+}
+
+bool checkInterrupt() {
+  return (R_ToplevelExec(chkIntFn,NULL) == false);
+}
+
+
+
 class GammaPrior : public EpiRisk::Prior
 {
   float shape_;
@@ -137,12 +149,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::NumericVector startval =_init["epsilon1"];
   EpiRisk::Parameter epsilon1(startval[0], GammaPrior(prior[0], prior[1]), "epsilon1");
 
-  if(doNDiff[0])
-    startval = _init["epsilon2"]; 
-  else
-    startval = 1.0;
-
-  prior = _priorParms["epsilon2"]; 
+  startval = _init["epsilon2"]; prior = _priorParms["epsilon2"]; 
   EpiRisk::Parameter epsilon2(startval[0], GammaPrior(prior[0], prior[1]), "epsilon2");
   startval = _init["gamma1"]; prior = _priorParms["gamma1"];
   EpiRisk::Parameter gamma1(startval[0], GammaPrior(prior[0], prior[1]), "gamma1");
@@ -222,8 +229,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   txDelta.add(delta);
   //txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
-    (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
-          "txBase");
+   (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
+  						      "txBase");
   updateDistance->SetParameters(txDelta);
 
   EpiRisk::UpdateBlock txPsi;
@@ -277,7 +284,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       //EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
       //(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
       EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
-	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
+      (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
       updateSuscep->SetParameters(txSuscep);
     }
 
@@ -344,10 +351,15 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::Rcout << "Running MCMC" << std::endl;
   for(int k=0; k<numIter[0]; ++k)
     {
+      if(checkInterrupt()) {
+	cerr << ("Execution cancelled by user");
+	output.flush();
+	break;
+      }
       mcmc.Update();
       output.write();
-      //likelihood.PrintLikelihoodComponents();
-      //likelihood.DumpProductVector();
+      likelihood.PrintLikelihoodComponents();
+      likelihood.DumpProductVector(1.0f);
       if(k % 500 == 0)
   	{
 	  Rcpp::Rcout << "Iteration " << k << std::endl;

@@ -161,6 +161,7 @@ namespace EpiRisk
       float bgIntegral;
       float logProduct;
       float integral;
+      float sumSuscSusc;
     };
 
     struct Parameters
@@ -316,7 +317,7 @@ namespace EpiRisk
     void
     DumpInfSusc() const;
     void
-    DumpProductVector() const;
+    DumpProductVector(const float val = -1.0f) const;
   private:
 
     // Helper methods

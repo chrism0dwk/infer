@@ -43,6 +43,7 @@
  *      Author: stsiab
  */
 
+
 #include <algorithm>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
@@ -877,7 +878,7 @@ namespace EpiRisk
               calls_[2]++;
             }
 
-          if (doCompareProductVector_)
+          if (false) //*doCompareProductVector_)
             {
               float proposal = likelihood_->Propose();
 
@@ -909,7 +910,7 @@ namespace EpiRisk
                   likelihood_->Reject();
                   //throw logic_error(s.str().c_str());
                 }
-              *doCompareProductVector_ = false;
+              //*doCompareProductVector_ = false;
             }
         }
       ucalls_++;

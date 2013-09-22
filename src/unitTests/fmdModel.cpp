@@ -77,9 +77,10 @@ FmdModel::beta(const Individual& i, const Individual& j, const double time) cons
 {
   double dist = distance(i,j);
   if ( dist <= 25.0 ) {
-    return params_.gamma1 * infectivity(i,time) * susceptibility(j) * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
+    float kernel = params_.epsilon1 + params_.gamma1 * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
+    return infectivity(i,time) * susceptibility(j) * kernel;
   }
-  else return 0.0;
+  else return params_.epsilon1;
 }
 
 double
@@ -91,7 +92,7 @@ FmdModel::betastar(const Individual& i, const Individual& j, const double time) 
 double
 FmdModel::background(const Individual& j, const double t) const
 {
-  return params_.epsilon1 * (t > params_.movtban ? params_.epsilon2 : 1.0);
+  return 1e-10; //params_.epsilon1 * (t > params_.movtban ? params_.epsilon2 : 1.0);
 }
 
 double

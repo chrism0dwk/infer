@@ -187,15 +187,18 @@ namespace EpiRisk
   {
     thrust::host_vector<float> current = likelihood_->GetProdVector();
     thrust::host_vector<float> proposal = proposal_->GetProdVector();
+    std::vector<std::string> ids; likelihood_->GetIds(ids);
     cerr << "Checking prod vector (" << current.size() << "):" << endl;
     cerr.precision(15);
     for(size_t i = 0; i<current.size(); ++i)
       {
         float curr = current[i];
         float prop = proposal[i];
-        if (fabs((curr - prop)/curr) > 1e-6)
+
+        if (fabs((curr - prop)/curr) > 1e-5)
           {
-            cerr << i << ":\t" << curr << "\t" << prop << "\t" << curr - prop << endl;
+	    cerr.precision(20);
+            cerr << i << ":\t" << ids[i] << "\t" << curr << "\t" << prop << "\t" << fabs((curr - prop)/curr) << endl;
           }
       }
   }
