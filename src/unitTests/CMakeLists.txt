@@ -12,3 +12,12 @@ target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood posteriorwriter)
 set(fmdSim_SOURCES fmdSim.cpp fmdModel.cpp)
 add_executable(fmdSim ${fmdSim_SOURCES})
 target_link_libraries(fmdSim data stlstrtok random gsl gslcblas boost_program_options)
+
+set(testCpuLik_SOURCES testCpuLik.cpp)
+add_executable(testCpuLik ${testCpuLik_SOURCES})
+set_target_properties(testCpuLik PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(testCpuLik data parameter cpulikelihood)
+
+set(testGpuLik_SOURCES testGpuLik.cpp)
+add_executable(testGpuLik ${testGpuLik_SOURCES})
+target_link_libraries(testGpuLik data parameter gpulikelihood)

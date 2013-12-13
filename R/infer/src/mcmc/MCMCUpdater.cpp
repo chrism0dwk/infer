@@ -43,7 +43,6 @@
  *      Author: stsiab
  */
 
-
 #include <algorithm>
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
@@ -787,14 +786,17 @@ namespace EpiRisk
       float oldValue = param_;
 
       // Calculate current posterior
-      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      float llCur = likelihood_->GetCurrentValue();
+      float infecPartCur = likelihood_->GetNCInfecTimes(ncProp_);
+      float priorCur = log(param_.prior());
+      float logPiCur = llCur + infecPartCur + priorCur;
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
           float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
-          if (accept < 0.15)
+          if (accept < 0.234)
             tuning_ *= exp(-deltan);
           else
             tuning_ *= exp(deltan);
@@ -806,18 +808,18 @@ namespace EpiRisk
       param_ *= exp(random_->gaussian(0, tuning_));
 
       // Perform the non-centering
-      float infecPartDiff = likelihood_->NonCentreInfecTimes(oldValue, param_,
-          ncProp_);
-
+      float infecPartCan = likelihood_->ProposeNCInfecTimes(oldValue, param_, ncProp_);
+      float llCan = likelihood_->Propose();
+      float priorCan = log(param_.prior());
       // Calculate candidate posterior
-      float logPiCan = likelihood_->Propose() + log(param_.prior());
-
+      float logPiCan = llCan + infecPartCan + priorCan;
+      
       // q-ratio
       float qratio = logf(param_ / oldValue);
 
       // Accept or reject
       if (log(random_->uniform())
-          < logPiCan - logPiCur + infecPartDiff + qratio)
+          < logPiCan - logPiCur + qratio)
         {
           acceptance_++;
           windowAcceptance_++;
@@ -931,6 +933,7 @@ namespace EpiRisk
       //float newIN = random_->gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
       float oldIN = likelihood_->GetIN(index);
       float newIN = oldIN * exp(random_->gaussian(0.0f, updateTuning_));
+      if(newIN == 0.0f)	return false;  // Reject if newIN is zero!
 
       float piCur = likelihood_->GetCurrentValue();
       float piCan = likelihood_->UpdateI(index, newIN);
@@ -990,6 +993,7 @@ namespace EpiRisk
       size_t index = random_->integer(numSusceptible);
 
       float inProp = random_->gamma(INFECPROP_A, INFECPROP_B);
+      if(inProp == 0.0f) return false; // Reject if I->N is zero.
 
       float logPiCur = likelihood_->GetCurrentValue();
 

@@ -607,7 +607,7 @@ namespace EpiRisk
             "Cannot open file to serialize epidemic output.  Check your file path.");
 
       // HEADER
-      file << "id,I,N,R,type\n";
+      file << "id,i,n,r,type\n";
 
       // CONTENT
       for (typename Model::PopulationType::InfectiveIterator it =

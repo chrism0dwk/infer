@@ -359,6 +359,8 @@ namespace EpiRisk
     csrMatrix->nnz = nnz;
     csrMatrix->m = n;
     csrMatrix->n = n;
+    
+    cout << "D sparsity = " << csrMatrix->nnz << endl;
 
     float* devDrow = NULL;
     int* devColNums = NULL;
@@ -2586,9 +2588,9 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   GpuLikelihood::PrintLikelihoodComponents() const
   {
     cudaDeviceSynchronize();
-    cerr << "Background: " << hostComponents_->bgIntegral << "\n";
-    cerr << "Integral: " << hostComponents_->integral << "\n";
-    cerr << "Product: " << hostComponents_->logProduct << "\n";
+    cout << "Background: " << hostComponents_->bgIntegral << "\n";
+    cout << "Integral: " << hostComponents_->integral << "\n";
+    cout << "Product: " << hostComponents_->logProduct << "\n";
   }
 
   void GpuLikelihood::PrintParameters() const

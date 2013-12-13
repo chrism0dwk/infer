@@ -19,6 +19,11 @@ endif()
 cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES})
 target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
 
+set(cpulikelihood_SOURCES CpuLikelihood.cpp)
+cuda_add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
+set_target_properties(cpulikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
+target_link_libraries(cpulikelihood data stlstrtok)
+
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})
 add_dependencies(mcmc random)

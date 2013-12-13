@@ -80,7 +80,7 @@ FmdModel::beta(const Individual& i, const Individual& j, const double time) cons
     float kernel = params_.epsilon1 + params_.gamma1 * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
     return infectivity(i,time) * susceptibility(j) * kernel;
   }
-  else return params_.epsilon1;
+  else return params_.epsilon1 * infectivity(i,time) * susceptibility(j);
 }
 
 double
