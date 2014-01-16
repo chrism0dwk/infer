@@ -571,6 +571,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     if (tid < popSize)
       {
         float I = eventTimes[tid];
+	// 
         buff[threadIdx.x] = epsilon1 * max((min(I, movtBan) - I1Time),0.0f);
         buff[threadIdx.x] += epsilon1 * epsilon2 * max(I - max(movtBan,I1Time), 0.0f);
       }
@@ -580,7 +581,21 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     if(threadIdx.x == 0) output[blockIdx.x] = buff[0];
   }
 
+  __device__ __host__
+  float
+  _homoIntensity(const float time, const GpuLikelihood::Parameters p)
+  {
+    return time < p.movtBan ? p.epsilon1 : p.epsilon2;
+  }
 
+  __device__ __host__
+  float
+  _homoExposure(const float Ii, const float Ni, const float Ij, const GpuLikelihood::Parameters p)
+  {
+    float preMB  = _H(fminf(fminf(p.movtBan, Ij),Ni) - fminf(fminf(p.movtBan, Ii), Ij), p);
+    float postMB = _H(fminf(Ij,Ni) - fminf(Ii, Ij), p) - preMB;
+    return p.epsilon1 * preMB + p.epsilon2 * postMB;
+  }
 
 
   __global__ void
@@ -631,12 +646,12 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	for (int j=lane; j<infecSize; j += 32)
 	  {
 	    float Ij = eventTimes[j];
-	    float epsilonij = _H(fminf(Ni, Ij) - fminf(Ii,Ij), p);
-	    epsilonij *= susceptibility[j];
+	    // Calculate in two parts -- 1. pre movt ban
+	    float epsilonij = _homoExposure(Ii, Ni, Ij, p) * susceptibility[j];
 	    if(i!=j) ei += epsilonij;
 	  }
 	
-        buff[threadIdx.x] = (betai*p.gamma1 + ei*p.epsilon1) * infectivity[i];
+        buff[threadIdx.x] = (betai*p.gamma1 + ei) * infectivity[i];
       }
 
     // Reduce all warp sums and write to global memory.
@@ -655,7 +670,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	       const CsrMatrix distance, const float* eventTimes,
 	       const int eventTimesPitch, const float* susceptibility,
 	       const float* infectivity, const GpuLikelihood::Parameters p, 
-	       const float movtBan, float* prodCache)
+	       float* prodCache)
   {
     // Each warp calculates a row of the sparse matrix
 
@@ -695,7 +710,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
                 threadProdCache[threadIdx.x] += p.gamma1 * idxOnj * infectivity[i] * _K(distance.val[ii],p);
               }
           }
-	
+	__syncthreads();
 	// Epsilon part
 	for (int ii = lane; ii < infecSize; ii += 32)
 	  {
@@ -703,7 +718,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	    float Ii = eventTimes[i];
 	    float Ni = eventTimes[eventTimesPitch + i];
 	    if (Ii < Ij and Ij <= Ni)
-	      threadProdCache[threadIdx.x] += _h(Ij - Ii, p) * infectivity[i] * p.epsilon1;
+	      threadProdCache[threadIdx.x] +=  _h(Ij - Ii, p) * infectivity[i] * 
+		_homoIntensity(Ij, p);
 	  }
         __syncthreads();
 
@@ -823,19 +839,19 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
       // j --> Idx
       if (Ij < Nj)
 	{
-	  jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), p);
-	  jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii),p);
+	  jOnIdx = _homoExposure(Ij, Nj, newTime, p);
+	  jOnIdx -= _homoExposure(Ij, Nj, Ii, p);
 	  jOnIdx *= susceptibility[i];
 	  jOnIdx *= infectivity[j];
 	}
 
       // Idx --> j
-      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij),p);
-      IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), p);
+      float IdxOnj = _homoExposure(newTime, Ni, Ij, p);
+      IdxOnj -= _homoExposure(Ii, Ni, Ij, p);
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
-      if(i!=j) pressureChange += (jOnIdx + IdxOnj) * p.epsilon1;
+      if(i!=j) pressureChange += jOnIdx + IdxOnj;
     }
 
     buff[threadIdx.x] = pressureChange;
@@ -919,6 +935,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
           }
       }
   
+    // Non-spatial bit
     if(tid < infecSize)
       {
 	int j = infecIdx[tid].ptr;
@@ -929,15 +946,16 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	float idxOnj = 0.0f;
 	if(Ii < Ij and Ij <= Ni) idxOnj -= _h(Ij - Ii,p);
 	if(newTime < Ij and Ij <= Ni) idxOnj += _h(Ij - newTime, p);
+	idxOnj *= _homoIntensity(Ij, p);
 
-	if(i != j) _atomicAdd(prodCache+j, p.epsilon1*idxOnj*infectivity[i]*susceptibility[j]);
+	if(i != j) _atomicAdd(prodCache+j, idxOnj*infectivity[i]*susceptibility[j]);
 
 	// j --> Idx
 	float jOnIdx = 0.0f;
 	if(Ij < newTime and newTime <= Nj)
-	  jOnIdx = _h(newTime - Ij, p);
+	  jOnIdx = _h(newTime - Ij, p) * _homoIntensity(newTime, p);
 
-	if(i != j) buff[threadIdx.x] += p.epsilon1*jOnIdx*infectivity[j]*susceptibility[i];
+	if(i != j) buff[threadIdx.x] += jOnIdx*infectivity[j]*susceptibility[i];
       }
 	
     _shmemReduce(buff);
@@ -1021,17 +1039,17 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
       // j --> Idx
       if (Ij < Nj)
       {
-	jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), p);
+	jOnIdx = _homoExposure(Ij, Nj, newTime, p);
 	jOnIdx *= susceptibility[i];
 	jOnIdx *= infectivity[j];
       }
       
       // Idx --> j
-      float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij),p);
+      float IdxOnj = _homoExposure(newTime, Ni, Ij, p);
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
       
-      if(i!=j) buff[threadIdx.x] += (jOnIdx + IdxOnj) * p.epsilon1;
+      if(i!=j) buff[threadIdx.x] += jOnIdx + IdxOnj;
     }
  
     // Reduce buffer into output
@@ -1117,18 +1135,17 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
       // j --> Idx
       if (Ij < Nj)
 	{
-	  jOnIdx = -_H(fminf(Nj, Ii) - fminf(Ij, Ii), p);
-	  //jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni), p);
+	  jOnIdx = -_homoExposure(Ij, Nj, Ii, p);
 	  jOnIdx *= susceptibility[i];
 	  jOnIdx *= infectivity[j];
 	}
 
       // Idx --> j
-      float IdxOnj = -_H(fminf(Ni, Ij) - fminf(Ii, Ij),p);
+      float IdxOnj = -_homoExposure(Ii, Ni, Ij, p);
       IdxOnj *= susceptibility[j];
       IdxOnj *= infectivity[i];
 
-      if(i!=j) buff[threadIdx.x] += (jOnIdx + IdxOnj) * p.epsilon1;
+      if(i!=j) buff[threadIdx.x] += jOnIdx + IdxOnj;
     }
 
     // Reduce buffer into output
@@ -1202,6 +1219,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
       }
     __syncthreads();
+
+    // Homogeneous part
     if(tid < infecSize)
       {
 	int j = infecIdx[tid].ptr;
@@ -1210,15 +1229,15 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
 	// Idx --> j
 	float idxOnj = 0.0f;
-	if(newTime < Ij and Ij <= Ni) idxOnj += _h(Ij - newTime, p);
-	if(i != j) _atomicAdd(prodCache+j, p.epsilon1*idxOnj*infectivity[i]*susceptibility[j]);
+	if(newTime < Ij and Ij <= Ni) idxOnj += _h(Ij - newTime, p) * _homoIntensity(Ij,p);
+	if(i != j) _atomicAdd(prodCache+j, idxOnj*infectivity[i]*susceptibility[j]);
 
 	// j --> Idx
 	float jOnIdx = 0.0f;
 	if(Ij < newTime and newTime <= Nj)
-	  jOnIdx = _h(newTime - Ij, p);
+	  jOnIdx = _h(newTime - Ij, p) * _homoIntensity(newTime, p);
 
-	if(i != j) buff[threadIdx.x] += p.epsilon1*jOnIdx*infectivity[j]*susceptibility[i];
+	if(i != j) buff[threadIdx.x] += jOnIdx*infectivity[j]*susceptibility[i];
       }
 
     _shmemReduce(buff);
@@ -1278,8 +1297,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
 	// Idx --> j
 	float idxOnj = 0.0f;
-	if(newTime < Ij and Ij <= Ni) idxOnj -= _h(Ij - newTime, p);
-	if(i != j) _atomicAdd(prodCache+j, p.epsilon1*idxOnj*infectivity[i]*susceptibility[j]);
+	if(Ii < Ij and Ij <= Ni) idxOnj -= _h(Ij - Ii, p) * _homoIntensity(Ij,p);
+	if(i != j) _atomicAdd(prodCache+j, idxOnj*infectivity[i]*susceptibility[j]);
       }
   }
 
@@ -1288,6 +1307,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 	    const int infecSize,
 	    const float* eventTimes,
 	    const int eventTimesPitch,
+	    const float obsTime,
 	    const float* infectivity,
 	    const GpuLikelihood::Parameters p,
 	    float* output)
@@ -1301,7 +1321,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
       int i = infecIdx[tid].ptr;
       float Ii = eventTimes[i];
       float Ni = eventTimes[i+eventTimesPitch];
-      buff[threadIdx.x] = _H(Ni - Ii, p) * infectivity[i];
+      buff[threadIdx.x] = _homoExposure(Ii, Ni, obsTime, p) * infectivity[i];
     }
 
     _shmemReduce(buff);
@@ -1733,9 +1753,6 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
     addReduce_ = other.addReduce_;
 
     cudaDeviceSynchronize();
-    
-
-
   }
 
 // Assignment constructor
@@ -2038,6 +2055,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     paramVals_.nu = *nu_;
     paramVals_.a = *a_;
     paramVals_.b = *b_;
+    paramVals_.movtBan = movtBan_;
 
     float* tmp = new float[numSpecies_];
 
@@ -2177,11 +2195,11 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
 							devSusceptibility_,
 							devInfectivity_,
 							paramVals_, 
-							movtBan_, 
 							thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
-
+    cudaDeviceSynchronize();
     ReduceProductVector();
+    DumpProductVector(0.0f);
   }
 
   inline
@@ -2225,6 +2243,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
 					    devInfecIdx_->size(),
 					    devEventTimes_,
 					    eventTimesPitch_,
+					    obsTime_,
 					    devInfectivity_,
 					    paramVals_,
 					    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2240,7 +2259,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     else checkCudaError(cudaMemcpyAsync(&devComponents_->sumHfunc, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToHost));
     
     cudaDeviceSynchronize();
-    hostComponents_->bgIntegral = hostComponents_->sumSuscSusc * hostComponents_->sumHfunc * paramVals_.epsilon1;
+    hostComponents_->bgIntegral = hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
 
     checkCudaError(cudaFree(devSuscOccults));
   }
@@ -2253,7 +2272,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     timeval start, end;
     gettimeofday(&start, NULL);
 #endif
-    cout << "Num infecs: " << GetNumInfecs() << endl;
+    //    cout << "Num infecs: " << GetNumInfecs() << endl;
     RefreshParameters();
     CalcInfectivityPow();
     CalcInfectivity();
@@ -2437,8 +2456,9 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
 
     // Change pressure on susceptibles
     thrust::device_ptr<float> infectivity(devInfectivity_);
-    hostComponents_->sumHfunc += infectivity[i] * (_H(inTime, paramVals_) - _H(hostPopulation_[i].N - oldTime, paramVals_));
-    hostComponents_->bgIntegral =  paramVals_.epsilon1 * hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
+    hostComponents_->sumHfunc += infectivity[i] * (_homoExposure(newTime, hostPopulation_[i].N, obsTime_ , paramVals_) 
+						   - _homoExposure(oldTime, hostPopulation_[i].N, obsTime_, paramVals_));
+    hostComponents_->bgIntegral =  hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
     
     cudaDeviceSynchronize();
 
@@ -2590,8 +2610,8 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     thrust::device_ptr<float> infectivity(devInfectivity_);
     thrust::device_ptr<float> susceptibility(devSusceptibility_);
     hostComponents_->sumSuscSusc -= susceptibility[i];
-    hostComponents_->sumHfunc += infectivity[i] * _H(inTime, paramVals_);
-    hostComponents_->bgIntegral = paramVals_.epsilon1 * hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
+    hostComponents_->sumHfunc += infectivity[i] * _homoExposure(newTime, Ni, obsTime_, paramVals_);
+    hostComponents_->bgIntegral = hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
 
     logLikelihood_ = hostComponents_->logProduct
         - (hostComponents_->integral + hostComponents_->bgIntegral);
@@ -2712,8 +2732,8 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     thrust::device_ptr<float> infectivity(devInfectivity_);
     thrust::device_ptr<float> susceptibility(devSusceptibility_);
     hostComponents_->sumSuscSusc += susceptibility[i];
-    hostComponents_->sumHfunc -= infectivity[i] * _H(notification - oldI, paramVals_);
-    hostComponents_->bgIntegral = paramVals_.epsilon1 * hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
+    hostComponents_->sumHfunc -= infectivity[i] * _homoExposure(oldI, notification, obsTime_, paramVals_);
+    hostComponents_->bgIntegral = hostComponents_->sumSuscSusc * hostComponents_->sumHfunc;
 
     logLikelihood_ = hostComponents_->logProduct
         - (hostComponents_->integral + hostComponents_->bgIntegral);

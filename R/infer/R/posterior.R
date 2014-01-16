@@ -217,6 +217,19 @@ setMethod("summary","HD5InfecProxy",
 			"To be implemented -- tell me what you want to know about!"
 		})
 
+# Plot methods
+setGeneric("plot")
+setMethod("plot","HD5ParamProxy",
+          function(x) {
+            np <- dim(x)[2]
+            gridDim <- crn(np)
+            par(mfrow=gridDim)
+            for(i in names(x))
+              {
+                plot(x[,i],type='l',main=i)
+              }
+          })
+
 
 } # .initPosterior
 

@@ -176,6 +176,7 @@ namespace EpiRisk
       float nu;
       float a;
       float b;
+      float movtBan;
     };
 
     explicit

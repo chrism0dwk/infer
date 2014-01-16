@@ -223,7 +223,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   EpiRisk::UpdateBlock txDelta;
   txDelta.add(epsilon1);
-  if(doMovtBan[0]) txDelta.add(epsilon2);
+  txDelta.add(epsilon2);
+  //if(doMovtBan[0]) txDelta.add(epsilon2);
   txDelta.add(gamma1);
   if(doNDiff[0]) txDelta.add(gamma2);
   txDelta.add(delta);
@@ -232,6 +233,18 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
   						      "txBase");
   updateDistance->SetParameters(txDelta);
+
+  // EpiRisk::Mcmc::SingleSiteLogMRW* updateDistance = 
+  //   (EpiRisk::Mcmc::SingleSiteLogMRW*) mcmc.Create("SingleSiteLogMRW","txBase");
+  // updateDistance->SetParameters(txDelta);
+  // updateDistance->SetTuning(0.005);
+
+  // EpiRisk::UpdateBlock ep1;
+  // ep1.add(epsilon1);
+  // EpiRisk::Mcmc::SingleSiteLogMRW* updateEp1 = 
+  //   (EpiRisk::Mcmc::SingleSiteLogMRW*) mcmc.Create("SingleSiteLogMRW", "epsilon1");
+  // updateEp1->SetParameters(ep1);
+  // updateEp1->SetTuning(2.0);
 
   EpiRisk::UpdateBlock txPsi;
   EpiRisk::UpdateBlock txPhi;
@@ -271,7 +284,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       
       txInfec.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
-	txInfec.add(xi[i]);
+    	txInfec.add(xi[i]);
       EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
         (EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
       //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
@@ -280,7 +293,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       
       txSuscep.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
-	txSuscep.add(zeta[i]);
+    	txSuscep.add(zeta[i]);
       EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
         (EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
       //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
@@ -359,13 +372,13 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       mcmc.Update();
       output.write();
       cout.precision(15);
-      cout << "-----FAST-----" << endl;
-      likelihood.PrintLikelihoodComponents();
-      likelihood.FullCalculate();
-      cout << "-----CORRECTED-----" << endl;
-      likelihood.PrintLikelihoodComponents();
-      cout << "-------------------" << endl;
-      likelihood.DumpProductVector(1.0f);
+      // cout << "-----FAST-----" << endl;
+      // likelihood.PrintLikelihoodComponents();
+      // likelihood.FullCalculate();
+      // cout << "-----CORRECTED-----" << endl;
+      // likelihood.PrintLikelihoodComponents();
+      // cout << "-------------------" << endl;
+      // likelihood.DumpProductVector(1.0f);
       if(k % 500 == 0)
   	{
 	  Rcpp::Rcout << "Iteration " << k << std::endl;

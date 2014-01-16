@@ -67,26 +67,30 @@ FmdModel::distance(const Individual& i, const Individual& j) const
 {
   double dx = i.getCovariates().x - j.getCovariates().x;
   double dy = i.getCovariates().y - j.getCovariates().y;
-  double distance = sqrt( dx*dx + dy*dy );
+  double dsq = dx*dx + dy*dy;
+  double pressure = 0.0f;
+  if ( dsq <= 25.0*25.0 )
+    pressure = params_.gamma1 * params_.delta / powf(params_.delta*params_.delta + dsq, params_.omega);
 
-  return distance;
+  return pressure;
 }
 
 double
 FmdModel::beta(const Individual& i, const Individual& j, const double time) const
 {
-  double dist = distance(i,j);
-  if ( dist <= 25.0 ) {
-    float kernel = params_.epsilon1 + params_.gamma1 * params_.delta / powf(params_.delta*params_.delta + dist*dist, params_.omega);
-    return infectivity(i,time) * susceptibility(j) * kernel;
-  }
-  else return params_.epsilon1 * infectivity(i,time) * susceptibility(j);
+  double val = 0.0;
+  val += time < params_.movtban ? params_.epsilon1 : params_.epsilon2;
+
+  val += distance(i,j);
+  
+  return val * infectivity(i,time) * susceptibility(j);
 }
 
 double
 FmdModel::betastar(const Individual& i, const Individual& j, const double time) const
 {
-  return params_.gamma2 * beta(i,j,time);
+  double val = params_.gamma2 * distance(i,j);
+  return val;
 }
 
 double

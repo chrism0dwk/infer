@@ -20,5 +20,6 @@ exportMethods(show,
               "$",
               as.data.frame,
               summary,
+              plot,
               berp.fit,
               berp.sim)

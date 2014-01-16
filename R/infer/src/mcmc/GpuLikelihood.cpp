@@ -290,12 +290,13 @@ namespace EpiRisk
   GpuLikelihood::SetMovtBan(const float movtBanTime)
   {
 	  movtBan_ = movtBanTime;
+	  paramVals_.movtBan = movtBanTime;
   }
 
   float
   GpuLikelihood::GetMovtBan() const
   {
-	  return movtBan_;
+	  return paramVals_.movtBan;
   }
 
   size_t
