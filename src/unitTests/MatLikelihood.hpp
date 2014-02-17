@@ -37,7 +37,6 @@
 #include "Parameter.hpp"
 #include "SpatPointPop.hpp"
 #include "Data.hpp"
-#include "GpuLikelihood.hpp"
 
 using namespace boost::numeric;
 using namespace boost::numeric::ublas;
@@ -92,8 +91,6 @@ private:
   // Constants
   const float zero_;
   const float unity_;
-
-  GpuLikelihood* gpu_;
 
 };
 

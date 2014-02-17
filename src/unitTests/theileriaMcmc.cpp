@@ -361,7 +361,7 @@ main(int argc, char* argv[])
   int gpuId = atoi(argv[9]);
   cout << "GPU: " << gpuId << endl;
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *contactDataImporter,
-			   (size_t) 1, obsTime, 90.0f, false, gpuId);
+			   (size_t) 1, obsTime, 50.0f, false, gpuId);
 
   delete contactDataImporter;
   delete popDataImporter;
@@ -369,19 +369,23 @@ main(int argc, char* argv[])
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(1e-12, GammaPrior(5e-5, 1), "epsilon1");
-  Parameter gamma1(0.01, GammaPrior(1, 1), "gamma1");
-  Parameter delta(10, GammaPrior(1, 1), "delta");
+  Parameter epsilon1(2.7e-8, GammaPrior(2.7e-8, 1), "epsilon1");
+  Parameter gamma1(1.0, GammaPrior(1, 1), "gamma1");
+  Parameter delta(1.0, GammaPrior(1, 1), "delta");
   Parameter omega(1.2, GammaPrior(1,1), "omega");
-  Parameter p(0.01, GammaPrior(1,1), "p");
+  Parameter beta1(0.1, GammaPrior(1,1), "beta1");
+  Parameter beta2(0.1, GammaPrior(1,1), "beta2");
   Parameter nu(0.05, GammaPrior(1, 1), "nu");
-  Parameter alpha(0, GammaPrior(1, 1), "alpha");
+  Parameter alpha(100, GammaPrior(1, 1), "mu");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(25, 500), "b");
-
+  Parameters phi(3);
+  phi[0] = Parameter(1, GammaPrior(1,1), "phi0");
+  phi[1] = Parameter(0.5, BetaPrior(20,20), "phi1");
+  phi[2] = Parameter(0.2, BetaPrior(1,30), "phi2");
 
   likelihood.SetMovtBan(0.0f);
-  likelihood.SetParameters(epsilon1, gamma1, delta, omega, p,
+  likelihood.SetParameters(epsilon1, gamma1, phi, delta, omega, beta1, beta2,
       nu, alpha, a, b);
 
 
@@ -392,10 +396,13 @@ main(int argc, char* argv[])
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
   UpdateBlock txDelta;
-  //txDelta.add(epsilon1);
-  txDelta.add(gamma1);
-  txDelta.add(p);
+  txDelta.add(epsilon1);
+  //txDelta.add(gamma1);
+  txDelta.add(beta1);
+  txDelta.add(beta2);
   txDelta.add(delta);
+  txDelta.add(phi[1]);
+  txDelta.add(phi[2]);
   //txDelta.add(nu);
   //txDelta.add(alpha);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
@@ -417,17 +424,17 @@ main(int argc, char* argv[])
   updateInfecTime->SetReps(800);
   updateInfecTime->SetOccults(true);
 
-   UpdateBlock bUpdate; bUpdate.add(b);
-  // Mcmc::InfectionTimeGammaCentred* updateBC =
-  //    (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  // updateBC->SetParameters(bUpdate);
-  // updateBC->SetTuning(0.014);
+   // UpdateBlock bUpdate; bUpdate.add(b);
+   // Mcmc::InfectionTimeGammaCentred* updateBC =
+   //    (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+   // updateBC->SetParameters(bUpdate);
+   // updateBC->SetTuning(0.014);
 
-  // Mcmc::InfectionTimeGammaNC* updateBNC =
-  //    (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  // updateBNC->SetParameters(bUpdate);
-  // updateBNC->SetTuning(0.0007);
-  // updateBNC->SetNCRatio(ncratio);
+   // Mcmc::InfectionTimeGammaNC* updateBNC =
+   //    (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+   // updateBNC->SetParameters(bUpdate);
+   // updateBNC->SetTuning(0.0007);
+   // updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -436,9 +443,12 @@ main(int argc, char* argv[])
     PosteriorHDF5Writer output(outputFile, likelihood);
     output.AddParameter(epsilon1);
     output.AddParameter(gamma1);
+    output.AddParameter(phi[1]);
+    output.AddParameter(phi[2]);
     output.AddParameter(delta);
     output.AddParameter(omega);
-    output.AddParameter(p);
+    output.AddParameter(beta1);
+    output.AddParameter(beta2);
     output.AddParameter(nu);
     output.AddParameter(alpha);
     output.AddParameter(b);
@@ -464,6 +474,7 @@ main(int argc, char* argv[])
           }
         mcmc.Update();
         output.write();
+	likelihood.PrintLikelihoodComponents();
       }
 
     // Wrap up

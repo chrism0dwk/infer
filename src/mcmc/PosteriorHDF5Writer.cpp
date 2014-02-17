@@ -117,7 +117,8 @@ void PosteriorHDF5Writer::write() {
 	// Write infecs
 	hvl_t buff;
 	std::vector<IPTuple_t> vBuff;
-	likelihood_.GetInfectiousPeriods(vBuff);
+	//likelihood_.GetInfectiousPeriods(vBuff);
+	likelihood_.GetInfectionTimes(vBuff);
 	buff.len = vBuff.size();
 	buff.p = vBuff.data();
 	infecTable_->AppendPacket(&buff);

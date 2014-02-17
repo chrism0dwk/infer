@@ -227,11 +227,6 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
   for(size_t i=0; i<D_.index1_data().size(); ++i) DRowPtr_[i] = D_.index1_data()[i];
   DColInd_.resize(D_.index2_data().size());
   for(size_t i=0; i<D_.index2_data().size(); ++i) DColInd_[i] = D_.index2_data()[i];
-  
-  
-  // Set up GPU environment
-  cerr << "Initialising GPU" << endl;
-  gpu_ = new GpuLikelihood(population_.size(),subPopSz_,infectivesSz_,infectivesSz_, 3, obsTime_, D_.nnz());
 
 
   // Parameters(needs glue code!)
@@ -263,7 +258,6 @@ MatLikelihood::MatLikelihood(const EpiRisk::Population<TestCovars>& population,
 
 MatLikelihood::~MatLikelihood()
 {
-  delete gpu_;
   delete infecTimes_;
 }
 
@@ -271,20 +265,20 @@ double
 MatLikelihood::calculate()
 {
 
-//  for (size_t j=0; j<subPopSz_; ++j)
-//    {
-//      // Copy covariates
-//      animalsSuscPow_(j,0) = powf(animals_(j,0),txparams_(13));
-//      animalsSuscPow_(j,1) = powf(animals_(j,1),txparams_(14));
-//      animalsSuscPow_(j,2) = powf(animals_(j,2),txparams_(15));
-//
-//      if(j < infectivesSz_)
-//        {
-//          animalsInfPow_(j,0) = powf(animals_(j,0),txparams_(10));
-//          animalsInfPow_(j,1) = powf(animals_(j,1),txparams_(11));
-//          animalsInfPow_(j,2) = powf(animals_(j,2),txparams_(12));
-//        }
-//    }
+ for (size_t j=0; j<subPopSz_; ++j)
+   {
+     // Copy covariates
+     animalsSuscPow_(j,0) = powf(animals_(j,0),txparams_(13));
+     animalsSuscPow_(j,1) = powf(animals_(j,1),txparams_(14));
+     animalsSuscPow_(j,2) = powf(animals_(j,2),txparams_(15));
+
+     if(j < infectivesSz_)
+       {
+         animalsInfPow_(j,0) = powf(animals_(j,0),txparams_(10));
+         animalsInfPow_(j,1) = powf(animals_(j,1),txparams_(11));
+         animalsInfPow_(j,2) = powf(animals_(j,2),txparams_(12));
+       }
+   }
 
   // Calculate product mask and exposure times
   for(size_t i = 0; i < infectivesSz_; ++i) {
@@ -413,62 +407,5 @@ MatLikelihood::calculate()
   return lp - integral;
 }
 
-double
-MatLikelihood::gpuCalculate()
-{
-
-  gpu_->FullCalculate();
-  unsigned int moveIdx;
-
-  gsl_rng * r = gsl_rng_alloc (gsl_rng_taus);
-
-//  for(size_t i=0; i<2000; ++i)
-//  {
-//      int toMove = gsl_rng_uniform_int(r, infectivesSz_);
-//      float inTime = gsl_ran_gamma(r, 10, 1);
-//      gpu_->UpdateInfectionTime(toMove,inTime);
-//
-//  }
-
-  size_t moveType;
-  float inTime;
-  bool stop = false;
-  do
-    {
-      cout << "Choose move (1=move, 2=add, 3=delete, 4=stop): ";
-      cin >> moveType;
-
-      switch (moveType)
-      {
-      case 1:
-        cout << "Choose index: ";
-        cin >> moveIdx;
-        cout << "I->N time: ";
-        cin >> inTime;
-        gpu_->UpdateInfectionTime(moveIdx, inTime);
-        break;
-
-      case 2:
-        cout << "Choose index: ";
-        cin >> moveIdx;
-        cout << "I->N time: ";
-        cin >> inTime;
-        gpu_->AddInfectionTime(moveIdx, inTime);
-        break;
-
-      case 3:
-        cout << "Choose index: ";
-        cin >> moveIdx;
-        gpu_->DeleteInfectionTime(moveIdx);
-        break;
-      case 4:
-        stop = true;
-        break;
-      }
-    } while(!stop);
-  gpu_->Calculate();
-
-  return gpu_->LogLikelihood();
-}
 
 

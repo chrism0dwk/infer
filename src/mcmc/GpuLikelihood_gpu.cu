@@ -153,7 +153,7 @@ namespace EpiRisk
     // Returns a logistic 'h' function
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
     if(t >= 0) {
-      float rv = exp(nu*t) / ( alpha + exp(nu*t));
+      float rv = expf(nu*t) / ( alpha + expf(nu*t));
       return rv;
     }
     else
@@ -168,19 +168,22 @@ namespace EpiRisk
     // Returns the integral of the 'h' function over [0,t]
 
     //float integral = 1.0f / nu * logf( (1.0f + expf(nu*(t - alpha))) / (1.0f + expf(-nu*alpha)));
-
-    float integral = 1.0f / nu * logf( (alpha + expf(nu*t)) / (1.0f + alpha));
+    float e = expf(nu*t);
+    if (isinf(e)) return t;
+    else {
+    float integral = 1.0f / nu * logf( (alpha + e) / (1.0f + alpha));
     //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
 
     //float integral = t - alpha;
     return fmaxf(0.0f, integral);
+    }
   }
 
   struct DistanceKernel {
     __device__ __host__ float
     operator()(const float dsq, const float delta, const float omega)
     {
-      return 0.0001f;//delta / powf(delta*delta + dsq, omega);
+      return delta / powf(delta*delta + dsq, omega);
     }
   };
     
@@ -579,6 +582,14 @@ namespace EpiRisk
         data[tid + pitch] = N;
         data[tid] = I;
       }
+  }
+
+  __global__ void
+  _calcSusceptibility(const int* tickLevel, const int popSize, const float* phi, float* susceptibility)
+  {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    if (tid < popSize)
+      susceptibility[tid] = phi[tickLevel[tid]];
   }
 
   template <class OP, bool zeroFirst>
@@ -1300,10 +1311,20 @@ namespace EpiRisk
   }
 
   GpuLikelihood::GpuLikelihood(PopDataImporter& population,
-			       EpiDataImporter& epidemic, ContactDataImporter& contact, const size_t nSpecies, const float obsTime,
-			       const float dLimit, const bool occultsOnlyDC, const int gpuId) :
-    popSize_(0), numSpecies_(nSpecies), obsTime_(obsTime), I1Time_(0.0), I1Idx_(
-										0), covariateCopies_(0), occultsOnlyDC_(occultsOnlyDC), movtBan_(obsTime)
+			       EpiDataImporter& epidemic, 
+			       ContactDataImporter& contact, 
+			       const size_t nSpecies, 
+			       const float obsTime,
+			       const float dLimit, 
+			       const bool occultsOnlyDC, 
+			       const int gpuId) : popSize_(0), 
+						  numSpecies_(nSpecies), 
+						  obsTime_(obsTime), 
+						  I1Time_(0.0), 
+						  I1Idx_(0), 
+						  covariateCopies_(0), 
+						  occultsOnlyDC_(occultsOnlyDC), 
+						  movtBan_(obsTime)
   {
 
     // Get GPU details
@@ -1330,8 +1351,12 @@ namespace EpiRisk
     LoadPopulation(population);
     LoadEpidemic(epidemic);
     SortPopulation();
+    cerr << "Calculating distance matrix..." << flush;
     CalcDistanceMatrix(dLimit);
+    cerr << "Done" << endl;
+    cerr << "Loading contact matrix..." << flush;
     LoadContact(contact);
+    cerr << "Done" << endl;
 
     // Set up on GPU
     SetSpecies();
@@ -1364,6 +1389,9 @@ namespace EpiRisk
 
     checkCudaError(
 		   cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
+
+    // Phi parameter array
+    checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*TICKLEVELS));
 
     // BLAS handles
     blasStat_ = cublasCreate(&cudaBLAS_);
@@ -1431,20 +1459,34 @@ namespace EpiRisk
 
   // Copy constructor
   GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
-    popSize_(other.popSize_), numKnownInfecs_(other.numKnownInfecs_), 
-    maxInfecs_(other.maxInfecs_), numSpecies_(other.numSpecies_), 
-    hostPopulation_(other.hostPopulation_), obsTime_(other.obsTime_),
-    I1Time_(other.I1Time_), I1Idx_(other.I1Idx_), 
+    popSize_(other.popSize_), 
+    numKnownInfecs_(other.numKnownInfecs_), 
+    maxInfecs_(other.maxInfecs_), 
+    numSpecies_(other.numSpecies_), 
+    hostPopulation_(other.hostPopulation_), 
+    obsTime_(other.obsTime_),
+    I1Time_(other.I1Time_), 
+    I1Idx_(other.I1Idx_), 
     covariateCopies_(other.covariateCopies_), 
-    devAnimals_(other.devAnimals_), animalsPitch_(other.animalsPitch_), 
-    devD_(other.devD_), devC_(other.devC_),
-    hostDRowPtr_(other.hostDRowPtr_), hostCRowPtr_(other.hostCRowPtr_),dnnz_(other.dnnz_),
+    devAnimals_(other.devAnimals_), 
+    animalsPitch_(other.animalsPitch_), 
+    devD_(other.devD_), 
+    devC_(other.devC_),
+    hostDRowPtr_(other.hostDRowPtr_), 
+    hostCRowPtr_(other.hostCRowPtr_),
+    dnnz_(other.dnnz_),
     integralBuffSize_(other.integralBuffSize_), 
     epsilon1_(other.epsilon1_),
-    gamma1_(other.gamma1_),
-    delta_(other.delta_), omega_(other.omega_), p_(other.p_), nu_(other.nu_), 
+    gamma1_(other.gamma1_), 
+    delta_(other.delta_), 
+    omega_(other.omega_), 
+    beta1_(other.beta1_), 
+    beta2_(other.beta2_), 
+    nu_(other.nu_), 
     alpha_(other.alpha_), 
-    a_(other.a_), b_(other.b_), cuRand_(other.cuRand_)
+    a_(other.a_), 
+    b_(other.b_), 
+    cuRand_(other.cuRand_)
   {
     timeval start, end;
     gettimeofday(&start, NULL);
@@ -1476,6 +1518,8 @@ namespace EpiRisk
     checkCudaError(
 		   cudaMemcpy(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
+    checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*TICKLEVELS));
+
     // Infection index
     devInfecIdx_ = new thrust::device_vector<InfecIdx_t>(*other.devInfecIdx_);
     hostInfecIdx_ = new thrust::host_vector<InfecIdx_t>(*other.hostInfecIdx_);
@@ -1496,7 +1540,9 @@ namespace EpiRisk
     checkCudaError(
 		   cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
 
-
+    // Phi parameters
+    phi_ = other.phi_;
+    RefreshParameters();
     // BLAS handles
     blasStat_ = other.blasStat_;
     cudaBLAS_ = other.cudaBLAS_;
@@ -1554,13 +1600,17 @@ namespace EpiRisk
     // Host Parameters Copy
     epsilon1_ = other.epsilon1_;
     gamma1_ = other.gamma1_;
+    phi_ = other.phi_;
     delta_ = other.delta_;
     omega_ = other.omega_;
-    p_ = other.p_;
+    beta1_ = other.beta1_;
+    beta2_ = other.beta2_;
     nu_ = other.nu_;
     alpha_ = other.alpha_;
     a_ = other.a_;
     b_ = other.b_;
+
+    RefreshParameters();
 
     // Likelihood components
     // copy product vector
@@ -1619,6 +1669,8 @@ namespace EpiRisk
       cudaFree(devSusceptibility_);
     if (devInfectivity_)
       cudaFree(devInfectivity_);
+    if(devPhi_)
+      cudaFree(devPhi_);
 
     if (hostComponents_)
       cudaFreeHost(hostComponents_);
@@ -1733,17 +1785,17 @@ namespace EpiRisk
   {
 
     // Set up Species and events
-    float* speciesMatrix = new float[popSize_ * numSpecies_];
+    int* speciesMatrix = new int[popSize_ * numSpecies_];
     Population::const_iterator it = hostPopulation_.begin();
     for (size_t i = 0; i < hostPopulation_.size(); ++i)
       {
-	speciesMatrix[i] = it->ticks;
+	speciesMatrix[i] = (int)it->ticks;
         ++it;
       }
 
     // Allocate Animals_
     checkCudaError(
-		   cudaMallocPitch(&devAnimals_, &animalsPitch_, popSize_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimals_, &animalsPitch_, popSize_ * sizeof(int), numSpecies_));
     animalsPitch_ /= sizeof(float);
     checkCudaError(
 		   cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_, popSize_ * sizeof(float), numSpecies_));
@@ -1756,8 +1808,8 @@ namespace EpiRisk
     checkCudaError(cudaMalloc(&devSusceptibility_, popSize_ * sizeof(float)));
     checkCudaError(cudaMalloc(&devInfectivity_, maxInfecs_ * sizeof(float)));
 
-    cudaError_t rv = cudaMemcpy2D(devAnimals_, animalsPitch_ * sizeof(float),
-				  speciesMatrix, popSize_ * sizeof(float), popSize_ * sizeof(float),
+    cudaError_t rv = cudaMemcpy2D(devAnimals_, animalsPitch_ * sizeof(int),
+				  speciesMatrix, popSize_ * sizeof(int), popSize_ * sizeof(int),
 				  numSpecies_, cudaMemcpyHostToDevice);
     if (rv != cudaSuccess)
       throw GpuRuntimeError("Failed copying species data to device", rv);
@@ -1802,6 +1854,15 @@ namespace EpiRisk
     I1Time_ = v[I1Idx_];
     cudaDeviceSynchronize();
   }
+
+  inline
+  void
+  GpuLikelihood::CalcSusceptibility()
+  {
+    int numBlocks = (popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
+    _calcSusceptibility<<<numBlocks, THREADSPERBLOCK>>>(devAnimals_,popSize_,devPhi_,devSusceptibility_);
+  }
+
   inline
   void
   GpuLikelihood::CalcBgIntegral()
@@ -1834,16 +1895,16 @@ namespace EpiRisk
     _calcProduct<DistanceKernel,true><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
-									     devAnimals_,
-									     *epsilon1_, 1.0f,*delta_,*omega_,
-									     *gamma1_,*nu_, *alpha_, 
+									     devSusceptibility_,
+									     *epsilon1_, *gamma1_,*delta_,*omega_,
+									     *beta1_,*nu_, *alpha_, 
 									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _calcProduct<Identity,false><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
-    									devAnimals_,
-    									*epsilon1_,1.0f,*delta_,*omega_,
-    									*p_,*nu_,*alpha_, 
+    									devSusceptibility_,
+    									*epsilon1_,*gamma1_,*delta_,*omega_,
+    									*beta2_,*nu_,*alpha_, 
     									thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -1863,16 +1924,16 @@ namespace EpiRisk
     _calcIntegral<DistanceKernel,true><<<integralBuffSize,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
-									     devAnimals_,
-									     *delta_,*omega_,*gamma1_,*nu_,*alpha_, 
+									     devSusceptibility_,
+									     *delta_,*omega_,*beta1_,*nu_,*alpha_, 
 									     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
 
     _calcIntegral<Identity,false><<<integralBuffSize,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
-    									devAnimals_,
-    									*delta_,*omega_,*p_,*nu_, *alpha_, 
+    									devSusceptibility_,
+    									*delta_,*omega_,*beta2_,*nu_, *alpha_, 
     									thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     
@@ -1897,12 +1958,16 @@ namespace EpiRisk
     gettimeofday(&start, NULL);
 #endif
 
+    RefreshParameters();
     UpdateI1();
+    CalcSusceptibility();
+    //CheckSuscep();
     CalcIntegral();
     CalcProduct();
     CalcBgIntegral();
 
     cudaDeviceSynchronize();
+    hostComponents_->integral *= *gamma1_;
     logLikelihood_ = hostComponents_->logProduct
       - (hostComponents_->integral + hostComponents_->bgIntegral);
 
@@ -1932,13 +1997,15 @@ namespace EpiRisk
     gettimeofday(&start, NULL);
 #endif
 
+    RefreshParameters();
     UpdateI1();
+    CalcSusceptibility();
     CalcIntegral();
     CalcProduct();
     CalcBgIntegral();
 
     cudaDeviceSynchronize();
-
+    hostComponents_->integral *= *gamma1_;
     logLikelihood_ = hostComponents_->logProduct
       - (hostComponents_->integral + hostComponents_->bgIntegral);
 
@@ -2039,10 +2106,10 @@ namespace EpiRisk
     												    *devD_,
     												    devEventTimes_, 
     												    eventTimesPitch_, 
-    												    devAnimals_,
+    												    devSusceptibility_,
     												    *delta_, 
     												    *omega_, 
-    												    *gamma1_, 
+    												    *beta1_, 
     												    *nu_, 
     												    *alpha_, 
     												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2052,10 +2119,10 @@ namespace EpiRisk
     												    *devC_,
     												    devEventTimes_, 
     												    eventTimesPitch_, 
-    												    devAnimals_,
+    												    devSusceptibility_,
     												    *delta_, 
     												    *omega_, 
-    												    *p_, 
+    												    *beta2_, 
     												    *nu_, 
     												    *alpha_, 
     												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2081,12 +2148,12 @@ namespace EpiRisk
 												   *devD_,
 												   devEventTimes_, 
 												   eventTimesPitch_,
-												   devAnimals_, 
+												   devSusceptibility_, 
 												   *epsilon1_, 
-												   1.0f, 
+												   *gamma1_, 
 												   *delta_, 
 												   *omega_, 
-												   *gamma1_,
+												   *beta1_,
 												   *nu_, 
 												   *alpha_, 
 												   I1Idx_, 
@@ -2098,12 +2165,12 @@ namespace EpiRisk
      												   *devC_,
      												   devEventTimes_, 
      												   eventTimesPitch_,
-     												   devAnimals_, 
+     												   devSusceptibility_, 
      												   *epsilon1_, 
-     												   1.0f, 
+     												   *gamma1_, 
      												   *delta_, 
      												   *omega_, 
-     												   *p_,
+     												   *beta2_,
      												   *nu_, 
      												   *alpha_, 
      												   I1Idx_, 
@@ -2130,7 +2197,7 @@ namespace EpiRisk
     //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost)); // CUDA_MEMCPY
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral;
+      + hostComponents_->integral * *gamma1_;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (newTime - oldTime);
     }
@@ -2207,10 +2274,10 @@ namespace EpiRisk
 														 *devD_, 
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devAnimals_,
+														 devSusceptibility_,
 														 *delta_, 
 														 *omega_, 
-														 *gamma1_,
+														 *beta1_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2220,10 +2287,10 @@ namespace EpiRisk
 														 *devC_, 
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devAnimals_,
+														 devSusceptibility_,
 														 *delta_, 
 														 *omega_, 
-														 *p_,
+														 *beta2_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2249,12 +2316,12 @@ namespace EpiRisk
 														*devD_, 
 														devEventTimes_,
 														eventTimesPitch_,
-														devAnimals_,
+														devSusceptibility_,
 														*epsilon1_,
-														1.0f,
+														*gamma1_,
 														*delta_, 
 														*omega_, 
-														*gamma1_,
+														*beta1_,
 														*nu_, 
 														*alpha_, 
 														I1Idx_, 
@@ -2265,12 +2332,12 @@ namespace EpiRisk
     														*devC_, 
     														devEventTimes_,
     														eventTimesPitch_,
-    														devAnimals_,
+    														devSusceptibility_,
     														*epsilon1_,
-    														1.0f,
+    														*gamma1_,
     														*delta_, 
     														*omega_, 
-    														*p_,
+    														*beta2_,
     														*nu_, 
     														*alpha_, 
     														I1Idx_, 
@@ -2293,7 +2360,7 @@ namespace EpiRisk
     // Collect results and update likelihood
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral;
+      + hostComponents_->integral * *gamma1_;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (newTime - Ni);
     }
@@ -2356,10 +2423,10 @@ namespace EpiRisk
 														 *devD_,
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devAnimals_,
+														 devSusceptibility_,
 														 *delta_, 
 														 *omega_, 
-														 *gamma1_,
+														 *beta1_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2369,10 +2436,10 @@ namespace EpiRisk
 														 *devC_,
 														 devEventTimes_, 
 														 eventTimesPitch_, 
-														 devAnimals_,
+														 devSusceptibility_,
 														 *delta_, 
 														 *omega_, 
-														 *p_,
+														 *beta2_,
 														 *nu_, 
 														 *alpha_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
@@ -2397,11 +2464,11 @@ namespace EpiRisk
 														*devD_, 
 														devEventTimes_, 
 														eventTimesPitch_,
-														devAnimals_, 
-														1.0f, 
+														devSusceptibility_, 
+														*gamma1_, 
 														*delta_, 
 														*omega_,
-														*gamma1_,
+														*beta1_,
 														*nu_, 
 														*alpha_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
@@ -2411,11 +2478,11 @@ namespace EpiRisk
 														*devC_, 
 														devEventTimes_, 
 														eventTimesPitch_,
-														devAnimals_, 
-														1.0f, 
+														devSusceptibility_, 
+														*gamma1_, 
 														*delta_, 
 														*omega_,
-														*p_,
+														*beta2_,
 														*nu_, 
 														*alpha_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
@@ -2446,7 +2513,7 @@ namespace EpiRisk
     //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-      + hostComponents_->integral;
+      + hostComponents_->integral * *gamma1_;
     if (!haveNewI1) {
       hostComponents_->bgIntegral += *epsilon1_ * (notification - oldI);
     }
@@ -2630,6 +2697,22 @@ namespace EpiRisk
       }
   }
 
+  void
+  GpuLikelihood::GetInfectionTimes(std::vector<EpiRisk::IPTuple_t>& times)
+  {
+    times.resize(GetNumInfecs());
+
+    std::vector<float> buff(popSize_);
+
+    checkCudaError(cudaMemcpy(buff.data(), devEventTimes_, sizeof(float)*popSize_, cudaMemcpyDeviceToHost));
+
+    for(size_t i=0; i<GetNumInfecs(); ++i)
+      {
+	times[i].idx = (*hostInfecIdx_)[i].ptr;
+	times[i].val = buff[times[i].idx];
+      }
+  }
+
   std::ostream&
   operator <<(std::ostream& out, const GpuLikelihood& likelihood)
   {
@@ -2657,6 +2740,18 @@ namespace EpiRisk
   }
 
   void
+  GpuLikelihood::RefreshParameters()
+  {
+    float tmp[TICKLEVELS];
+    
+    for(int p=0; p<TICKLEVELS; ++p)
+      tmp[p] = phi_[p];
+    checkCudaError(
+		   cudaMemcpy(devPhi_, tmp, TICKLEVELS*sizeof(float), cudaMemcpyHostToDevice)
+		   );
+  }
+
+  void
   GpuLikelihood::PrintLikelihoodComponents() const
   {
     cudaDeviceSynchronize();
@@ -2672,7 +2767,8 @@ namespace EpiRisk
     cerr << "Gamma1: " << *gamma1_ << "\n";
     cerr << "Delta: " << *delta_ << "\n";
     cerr << "Omega: " << *omega_ << "\n";
-    cerr << "p:" << *p_ << "\n";
+    cerr << "beta1:" << *beta1_ << "\n";
+    cerr << "beta2:" << *beta2_ << "\n";
     cerr << "alpha: " << *alpha_ << "\n";
     cerr << "a: " << *a_ << "\n";
     cerr << "b: " << *b_ << endl;
@@ -2734,12 +2830,41 @@ namespace EpiRisk
   }
 
   void
+  GpuLikelihood::CheckSuscep() const
+  {
+    float* tmp = new float[popSize_];
+    checkCudaError(cudaMemcpy(tmp, devSusceptibility_, popSize_*sizeof(float), cudaMemcpyDeviceToHost));
+    float sum=0.0;
+    for(int i=0; i<popSize_; ++i) {
+      cerr << hostPopulation_[i].id << ": " << tmp[i] << "\n";
+      sum += tmp[i];
+    }
+    cerr << "Sum susceptibility = " << sum << endl;
+
+    delete[] tmp;
+  }
+
+  void
   GpuLikelihood::PrintProdVector() const
   {
     cerr << "======PROD VECTOR=======\n";
     thrust::host_vector<float> prod = GetProdVector();
     for(int i = 0; i<hostPopulation_.size(); ++i)
       cerr << hostPopulation_[i].id << "\t" << prod[i] << "\n";
+  }
+
+  void
+  GpuLikelihood::DumpAnimals() const
+  {
+    float* tmp = new float[popSize_];
+    checkCudaError(cudaMemcpy(tmp, devSusceptibility_, sizeof(float)*popSize_, cudaMemcpyDeviceToHost));
+    float tmpPhi[TICKLEVELS];
+    checkCudaError(cudaMemcpy(tmpPhi, devPhi_, sizeof(float)*TICKLEVELS, cudaMemcpyDeviceToHost));
+    int idx = 0;
+    while(hostPopulation_[idx].id != "HU-7395-0134") idx++;
+    cerr << hostPopulation_[idx].id << "\t" << tmp[idx] << ", phi[2]=" << phi_[2] <<", devphi[2]="<<tmpPhi[2]<<"\n";
+
+    delete[] tmp;
   }
 
 

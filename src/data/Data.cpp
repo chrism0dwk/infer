@@ -83,7 +83,7 @@ PopDataImporter::next()
   getline(dataFile_,row);
 
   stlStrTok(tokens,row,",");
-  if (tokens.size() != 4) throw EpiRisk::fileEOF();
+  if (tokens.size() < 4) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
   record.data.x = atof(tokens[1].c_str()) / 1000;

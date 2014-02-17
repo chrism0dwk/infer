@@ -354,8 +354,8 @@ namespace EpiRisk
 
 
   void
-  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& gamma1,
-			       Parameter& delta, Parameter& omega, Parameter& p, 
+  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& gamma1, Parameters& phi,
+			       Parameter& delta, Parameter& omega, Parameter& beta1, Parameter& beta2, 
 			       Parameter& nu, Parameter& alpha, Parameter& a, Parameter& b)
   {
 
@@ -363,12 +363,17 @@ namespace EpiRisk
     gamma1_ = gamma1.GetValuePtr();
     delta_ = delta.GetValuePtr();
     omega_ = omega.GetValuePtr();
-    p_ = p.GetValuePtr();
+    beta1_ = beta1.GetValuePtr();
+    beta2_ = beta2.GetValuePtr();
     nu_ = nu.GetValuePtr();
     alpha_ = alpha.GetValuePtr();
     a_ = a.GetValuePtr();
     b_ = b.GetValuePtr();
 
+    phi_.clear();
+    for(int p=0; p<TICKLEVELS; ++p) phi_.push_back(phi[p].GetValuePtr());
+    
+    RefreshParameters();
   }
 
   void

@@ -59,6 +59,7 @@
 
 // Model defines
 #define NUMEVENTS 3
+#define TICKLEVELS 3
 //#define NUMSPECIES 3
 
 
@@ -201,16 +202,18 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
     SetParameters(Parameter& epsilon1, 
-		  Parameter& gamma1, 
+		  Parameter& gamma1,
+		  Parameters& phi,
 		  Parameter& delta, 
 		  Parameter& omega, 
-		  Parameter& p,
+		  Parameter& beta1,
+		  Parameter& beta2,
 		  Parameter& nu, 
 		  Parameter& alpha, 
 		  Parameter& a, 
 		  Parameter& b);
-    // void
-    // RefreshParameters();
+    void
+    RefreshParameters();
     void
     SetMovtBan(const float movtBanTime);
     float
@@ -247,6 +250,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     AddInfectionTime(const unsigned int idx, const float inTime);
     void
     DeleteInfectionTime(const unsigned int idx);
+    void
+    CalcSusceptibility();
     void
     CalcProduct();
     void
@@ -288,6 +293,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
         const float prob);
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
+    void 
+    GetInfectionTimes(std::vector<EpiRisk::IPTuple_t>& times);
 
     friend std::ostream&
     operator<<(std::ostream& out, const GpuLikelihood& likelihood);
@@ -302,6 +309,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     PrintEventTimes() const;
     void
     PrintDistMatrix() const;
+    void CheckSuscep() const;
+    void DumpAnimals() const;
 
   private:
 
@@ -372,7 +381,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
 
     // Covariate data is shared over a copy
     size_t* covariateCopies_;
-    float* devAnimals_;
+    int* devAnimals_;
     size_t animalsPitch_;
 
     CsrMatrix* devD_;
@@ -408,11 +417,14 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     float* gamma1_;
     float* delta_;
     float* omega_;
-    float* p_;
+    float* beta1_;
+    float* beta2_;
     float* nu_;
     float* alpha_;
     float* a_;
     float* b_;
+    PointerVector<float> phi_;
+    float* devPhi_;
 
     // GPU BLAS handles
     cublasStatus_t blasStat_;
