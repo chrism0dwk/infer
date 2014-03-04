@@ -105,6 +105,27 @@ public:
   }
 };
 
+class GaussianPrior : public Prior
+{
+  float mu_;
+  float sigma_;
+public:
+  GaussianPrior(const float mu, const float sigma) :
+    mu_(mu),sigma_(sigma)
+  {
+  };
+  float
+  operator()(const float x)
+  {
+    return gsl_ran_gaussian_pdf(x-mu_, sigma_);
+  }
+  Prior*
+  create() const { return new GaussianPrior(mu_, sigma_); }
+  Prior*
+  clone() const { return new GaussianPrior(*this); }
+};
+
+
 class BetaPrior : public Prior
 {
   float a_;
@@ -375,8 +396,9 @@ main(int argc, char* argv[])
   Parameter omega(1.2, GammaPrior(1,1), "omega");
   Parameter beta1(0.1, GammaPrior(1,1), "beta1");
   Parameter beta2(0.1, GammaPrior(1,1), "beta2");
-  Parameter nu(0.05, GammaPrior(1, 1), "nu");
-  Parameter alpha(100, GammaPrior(1, 1), "mu");
+  Parameter nu(-21, GaussianPrior(-21.0, 15.3), "nu");
+  Parameter alpha1(0.0f, BetaPrior(2, 2), "alpha1");
+  Parameter alpha2(0.5f, BetaPrior(2, 2), "alpha2");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(25, 500), "b");
   Parameters phi(3);
@@ -386,7 +408,7 @@ main(int argc, char* argv[])
 
   likelihood.SetMovtBan(0.0f);
   likelihood.SetParameters(epsilon1, gamma1, phi, delta, omega, beta1, beta2,
-      nu, alpha, a, b);
+			   nu, alpha1, alpha2, a, b);
 
 
   // Set up MCMC algorithm
@@ -404,13 +426,19 @@ main(int argc, char* argv[])
   txDelta.add(phi[1]);
   txDelta.add(phi[2]);
   //txDelta.add(nu);
-  //txDelta.add(alpha);
+  //txDelta.add(alpha1);
+  txDelta.add(alpha2);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txDistance");
   //Mcmc::AdaptiveSingleMRW* updateDistance =
-  //  (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","delta");
+    //  (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW","delta");
   updateDistance->SetParameters(txDelta);
+
+  UpdateBlock updateNuBlk;
+  updateNuBlk.add(nu);
+  Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
+  updateNu->SetParameters(updateNuBlk);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
@@ -450,7 +478,8 @@ main(int argc, char* argv[])
     output.AddParameter(beta1);
     output.AddParameter(beta2);
     output.AddParameter(nu);
-    output.AddParameter(alpha);
+    output.AddParameter(alpha1);
+    output.AddParameter(alpha2);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);

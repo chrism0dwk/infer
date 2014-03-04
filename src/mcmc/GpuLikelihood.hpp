@@ -209,7 +209,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
 		  Parameter& beta1,
 		  Parameter& beta2,
 		  Parameter& nu, 
-		  Parameter& alpha, 
+		  Parameter& alpha1,
+		  Parameter& alpha2, 
 		  Parameter& a, 
 		  Parameter& b);
     void
@@ -420,9 +421,11 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     float* beta1_;
     float* beta2_;
     float* nu_;
-    float* alpha_;
+    float* alpha1_;
+    float* alpha2_;
     float* a_;
     float* b_;
+
     PointerVector<float> phi_;
     float* devPhi_;
 

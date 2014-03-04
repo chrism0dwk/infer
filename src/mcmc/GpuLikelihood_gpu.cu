@@ -36,6 +36,7 @@ namespace EpiRisk
   // Constants
   const float UNITY = 1.0;
   const float ZERO = 0.0;
+#define PI (atanf(1.0f)*4.0f)
   
   float
   GetDistElement(const CsrMatrix* d, const int row, const int col) {
@@ -148,35 +149,30 @@ namespace EpiRisk
   };
 
   __device__ float
-  _h(const float t, float nu, float alpha)
+  _h(const float t, const float I, float nu, float alpha1, float alpha2)
   {
     // Returns a logistic 'h' function
     //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
-    if(t >= 0) {
-      float rv = expf(nu*t) / ( alpha + expf(nu*t));
-      return rv;
-    }
-    else
-      return 0.0f;
-    //return nu*nu*t*exp(-nu*t);
-    
+    assert(t-I >= 0);
+    if(t <= I) return 0.0f;
+
+    double val = 1.0f + alpha1 * cosf(2.0f*PI/365.0f*(t + nu)) 
+      + alpha2 * cosf(4.0f*PI/365.0f*(t + nu));
+
+    return val/(1.0f+alpha1+alpha2);
   }
 
   __device__ float
-  _H(const float t, float nu, float alpha)
+  _H(const float b, const float a, float nu, float alpha1, float alpha2)
   {
-    // Returns the integral of the 'h' function over [0,t]
+    // Returns the integral of the 'h' function over [a,b]
 
-    //float integral = 1.0f / nu * logf( (1.0f + expf(nu*(t - alpha))) / (1.0f + expf(-nu*alpha)));
-    float e = expf(nu*t);
-    if (isinf(e)) return t;
-    else {
-    float integral = 1.0f / nu * logf( (alpha + e) / (1.0f + alpha));
-    //float integral = -nu * t * exp(-nu * t) - exp(-nu * t) + 1;
+    if(b <= a) return 0.0f;
 
-    //float integral = t - alpha;
-    return fmaxf(0.0f, integral);
-    }
+    float scale = 2.0f*PI/365.0f;
+    float period1 = alpha1/scale * ( sinf(scale*(b+nu)) - sinf(scale*(a+nu)) );
+    float period2 = alpha2/(2.0*scale) * ( sinf(scale*2.0*(b+nu)) - sinf(scale*2.0*(a+nu)) );
+    return (b - a + period1 + period2)/(1.0f+alpha1+alpha2);
   }
 
   struct DistanceKernel {
@@ -191,7 +187,7 @@ namespace EpiRisk
     __device__ __host__ float
     operator()(const float d, const float delta, const float omega)
     {
-      return 0.01f;//d;
+      return d;
     }
   };
 
@@ -598,7 +594,7 @@ namespace EpiRisk
 		const CsrMatrix distance, float* eventTimes, 
 		const int eventTimesPitch,const float* susceptibility,
 		const float delta, const float omega, const float p, 
-		const float nu, const float alpha, float* output)
+		const float nu, const float alpha1, const float alpha2, float* output)
   {
     // Each warp calculates a row i of the sparse matrix
 
@@ -625,7 +621,7 @@ namespace EpiRisk
           {
             // Integrated infection pressure
             float Ij = eventTimes[distance.colInd[jj]];
-            float betaij = _H(fminf(Ri, Ij) - fminf(Ii, Ij), nu, alpha);
+            float betaij = _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2);
 
             // Apply distance kernel and suscep
 	    OP op;
@@ -679,7 +675,7 @@ namespace EpiRisk
 	       const int eventTimesPitch, const float* susceptibility,
 	       const float epsilon1,
 	       const float gamma1, const float delta, const float omega, const float p, const float nu,
-	       const float alpha, float* prodCache)
+	       const float alpha1, const float alpha2, float* prodCache)
   {
     // Each warp calculates a row of the sparse matrix
 
@@ -711,7 +707,7 @@ namespace EpiRisk
               {
                 float idxOnj = 0.0f;
                 if (Ii < Ij and Ij <= Ri)
-                  idxOnj += _h(Ij - Ii, nu, alpha);
+                  idxOnj += _h(Ij, Ii, nu, alpha1, alpha2);
 		OP op;
                 threadProdCache[threadIdx.x] += idxOnj * p * op(distance.valtr[ii],delta,omega);
               }
@@ -766,7 +762,7 @@ namespace EpiRisk
 			       const InfecIdx_t* infecIdx, const float newTime, const CsrMatrix distance,
 			       float* eventTimes, const int eventTimesPitch, const float* susceptibility,
 			       const float delta, const float omega, const float p,
-			       const float nu, const float alpha, float* output)
+			       const float nu, const float alpha1, const float alpha2, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -794,8 +790,8 @@ namespace EpiRisk
         if (Ij < Rj)
           {
             // Recalculate pressure from j on idx
-            jOnIdx = _H(fminf(Rj, newTime) - fminf(Ij, newTime), nu, alpha); // New pressure
-            jOnIdx -= _H(fminf(Rj, Ii) - fminf(Ii, Ij), nu, alpha); // Old pressure
+            jOnIdx = _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2); // New pressure
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2); // Old pressure
 	    jOnIdx *= op(distance.valtr[begin+tid],delta,omega);
 	    // Apply infec and suscep
             jOnIdx *= susceptibility[i];
@@ -803,8 +799,8 @@ namespace EpiRisk
 	
 
         // Recalculate pressure from idx on j
-        float IdxOnj = _H(fminf(Ri, Ij) - fminf(newTime, Ij), nu, alpha);
-        IdxOnj -= _H(fminf(Ri, Ij) - fminf(Ii, Ij), nu, alpha);
+        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2);
+        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2);
         IdxOnj *= susceptibility[j];
 	IdxOnj *= op(distance.val[begin+tid],delta,omega);
     
@@ -832,7 +828,7 @@ namespace EpiRisk
 			      float* eventTimes, const int eventTimesPitch, const float* susceptibility,
 			      const float epsilon1, const float gamma1,
 			      const float delta, const float omega, const float p, 
-			      const float nu, const float alpha, const int I1Idx, float* prodCache)
+			      const float nu, const float alpha1, const float alpha2, const int I1Idx, float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     extern __shared__
@@ -862,10 +858,10 @@ namespace EpiRisk
             // Adjust product cache from idx on others
             float idxOnj = 0.0f;
             if (Ii < Ij and Ij <= Ri)
-              idxOnj -= _h(Ij - Ii, nu, alpha);
+              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2);
 
             if (newTime < Ij and Ij <= Ri)
-              idxOnj += _h(Ij - newTime, nu, alpha);
+              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2);
 
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta, omega);
             prodCache[j] += idxOnj;
@@ -873,7 +869,7 @@ namespace EpiRisk
             // Recalculate instantaneous pressure on idx
             float jOnIdx = 0.0f;
             if (Ij < newTime and newTime <= Rj)
-              jOnIdx = _h(newTime - Ij, nu, alpha);
+              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2);
 
             jOnIdx *= susceptibility[i] * p * op(distance.valtr[begin+tid],delta, omega);
             buff[threadIdx.x] = jOnIdx * gamma1;
@@ -898,7 +894,7 @@ namespace EpiRisk
 			    const float newTime, const CsrMatrix distance, const float* eventTimes,
 			    const int eventTimesPitch, const float* susceptibility,
 			    const float delta, const float omega, const float p,
-			    const float nu, const float alpha, float* output)
+			    const float nu, const float alpha1, const float alpha2, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -926,15 +922,15 @@ namespace EpiRisk
         if (Ij < Rj)
           {
             // Calculate pressure from j on idx
-            jOnIdx -= _H(fminf(Rj, Ii) - fminf(Ij, Ii), nu, alpha);
-            jOnIdx += _H(fminf(Rj, newTime) - fminf(Ij, newTime), nu, alpha);
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ij, Ii), nu, alpha1, alpha2);
+            jOnIdx += _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2);
 	    jOnIdx *= op(distance.valtr[begin+tid], delta, omega);
             // Apply infec and suscep
             jOnIdx *= susceptibility[i];
           }
 
         // Add pressure from idx on j
-        float IdxOnj = _H(fminf(Ri, Ij) - fminf(newTime, Ij), nu, alpha);
+        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2);
 	IdxOnj *= op(distance.val[begin+tid], delta, omega);
         IdxOnj *= susceptibility[j];
 
@@ -959,7 +955,7 @@ namespace EpiRisk
 			    const float newTime, const CsrMatrix distance, float* eventTimes,
 			    const int eventTimesPitch, const float* susceptibility,
 			    const float delta, const float omega, const float p,
-			    const float nu, const float alpha, float* output)
+			    const float nu, const float alpha1, const float alpha2, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -987,8 +983,8 @@ namespace EpiRisk
         if (Ij < Rj)
           {
             // Recalculate pressure from j on idx
-            jOnIdx -= _H(fminf(Rj, Ii) - fminf(Ii, Ij), nu, alpha); // Old pressure
-            jOnIdx += _H(fminf(Rj, Ri) - fminf(Ij, Ri), nu, alpha); // New pressure
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2); // Old pressure
+            jOnIdx += _H(fminf(Rj, Ri), fminf(Ij, Ri), nu, alpha1, alpha2); // New pressure
 	    jOnIdx *= op(distance.valtr[begin + tid], delta, omega);
 	    // Apply infec and suscep
             jOnIdx *= susceptibility[i];
@@ -996,7 +992,7 @@ namespace EpiRisk
 
         // Subtract pressure from idx on j
         float IdxOnj = 0.0f;
-        IdxOnj -= _H(fminf(Ri, Ij) - fminf(Ii, Ij), nu, alpha);
+        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2);
 	IdxOnj *= op(distance.val[begin+tid], delta, omega);
         IdxOnj *= susceptibility[j];
 
@@ -1023,7 +1019,7 @@ namespace EpiRisk
 			   const int eventTimesPitch, const float* susceptibility,
 			   const float epsilon1, const float gamma1, const float delta, 
 			   const float omega, const float p, const float nu, 
-			   const float alpha, const int I1Idx, float* prodCache)
+			   const float alpha1, const float alpha2, const int I1Idx, float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     extern __shared__
@@ -1052,7 +1048,7 @@ namespace EpiRisk
             // Adjust product cache from idx on others
             float idxOnj = 0.0f;
             if (newTime < Ij and Ij <= Ri)
-              idxOnj += _h(Ij - newTime, nu, alpha);
+              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2);
 	    
 	    OP op;
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta, omega);
@@ -1061,7 +1057,7 @@ namespace EpiRisk
             // Calculate instantaneous pressure on idx
             float jOnIdx = 0.0f;
             if (Ij < newTime and newTime <= Rj)
-              jOnIdx = _h(newTime - Ij, nu, alpha);
+              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2);
 
             jOnIdx *= gamma1 * susceptibility[i] * p * op(distance.valtr[begin+tid],delta,omega);
 
@@ -1086,7 +1082,7 @@ namespace EpiRisk
 			   const float newTime, const CsrMatrix distance, float* eventTimes,
 			   const int eventTimesPitch, const float* susceptibility,
 			   const float gamma1, const float delta, const float omega, 
-			   const float p, const float nu, const float alpha,
+			   const float p, const float nu, const float alpha1, const float alpha2,
 			   float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -1111,7 +1107,7 @@ namespace EpiRisk
             // Adjust product cache from idx on others
             float idxOnj = 0.0;
             if (Ii < Ij and Ij <= Ri)
-              idxOnj -= _h(Ij - Ii, nu, alpha);
+              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2);
 
 	    OP op;
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta,omega);
@@ -1483,7 +1479,8 @@ namespace EpiRisk
     beta1_(other.beta1_), 
     beta2_(other.beta2_), 
     nu_(other.nu_), 
-    alpha_(other.alpha_), 
+    alpha1_(other.alpha1_),
+    alpha2_(other.alpha2_), 
     a_(other.a_), 
     b_(other.b_), 
     cuRand_(other.cuRand_)
@@ -1606,7 +1603,8 @@ namespace EpiRisk
     beta1_ = other.beta1_;
     beta2_ = other.beta2_;
     nu_ = other.nu_;
-    alpha_ = other.alpha_;
+    alpha1_ = other.alpha1_;
+    alpha2_ = other.alpha2_;
     a_ = other.a_;
     b_ = other.b_;
 
@@ -1897,14 +1895,14 @@ namespace EpiRisk
 									     devEventTimes_,eventTimesPitch_,
 									     devSusceptibility_,
 									     *epsilon1_, *gamma1_,*delta_,*omega_,
-									     *beta1_,*nu_, *alpha_, 
+									     *beta1_,*nu_, *alpha1_, *alpha2_, 
 									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _calcProduct<Identity,false><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devSusceptibility_,
     									*epsilon1_,*gamma1_,*delta_,*omega_,
-    									*beta2_,*nu_,*alpha_, 
+    									*beta2_,*nu_,*alpha1_, *alpha2_, 
     									thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -1925,7 +1923,7 @@ namespace EpiRisk
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
 									     devSusceptibility_,
-									     *delta_,*omega_,*beta1_,*nu_,*alpha_, 
+									     *delta_,*omega_,*beta1_,*nu_,*alpha1_, *alpha2_, 
 									     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -1933,7 +1931,7 @@ namespace EpiRisk
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devSusceptibility_,
-    									*delta_,*omega_,*beta2_,*nu_, *alpha_, 
+    									*delta_,*omega_,*beta2_,*nu_, *alpha1_, *alpha2_, 
     									thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     
@@ -2111,7 +2109,7 @@ namespace EpiRisk
     												    *omega_, 
     												    *beta1_, 
     												    *nu_, 
-    												    *alpha_, 
+															  *alpha1_, *alpha2_, 
     												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _updateInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, 
     												    thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
@@ -2124,7 +2122,7 @@ namespace EpiRisk
     												    *omega_, 
     												    *beta2_, 
     												    *nu_, 
-    												    *alpha_, 
+														     *alpha1_, *alpha2_, 
     												    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     cudaDeviceSynchronize();
@@ -2155,7 +2153,7 @@ namespace EpiRisk
 												   *omega_, 
 												   *beta1_,
 												   *nu_, 
-												   *alpha_, 
+															 *alpha1_, *alpha2_, 
 												   I1Idx_, 
 												   thrust::raw_pointer_cast(&(*devProduct_)[0]));
 
@@ -2172,7 +2170,7 @@ namespace EpiRisk
      												   *omega_, 
      												   *beta2_,
      												   *nu_, 
-     												   *alpha_, 
+														     *alpha1_,*alpha2_, 
      												   I1Idx_, 
      												   thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
@@ -2279,7 +2277,7 @@ namespace EpiRisk
 														 *omega_, 
 														 *beta1_,
 														 *nu_, 
-														 *alpha_, 
+														       *alpha1_, *alpha2_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _addInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
 														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
@@ -2292,7 +2290,7 @@ namespace EpiRisk
 														 *omega_, 
 														 *beta2_,
 														 *nu_, 
-														 *alpha_, 
+														  *alpha1_,*alpha2_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
 
     checkCudaError(cudaGetLastError());
@@ -2323,7 +2321,7 @@ namespace EpiRisk
 														*omega_, 
 														*beta1_,
 														*nu_, 
-														*alpha_, 
+														      *alpha1_,*alpha2_, 
 														I1Idx_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _addInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
@@ -2339,7 +2337,7 @@ namespace EpiRisk
     														*omega_, 
     														*beta2_,
     														*nu_, 
-    														*alpha_, 
+														 *alpha1_,*alpha2_, 
     														I1Idx_, 
     														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
@@ -2428,7 +2426,7 @@ namespace EpiRisk
 														 *omega_, 
 														 *beta1_,
 														 *nu_, 
-														 *alpha_, 
+														       *alpha1_,*alpha2_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _delInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														 thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
@@ -2441,7 +2439,7 @@ namespace EpiRisk
 														 *omega_, 
 														 *beta2_,
 														 *nu_, 
-														 *alpha_, 
+														  *alpha1_,*alpha2_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     cudaDeviceSynchronize();
@@ -2470,7 +2468,7 @@ namespace EpiRisk
 														*omega_,
 														*beta1_,
 														*nu_, 
-														*alpha_, 
+														      *alpha1_,*alpha2_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _delInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
@@ -2484,7 +2482,7 @@ namespace EpiRisk
 														*omega_,
 														*beta2_,
 														*nu_, 
-														*alpha_, 
+														 *alpha1_,*alpha2_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -2769,7 +2767,8 @@ namespace EpiRisk
     cerr << "Omega: " << *omega_ << "\n";
     cerr << "beta1:" << *beta1_ << "\n";
     cerr << "beta2:" << *beta2_ << "\n";
-    cerr << "alpha: " << *alpha_ << "\n";
+    cerr << "alpha1: " << *alpha1_ << "\n";
+    cerr << "alpha2: " << *alpha2_ << "\n";
     cerr << "a: " << *a_ << "\n";
     cerr << "b: " << *b_ << endl;
     cerr << "ObsTime: " << obsTime_ << "\n";
