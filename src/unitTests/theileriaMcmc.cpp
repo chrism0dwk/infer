@@ -397,7 +397,7 @@ main(int argc, char* argv[])
   Parameter beta1(0.1, GammaPrior(1,1), "beta1");
   Parameter beta2(0.1, GammaPrior(1,1), "beta2");
   Parameter nu(-21, GaussianPrior(-21.0, 15.3), "nu");
-  Parameter alpha1(0.0f, BetaPrior(2, 2), "alpha1");
+  Parameter alpha1(0.5f, BetaPrior(2, 2), "alpha1");
   Parameter alpha2(0.5f, BetaPrior(2, 2), "alpha2");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(25, 500), "b");
@@ -426,7 +426,7 @@ main(int argc, char* argv[])
   txDelta.add(phi[1]);
   txDelta.add(phi[2]);
   //txDelta.add(nu);
-  //txDelta.add(alpha1);
+  txDelta.add(alpha1);
   txDelta.add(alpha2);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",

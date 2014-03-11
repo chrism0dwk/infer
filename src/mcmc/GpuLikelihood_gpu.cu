@@ -159,7 +159,7 @@ namespace EpiRisk
     double val = 1.0f + alpha1 * cosf(2.0f*PI/365.0f*(t + nu)) 
       + alpha2 * cosf(4.0f*PI/365.0f*(t + nu));
 
-    return val/(1.0f+alpha1+alpha2);
+    return 1.0f - val/(1.0f+alpha1+alpha2);
   }
 
   __device__ float
@@ -172,7 +172,7 @@ namespace EpiRisk
     float scale = 2.0f*PI/365.0f;
     float period1 = alpha1/scale * ( sinf(scale*(b+nu)) - sinf(scale*(a+nu)) );
     float period2 = alpha2/(2.0*scale) * ( sinf(scale*2.0*(b+nu)) - sinf(scale*2.0*(a+nu)) );
-    return (b - a + period1 + period2)/(1.0f+alpha1+alpha2);
+    return b - a - (b - a + period1 + period2)/(1.0f+alpha1+alpha2);
   }
 
   struct DistanceKernel {
