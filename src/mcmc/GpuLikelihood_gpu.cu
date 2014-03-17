@@ -149,30 +149,122 @@ namespace EpiRisk
   };
 
   __device__ float
-  _h(const float t, const float I, float nu, float alpha1, float alpha2)
+  _h(const float t, const float I, float nu, float ys, float yw)
   {
-    // Returns a logistic 'h' function
-    //return 1.0f / (1.0f + expf(-nu*(t-alpha)));
+    // Periodic piece-wise cubic spline
+    float[] T = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+    float[] Y = {1.0f, 1.0f, 1.0f, 1.0f};
+    float delta = 0.25;
+
     assert(t-I >= 0);
-    if(t <= I) return 0.0f;
-
-    double val = 1.0f + alpha1 * cosf(2.0f*PI/365.0f*(t + nu)) 
-      + alpha2 * cosf(4.0f*PI/365.0f*(t + nu));
-
-    return 1.0f - val/(1.0f+alpha1+alpha2);
+    
+    // Re-scale time to unit period
+    float t.adj = (t+nu)/365.0f;
+    t.adj = t.adj - floorf(t.adj);
+    
+    // Set up parameters
+    Y[0] = ys; y[2] = yw; y[4] = ys;
+    
+    // Calculate spline value
+    int epoch = (t.adj*4) % 1;
+    
+    float a = -6.0f*(Y[epoch+1]-Y[epoch])/(delta*delta);
+    float b = -a;
+    
+    float h = a/(6.0f*delta) * powf(t - T[epoch], 3);
+    h      += (Y[epoch+1]/delta - (a*delta)/6.0f) *  (t - T[epoch])
+    h      += b/(6.0f*delta) * powf(T[epoch+1] - t, 3);
+    h      += (Y[epoch]/delta - (b*delta)/6.0f) * (T[epoch+1] - t);
+    
+    return h;
+  }
+  
+  __device__ float
+  _HIntegrand(float t, const float* T, const float* Y) {
+    // Calculates cubic spline integral between t1 and t2
+    float delta = 0.25;
+    float a = -6.0f * (Y[1] - Y[0])/(delta * delta);
+    float b = -a;
+    
+    float h = a/(24.0f*delta) * powf(t - T[0], 4);
+    h      += (Y[1]/(2.0f*delta) - (a*delta)/12.0f) * powf(t - T[0],2);
+    h      -= b/(24.0f*delta) * powf(T[1] - t, 4);
+    h      -= (Y[0]/(2.0f*delta) - (b*delta)/12.0f) * powf(T[1] - t,2);
+    
+    return h;
   }
 
+  __global__ void
+  _HIntegConst(const float ys, const float yw, float* cache)
+  {
+    // Calculates cached integral -- requires only 4 threads
+    float[] T = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+    float[] Y = {1.0f, 1.0f, 1.0f, 1.0f};
+    float delta = 0.25;
+    
+    __shared__ float buff[4];
+    
+    int tid = blockIdx.x * blockDim + threaIdx;
+    
+    Y[0] = ys; Y[2] = yw; Y[4] = ys;
+    
+    if(tid < 4) {
+      buff[tid+1] = _HIntegrand(T[tid+1], Y+tid, T+tid)
+      - _HIntegrand(T[tid], Y+tid, T+tid);
+
+      __syncthreads()
+    
+      // Reduce cummulative sum here -- needs parallelising
+      if(tid == 0) {
+        buff[1] += buff[0];
+        buff[2] += buff[1];
+        buff[3] += buff[2];
+      }
+      __syncthreads();
+      
+      cache[tid+1] = buff[tid];  // Cache[0] is set to 0
+    }
+  }
+  
+  void
+  CalcHFuncIntegCache(const float ys, const float yw, float* cache, const bool setZero=false)
+  {
+    // Calculates the CUDA H function integral cache
+    
+    if(setZero)
+      checkCudaError(cudaMemset(cache, 0, sizeof(float)));
+    
+    _HIntegConst<<<1, 4>>>(ys, yw, cache);
+  }
+  
   __device__ float
-  _H(const float b, const float a, float nu, float alpha1, float alpha2)
+  _H(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float* hCache)
   {
     // Returns the integral of the 'h' function over [a,b]
+    float[] T = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+    float[] Y = {1.0f, 1.0f, 1.0f, 1.0f};
+    float delta = 0.25;
+    
+    Y[0] = alpha1; Y[2] = alpha2; Y[4] = alpha1;
+    
+    assert(b <= a);
 
-    if(b <= a) return 0.0f;
-
-    float scale = 2.0f*PI/365.0f;
-    float period1 = alpha1/scale * ( sinf(scale*(b+nu)) - sinf(scale*(a+nu)) );
-    float period2 = alpha2/(2.0*scale) * ( sinf(scale*2.0*(b+nu)) - sinf(scale*2.0*(a+nu)) );
-    return b - a - (b - a + period1 + period2)/(1.0f+alpha1+alpha2);
+    float t1 = (a+nu)/365.0f;
+    float t2 = (b+nu)/365.0f;
+    
+    // Set relative to the beginning of t1's period
+    t2 = t2 - floorf(t1);
+    t1 = t1 - floorf(t1);
+    
+    int epoch1 = (t1*4.0f) % 1;
+    int period2 = t2 % 1;
+    int epoch2 = ((t2-floorf(t2))*4.0f) % 1;
+    
+    float integrand1 = hCache[epoch1] + _HIntegrand(t1-epoch1*delta, T+(epoch1*4f)%1, Y+(epoch2*0.25f)%1);
+    float integrand2 = hCache[4]*period2 + hCache[epoch2] + _HIntegrand(t2-epoch2*delta, T+epoch2, Y+epoch2);
+    
+    return integrand2 - integrand1;
+    
   }
 
   struct DistanceKernel {
@@ -1388,6 +1480,9 @@ namespace EpiRisk
 
     // Phi parameter array
     checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*TICKLEVELS));
+    
+    // H function integral cache
+    checkCudaError(cudaMalloc(&devHIntegCache_, sizeof(float)*5));
 
     // BLAS handles
     blasStat_ = cublasCreate(&cudaBLAS_);
@@ -1539,7 +1634,13 @@ namespace EpiRisk
 
     // Phi parameters
     phi_ = other.phi_;
+    
+    // H function integral cache
+    checkCudaError(cudaMalloc(&devHIntegCache_, sizeof(float)*5));
+
+    // Refresh parameters
     RefreshParameters();
+    
     // BLAS handles
     blasStat_ = other.blasStat_;
     cudaBLAS_ = other.cudaBLAS_;
@@ -1669,6 +1770,8 @@ namespace EpiRisk
       cudaFree(devInfectivity_);
     if(devPhi_)
       cudaFree(devPhi_);
+    if(devHIntegCache_)
+      cudaFree(devHIntegCache_);
 
     if (hostComponents_)
       cudaFreeHost(hostComponents_);
@@ -2747,6 +2850,8 @@ namespace EpiRisk
     checkCudaError(
 		   cudaMemcpy(devPhi_, tmp, TICKLEVELS*sizeof(float), cudaMemcpyHostToDevice)
 		   );
+    
+    CalcHFuncIntegCache(*alpha1_, *alpha2_, devHIntegCache_,true);
   }
 
   void

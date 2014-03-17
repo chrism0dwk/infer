@@ -405,6 +405,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     thrust::device_vector<float>* devWorkspace_;
     int integralBuffSize_;
 
+
     // CUDAPP bits and pieces
     CUDPPHandle cudpp_;
     CUDPPHandle addReduce_;
@@ -428,6 +429,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
 
     PointerVector<float> phi_;
     float* devPhi_;
+    float* devHIntegCache_;
 
     // GPU BLAS handles
     cublasStatus_t blasStat_;
