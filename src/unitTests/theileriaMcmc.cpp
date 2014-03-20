@@ -396,11 +396,11 @@ main(int argc, char* argv[])
   Parameter omega(1.2, GammaPrior(1,1), "omega");
   Parameter beta1(0.1, GammaPrior(1,1), "beta1");
   Parameter beta2(0.1, GammaPrior(1,1), "beta2");
-  Parameter nu(-21, GaussianPrior(-21.0, 15.3), "nu");
-  Parameter alpha1(0.5f, BetaPrior(2, 2), "alpha1");
-  Parameter alpha2(0.5f, BetaPrior(2, 2), "alpha2");
+  Parameter nu(9.0, GaussianPrior(-21.0, 15.3), "nu");
+  Parameter alpha1(0.8f, BetaPrior(2, 2), "alpha1");
+  Parameter alpha2(0.8f, BetaPrior(2, 2), "alpha2");
   Parameter a(4.0, GammaPrior(1, 1), "a");
-  Parameter b(0.05, GammaPrior(25, 500), "b");
+  Parameter b(0.05, GammaPrior(2.5, 50), "b");
   Parameters phi(3);
   phi[0] = Parameter(1, GammaPrior(1,1), "phi0");
   phi[1] = Parameter(0.5, BetaPrior(20,20), "phi1");
@@ -437,8 +437,8 @@ main(int argc, char* argv[])
 
   UpdateBlock updateNuBlk;
   updateNuBlk.add(nu);
-  Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
-  updateNu->SetParameters(updateNuBlk);
+  // Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
+  // updateNu->SetParameters(updateNuBlk);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
@@ -452,17 +452,17 @@ main(int argc, char* argv[])
   updateInfecTime->SetReps(800);
   updateInfecTime->SetOccults(true);
 
-   // UpdateBlock bUpdate; bUpdate.add(b);
-   // Mcmc::InfectionTimeGammaCentred* updateBC =
-   //    (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-   // updateBC->SetParameters(bUpdate);
-   // updateBC->SetTuning(0.014);
+   UpdateBlock bUpdate; bUpdate.add(b);
+   Mcmc::InfectionTimeGammaCentred* updateBC =
+      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+   updateBC->SetParameters(bUpdate);
+   updateBC->SetTuning(0.014);
 
-   // Mcmc::InfectionTimeGammaNC* updateBNC =
-   //    (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-   // updateBNC->SetParameters(bUpdate);
-   // updateBNC->SetTuning(0.0007);
-   // updateBNC->SetNCRatio(ncratio);
+   Mcmc::InfectionTimeGammaNC* updateBNC =
+      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+   updateBNC->SetParameters(bUpdate);
+   updateBNC->SetTuning(0.0007);
+   updateBNC->SetNCRatio(1.0);
 
     //// Output ////
 

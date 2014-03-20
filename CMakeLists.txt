@@ -2,11 +2,11 @@
 project(infer-theileria)
 
 cmake_minimum_required(VERSION 2.8)
-set(CMAKE_MODULE_PATH ${infer-fmd_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH ${infer-theileria_SOURCE_DIR}/cmake/Modules ${CMAKE_MODULE_PATH})
 
 set(CMAKE_VERBOSE_MAKEFILE true)
 ### VERSION INFO ###
-set(PACKAGE_NAME infer-fmd)
+set(PACKAGE_NAME infer-theileria)
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 7)
 
