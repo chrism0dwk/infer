@@ -125,6 +125,26 @@ public:
   clone() const { return new GaussianPrior(*this); }
 };
 
+class UniformPrior : public Prior
+{
+private:
+  float a_;
+  float b_;
+public:
+  UniformPrior(const float a, const float b) : a_(a),b_(b)
+  {
+  };
+  float operator()(const float x)
+  {
+    if(a_ <= x and x <= b_) return 1.0f/(b_-a_);
+    else return 0.0f;
+  }
+  Prior*
+  create() const { return new UniformPrior(a_, b_); }
+  Prior*
+  clone() const { return new UniformPrior(*this); }
+};
+
 
 class BetaPrior : public Prior
 {
@@ -348,7 +368,12 @@ struct Settings
 
 
 
-
+struct TickSurv
+{
+  int tla10;
+  int numpos;
+  int total;
+};
 
 
 
@@ -380,13 +405,35 @@ main(int argc, char* argv[])
   size_t seed = atoi(argv[7]);
   float ncratio = atof(argv[8]);
   int gpuId = atoi(argv[9]);
+  // string tickfile = argv[10];
   cout << "GPU: " << gpuId << endl;
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *contactDataImporter,
-			   (size_t) 1, obsTime, 50.0f, false, gpuId);
+  			   (size_t) 1, obsTime, 50.0f, false, gpuId);
 
   delete contactDataImporter;
   delete popDataImporter;
   delete epiDataImporter;
+
+
+  // // Load surveillance data -- waste of memory here!!
+  // list<TickSurv> tickdata;
+  // int maxTLAId = 0;
+  // istream tickfile;
+  // string buff;
+  // tickfile.open(tickfile.c_str());
+  // getline(tickfile, buff);
+  // while(!tickfile.eof()) {
+  //   getline(tickfile,buff);
+  //   vector<string> toks;
+  //   stlStrSplit(buff, toks, ",");
+  //   if(toks.size() < 2) break;
+  //   TickSurv t;
+  //   t.tla10 = atoi(toks[0]);
+  //   t.numpos = atoi(toks[1]);
+  //   t.total = atoi(toks[2]);
+  //   tickdata.push_back(t);
+  //   if(maxTLAId < t.tla10) maxTLAId = t.tla10;
+  // }
 
   // Parameters
   // Set up parameters
@@ -396,11 +443,13 @@ main(int argc, char* argv[])
   Parameter omega(1.2, GammaPrior(1,1), "omega");
   Parameter beta1(0.1, GammaPrior(1,1), "beta1");
   Parameter beta2(0.1, GammaPrior(1,1), "beta2");
-  Parameter nu(9.0, GaussianPrior(-21.0, 15.3), "nu");
+  Parameter nu(137.0, UniformPrior(0.0, 180), "nu");
   Parameter alpha1(0.8f, BetaPrior(2, 2), "alpha1");
   Parameter alpha2(0.8f, BetaPrior(2, 2), "alpha2");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
+
+  // Hack here for phi sampled data
   Parameters phi(3);
   phi[0] = Parameter(1, GammaPrior(1,1), "phi0");
   phi[1] = Parameter(0.5, BetaPrior(20,20), "phi1");
@@ -437,8 +486,8 @@ main(int argc, char* argv[])
 
   UpdateBlock updateNuBlk;
   updateNuBlk.add(nu);
-  // Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
-  // updateNu->SetParameters(updateNuBlk);
+  //Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
+  //updateNu->SetParameters(updateNuBlk);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);

@@ -82,7 +82,7 @@ namespace EpiRisk
 
   };
 
-  class UniformPrior : public Prior
+  class StdUniformPrior : public Prior
   {
     float
     operator()(const float x = 0)
@@ -92,12 +92,12 @@ namespace EpiRisk
     Prior*
     clone() const
     {
-      return new UniformPrior(*this);
+      return new StdUniformPrior(*this);
     }
     Prior*
     create() const
     {
-      return new UniformPrior;
+      return new StdUniformPrior;
     }
   };
 
@@ -109,7 +109,7 @@ namespace EpiRisk
     Prior* prior_;
 
   public:
-    Parameter() : value_(0.0), prior_(new UniformPrior), tag_("") {};
+    Parameter() : value_(0.0), prior_(new StdUniformPrior), tag_("") {};
     Parameter(const float value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
     {
       prior_ = prior.clone();
