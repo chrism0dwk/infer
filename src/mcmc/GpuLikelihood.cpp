@@ -372,7 +372,10 @@ namespace EpiRisk
     b_ = b.GetValuePtr();
 
     phi_.clear();
-    for(int p=0; p<TICKLEVELS; ++p) phi_.push_back(phi[p].GetValuePtr());
+    checkCudaError(cudaFree(devPhi_));
+    checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*phi.size()));
+
+    for(int p=0; p<phi.size(); ++p) phi_.push_back(phi[p].GetValuePtr());
     
     RefreshParameters();
   }

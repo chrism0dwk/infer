@@ -33,6 +33,8 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <list>
+#include <vector>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -50,6 +52,7 @@ namespace po = boost::program_options;
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
 #include "PosteriorHDF5Writer.hpp"
+#include "stlStrTok.hpp"
 
 using namespace std;
 using namespace boost::numeric;
@@ -373,6 +376,8 @@ struct TickSurv
   int tla10;
   int numpos;
   int total;
+  double a;
+  double b;
 };
 
 
@@ -386,10 +391,10 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 10)
+  if (argc != 11)
     {
       cerr
-          << "Usage: fmdMcmc <pop file> <epi file> <contact matrix> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu>"
+          << "Usage: fmdMcmc <pop file> <epi file> <contact matrix> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu> <tladata>"
           << endl;
       return EXIT_FAILURE;
     }
@@ -405,7 +410,32 @@ main(int argc, char* argv[])
   size_t seed = atoi(argv[7]);
   float ncratio = atof(argv[8]);
   int gpuId = atoi(argv[9]);
-  // string tickfile = argv[10];
+  string tickfilename = argv[10];
+
+  // // Load surveillance data -- waste of memory here!!
+  list<TickSurv> tickdata;
+  int maxTLAId = 0;
+  ifstream tickfile;
+  string buff;
+  tickfile.open(tickfilename.c_str());
+  getline(tickfile, buff);
+  while(!tickfile.eof()) {
+    getline(tickfile,buff);
+    std::vector<string> toks;
+    stlStrTok(toks, buff, ",");
+    if(toks.size() < 2) break;
+    TickSurv t;
+    t.tla10 = atoi(toks[0].c_str());
+    t.numpos = atoi(toks[1].c_str());
+    t.total = atoi(toks[2].c_str());
+    t.a = atoi(toks[3].c_str());
+    t.b = atoi(toks[4].c_str());
+    tickdata.push_back(t);
+    if(maxTLAId < t.tla10) maxTLAId = t.tla10;
+  }
+
+  tickfile.close();
+
   cout << "GPU: " << gpuId << endl;
   GpuLikelihood likelihood(*popDataImporter, *epiDataImporter, *contactDataImporter,
   			   (size_t) 1, obsTime, 50.0f, false, gpuId);
@@ -415,29 +445,11 @@ main(int argc, char* argv[])
   delete epiDataImporter;
 
 
-  // // Load surveillance data -- waste of memory here!!
-  // list<TickSurv> tickdata;
-  // int maxTLAId = 0;
-  // istream tickfile;
-  // string buff;
-  // tickfile.open(tickfile.c_str());
-  // getline(tickfile, buff);
-  // while(!tickfile.eof()) {
-  //   getline(tickfile,buff);
-  //   vector<string> toks;
-  //   stlStrSplit(buff, toks, ",");
-  //   if(toks.size() < 2) break;
-  //   TickSurv t;
-  //   t.tla10 = atoi(toks[0]);
-  //   t.numpos = atoi(toks[1]);
-  //   t.total = atoi(toks[2]);
-  //   tickdata.push_back(t);
-  //   if(maxTLAId < t.tla10) maxTLAId = t.tla10;
-  // }
+
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(2.7e-8, GammaPrior(2.7e-8, 1), "epsilon1");
+  Parameter epsilon1(2.7e-8, GammaPrior(2.7, 1e8), "epsilon1");
   Parameter gamma1(1.0, GammaPrior(1, 1), "gamma1");
   Parameter delta(1.0, GammaPrior(1, 1), "delta");
   Parameter omega(1.2, GammaPrior(1,1), "omega");
@@ -449,11 +461,22 @@ main(int argc, char* argv[])
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
 
-  // Hack here for phi sampled data
-  Parameters phi(3);
-  phi[0] = Parameter(1, GammaPrior(1,1), "phi0");
-  phi[1] = Parameter(0.5, BetaPrior(20,20), "phi1");
-  phi[2] = Parameter(0.2, BetaPrior(1,30), "phi2");
+  // Iterate over tick data and set up the phi parameters
+  Parameters phi(maxTLAId+1);
+  for(list<TickSurv>::const_iterator it = tickdata.begin();
+      it != tickdata.end();
+      it++)
+    {
+      char tagbuff[10];
+      sprintf(tagbuff, "phi%i", it->tla10);
+      cout << tagbuff << endl;
+
+      double startval;
+      if(it->total == 0) startval = 0.5;
+      else if(it->numpos == 0) startval = 0.1;
+      else startval = 0.99;//(double)it->numpos / (double)it->total;
+      phi[it->tla10] = Parameter(startval, BetaPrior(it->a + it->numpos, it->b + it->total - it->numpos), tagbuff);
+    }
 
   likelihood.SetMovtBan(0.0f);
   likelihood.SetParameters(epsilon1, gamma1, phi, delta, omega, beta1, beta2,
@@ -467,13 +490,11 @@ main(int argc, char* argv[])
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
   UpdateBlock txDelta;
-  txDelta.add(epsilon1);
+  //txDelta.add(epsilon1);
   //txDelta.add(gamma1);
   txDelta.add(beta1);
   txDelta.add(beta2);
   txDelta.add(delta);
-  txDelta.add(phi[1]);
-  txDelta.add(phi[2]);
   //txDelta.add(nu);
   txDelta.add(alpha1);
   txDelta.add(alpha2);
@@ -486,8 +507,19 @@ main(int argc, char* argv[])
 
   UpdateBlock updateNuBlk;
   updateNuBlk.add(nu);
-  //Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
-  //updateNu->SetParameters(updateNuBlk);
+  Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
+  updateNu->SetParameters(updateNuBlk);
+
+  UpdateBlock updatePhiBlk;
+  for(list<TickSurv>::const_iterator it = tickdata.begin();
+      it != tickdata.end();
+      it++)
+    {
+      updatePhiBlk.add(phi[it->tla10]);
+    }
+  // Mcmc::AdaptiveMultiMRW* updatePhi =
+  //   (Mcmc::AdaptiveMultiMRW*) mcmc.Create("AdaptiveMultiMRW","phi");
+  // updatePhi->SetParameters(updatePhiBlk);
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);
@@ -520,8 +552,12 @@ main(int argc, char* argv[])
     PosteriorHDF5Writer output(outputFile, likelihood);
     output.AddParameter(epsilon1);
     output.AddParameter(gamma1);
-    output.AddParameter(phi[1]);
-    output.AddParameter(phi[2]);
+    for(list<TickSurv>::const_iterator it = tickdata.begin();
+	it != tickdata.end();
+	it++)
+      {
+	output.AddParameter(phi[it->tla10]);
+      }
     output.AddParameter(delta);
     output.AddParameter(omega);
     output.AddParameter(beta1);

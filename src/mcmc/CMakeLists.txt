@@ -8,7 +8,7 @@ include(FindCUDA)
 
 set(CUDA_64_BIT_DEVICE_CODE ON)
 set(gpulikelihood_SOURCES GpuLikelihood.cpp GpuLikelihood_gpu.cu)
-set(CUDA_NVCC_FLAGS -arch=sm_20)
+set(CUDA_NVCC_FLAGS -arch=sm_20;${CUDA_NVCC_FLAGS})
 
 if(CMAKE_BUILD_TYPE STREQUAL Release)
   set(CUDA_NVCC_FLAGS -use_fast_math;-O3;${CUDA_NVCC_FLAGS})

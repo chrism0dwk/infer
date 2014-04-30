@@ -1612,7 +1612,6 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     checkCudaError(
 		   cudaMemcpy(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
-    checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*TICKLEVELS));
 
     // Infection index
     devInfecIdx_ = new thrust::device_vector<InfecIdx_t>(*other.devInfecIdx_);
@@ -1636,6 +1635,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
     // Phi parameters
     phi_ = other.phi_;
+    checkCudaError(cudaMalloc(&devPhi_, sizeof(float)*phi_.size()));
     
     // H function integral cache
     checkCudaError(cudaMalloc(&devHIntegCache_, sizeof(float)*5));
@@ -2848,12 +2848,12 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
   void
   GpuLikelihood::RefreshParameters()
   {
-    float tmp[TICKLEVELS];
+    float tmp[phi_.size()];
     
-    for(int p=0; p<TICKLEVELS; ++p)
+    for(int p=0; p<phi_.size(); ++p)
       tmp[p] = phi_[p];
     checkCudaError(
-		   cudaMemcpy(devPhi_, tmp, TICKLEVELS*sizeof(float), cudaMemcpyHostToDevice)
+		   cudaMemcpy(devPhi_, tmp, phi_.size()*sizeof(float), cudaMemcpyHostToDevice)
 		   );
     
     CalcHFuncIntegCache(*alpha1_, *alpha2_, devHIntegCache_,true);

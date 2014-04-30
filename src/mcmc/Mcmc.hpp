@@ -112,11 +112,16 @@ namespace EpiRisk
     class McmcRandomScan : public McmcContainer
     {
     public:
+      explicit
+      McmcRandomScan(int n);
       virtual
       ~McmcRandomScan();
       virtual
       void
       Update();
+
+    private:
+      int n_;
     };
 
 
