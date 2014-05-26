@@ -196,7 +196,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   startval = _init["delta"]; prior = _priorParms["delta"];
   EpiRisk::Parameter delta(startval[0], GammaPrior(prior[0], prior[1]), "delta");
-  EpiRisk::Parameter omega(1.5, GammaPrior(6,4), "omega");
+  startval = _init["omega"]; prior = _priorParms["omega"];
+  EpiRisk::Parameter omega(startval[0], GammaPrior(prior[0],prior[1]), "omega");
   EpiRisk::Parameter nu(0.001, GammaPrior(1, 1), "nu");
   startval = _init["alpha"];
   EpiRisk::Parameter alpha(startval[0], GammaPrior(1, 1), "alpha");

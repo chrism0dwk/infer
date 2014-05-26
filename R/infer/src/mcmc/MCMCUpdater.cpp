@@ -931,6 +931,8 @@ namespace EpiRisk
       float oldIN = likelihood_->GetIN(index);
       float newIN = oldIN * exp(random_->gaussian(0.0f, updateTuning_));
 
+      if(newIN < 1.0e-9f)	return false;  // Reject if newIN is zero!
+
       float piCur = likelihood_->GetCurrentValue();
       float piCan = likelihood_->UpdateI(index, newIN);
 
@@ -989,6 +991,8 @@ namespace EpiRisk
       size_t index = random_->integer(numSusceptible);
 
       float inProp = random_->gamma(INFECPROP_A, INFECPROP_B);
+
+      if(inProp < 1.0e-9f) return false; // Reject if I->N is zero.
 
       float logPiCur = likelihood_->GetCurrentValue();
 

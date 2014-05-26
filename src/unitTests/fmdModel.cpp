@@ -110,9 +110,9 @@ FmdModel::ItoN(Random& random) const
 }
 
 double
-FmdModel::NtoR() const
+FmdModel::NtoR(Random& random) const
 {
-  return params_.ntor;
+  return random.gamma(params_.c,params_.d);
 }
 
 double
@@ -126,3 +126,12 @@ FmdModel::leftTruncatedItoN(Random& random, const Individual& j) const
   return d;
 }
 
+double
+FmdModel::leftTruncatedNtoR(Random& random, const Individual& j) const
+{
+  EpiRisk::FP_t d = population_.getObsTime() - j.getN();
+  EpiRisk::FP_t s = gsl_cdf_gamma_P(d, params_.c, 1.0/params_.d);
+  EpiRisk::FP_t u = random.uniform(s,1.0);
+  d = gsl_cdf_gamma_Pinv(u, params_.a, 1.0/params_.b);
+  return d;
+}

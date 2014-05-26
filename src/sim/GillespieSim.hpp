@@ -282,7 +282,7 @@ namespace EpiRisk
               Events events;
               events.I = it->getI();
               events.N = events.I + model_.leftTruncatedItoN(random_, *it);
-              events.R = events.N + model_.NtoR();
+              events.R = events.N + model_.NtoR(random_);
 
               population_.updateEvents(*it,events);
             }
@@ -290,9 +290,9 @@ namespace EpiRisk
           if (it->getN() < population_.getObsTime() and it->getR() > population_.getObsTime())
             {
               Events events = it->getEvents();
-              double Rcan = it->getN() + model_.NtoR();
+              double Rcan = it->getN() + model_.leftTruncatedNtoR(random_, *it);
               // If R is going to be < obsTime, set removal to be tomorrow -- fudgy!
-              events.R = Rcan > population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
+              events.R = Rcan;// > population_.getObsTime() ? Rcan : population_.getObsTime() + model_.NtoR();
               population_.updateEvents(*it, events);
             }
 
@@ -354,7 +354,7 @@ namespace EpiRisk
 
       // Choose notification and removal times
       double N = infection->getTime() + model_.ItoN(random_);
-      double R = N + model_.NtoR();
+      double R = N + model_.NtoR(random_);
 
       // Set times
       Events events;
