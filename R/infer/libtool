@@ -2,7 +2,7 @@
 
 # libtool - Provide generalized library-building support services.
 # Generated automatically by config.status (description) VERSION
-# Libtool was configured on host it060123:
+# Libtool was configured on host build-sn-gpu-p:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 #
 #   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005,
@@ -86,7 +86,7 @@ NM="/usr/bin/nm -B"
 LN_S="ln -s"
 
 # What is the maximum length of a command?
-max_cmd_len=1966080
+max_cmd_len=3458764513820540925
 
 # Object file suffix (normally "o").
 objext=o
@@ -234,10 +234,10 @@ finish_eval=""
 hardcode_into_libs=yes
 
 # Compile-time system search path for libraries.
-sys_lib_search_path_spec="/usr/lib/gcc/x86_64-redhat-linux/4.4.7 /usr/lib64 /lib64"
+sys_lib_search_path_spec="/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2 /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/lib/gcc /share/apps/NVIDIA/CUDA-6.0/lib64 /share/easybuild/RHEL6.3/westmere/software/R/3.0.3-goolf-1.5.14/lib64 /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/lib64 /lib64 /usr/lib64 /share/easybuild/RHEL6.3/westmere/software/GSL/1.15-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/libxml2/2.9.1-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/libpng/1.6.6-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/zlib/1.2.8-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/libreadline/6.2-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/ncurses/5.9-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/ScaLAPACK/2.0.2-gompi-1.5.14-OpenBLAS-0.2.8-LAPACK-3.5.0/lib /share/easybuild/RHEL6.3/westmere/software/FFTW/3.3.4-gompi-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/OpenBLAS/0.2.8-gompi-1.5.14-LAPACK-3.5.0/lib /share/easybuild/RHEL6.3/westmere/software/OpenMPI/1.6.5-GCC-4.8.2/lib"
 
 # Run-time system search path for libraries.
-sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib64/R/lib /usr/lib64/atlas /usr/lib64/ctapi /usr/lib64/llvm /usr/local/lib /usr/local/lib64 /usr/lib64/openmpi/lib /usr/lib64/mysql /usr/lib/nvidia /usr/lib64/nvidia /usr/lib64/nx /usr/lib64/nx/X11 /usr/lib64/qt-3.3/lib /usr/lib64/xulrunner "
+sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib64/R/lib /opt/mellanox/fca/lib /opt/ibutils/lib64 /opt/mellanox/mxm/lib /usr/lib64/mysql /usr/lib64/qt-3.3/lib /gpfs1m/apps/apps/lib/lib /usr/local/lib /usr/lib64/xulrunner-2 "
 
 # Whether dlopen is supported.
 dlopen_support=unknown
@@ -275,7 +275,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -8930,7 +8930,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -9040,17 +9040,17 @@ file_list_spec=""
 hardcode_action=immediate
 
 # The directories searched by this compiler when creating a shared library.
-compiler_lib_search_dirs="/usr/lib/gcc/x86_64-redhat-linux/4.4.7 /usr/lib/gcc/x86_64-redhat-linux/4.4.7 /usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../../../lib64 /lib/../lib64 /usr/lib/../lib64 /usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../.."
+compiler_lib_search_dirs="/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2 /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc /share/apps/NVIDIA/CUDA-6.0/lib/../lib64 /share/apps/NVIDIA/CUDA-6.0/lib64/../lib64 /share/easybuild/RHEL6.3/westmere/software/R/3.0.3-goolf-1.5.14/lib64/../lib64 /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/../../../../lib64 /lib/../lib64 /usr/lib/../lib64 /share/apps/NVIDIA/CUDA-6.0/lib /share/apps/NVIDIA/CUDA-6.0/lib64 /share/easybuild/RHEL6.3/westmere/software/GSL/1.15-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/R/3.0.3-goolf-1.5.14/lib64 /share/easybuild/RHEL6.3/westmere/software/libxml2/2.9.1-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/libpng/1.6.6-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/zlib/1.2.8-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/libreadline/6.2-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/ncurses/5.9-goolf-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/ScaLAPACK/2.0.2-gompi-1.5.14-OpenBLAS-0.2.8-LAPACK-3.5.0/lib /share/easybuild/RHEL6.3/westmere/software/FFTW/3.3.4-gompi-1.5.14/lib /share/easybuild/RHEL6.3/westmere/software/OpenBLAS/0.2.8-gompi-1.5.14-LAPACK-3.5.0/lib /share/easybuild/RHEL6.3/westmere/software/OpenMPI/1.6.5-GCC-4.8.2/lib /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/../../.."
 
 # Dependencies to place before and after the objects being linked to
 # create a shared library.
-predep_objects="/usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/4.4.7/crtbeginS.o"
-postdep_objects="/usr/lib/gcc/x86_64-redhat-linux/4.4.7/crtendS.o /usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../../../lib64/crtn.o"
+predep_objects="/usr/lib/../lib64/crti.o /gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/crtbeginS.o"
+postdep_objects="/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/crtendS.o /usr/lib/../lib64/crtn.o"
 predeps=""
 postdeps="-lstdc++ -lm -lgcc_s -lc -lgcc_s"
 
 # The library search path used internally by the compiler when linking
 # a shared library.
-compiler_lib_search_path="-L/usr/lib/gcc/x86_64-redhat-linux/4.4.7 -L/usr/lib/gcc/x86_64-redhat-linux/4.4.7 -L/usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/4.4.7/../../.."
+compiler_lib_search_path="-L/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2 -L/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc -L/share/apps/NVIDIA/CUDA-6.0/lib/../lib64 -L/share/apps/NVIDIA/CUDA-6.0/lib64/../lib64 -L/share/easybuild/RHEL6.3/westmere/software/R/3.0.3-goolf-1.5.14/lib64/../lib64 -L/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/share/apps/NVIDIA/CUDA-6.0/lib -L/share/apps/NVIDIA/CUDA-6.0/lib64 -L/share/easybuild/RHEL6.3/westmere/software/GSL/1.15-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/R/3.0.3-goolf-1.5.14/lib64 -L/share/easybuild/RHEL6.3/westmere/software/libxml2/2.9.1-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/libpng/1.6.6-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/zlib/1.2.8-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/libreadline/6.2-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/ncurses/5.9-goolf-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/ScaLAPACK/2.0.2-gompi-1.5.14-OpenBLAS-0.2.8-LAPACK-3.5.0/lib -L/share/easybuild/RHEL6.3/westmere/software/FFTW/3.3.4-gompi-1.5.14/lib -L/share/easybuild/RHEL6.3/westmere/software/OpenBLAS/0.2.8-gompi-1.5.14-LAPACK-3.5.0/lib -L/share/easybuild/RHEL6.3/westmere/software/OpenMPI/1.6.5-GCC-4.8.2/lib -L/gpfs1m/apps/easybuild/RHEL6.3/westmere/software/GCC/4.8.2/bin/../lib/gcc/x86_64-unknown-linux-gnu/4.8.2/../../.."
 
 # ### END LIBTOOL TAG CONFIG: CXX
