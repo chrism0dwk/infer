@@ -78,6 +78,24 @@ namespace EpiRisk
       }
     };
 
+    // MCMC Scanners
+    class RandomScan : public McmcContainer
+    {
+    public:
+      explicit
+      RandomScan();
+      virtual
+      ~RandomScan();
+      void
+      SetNumReps(int n);
+      virtual
+      void
+      Update();
+
+    private:
+      int n_;
+    };
+
     // MCMC UPDATERS
     class McmcUpdate : public Mcmc
     {

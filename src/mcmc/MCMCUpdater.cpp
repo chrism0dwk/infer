@@ -144,6 +144,32 @@ namespace EpiRisk
       return gsl_ran_gaussian_tail_pdf(x - mean, -mean, sqrt(var));
     }
 
+    RandomScan::RandomScan() : n_(0)
+    {
+    }
+
+    RandomScan::~RandomScan()
+    {
+    }
+
+    void
+    RandomScan::SetNumReps(int n)
+    {
+      n_ = n;
+    }
+
+    void
+    RandomScan::Update()
+    {
+      for(int k=0; k<n_; k++) {
+
+	boost::ptr_list<Mcmc>::iterator upd = updateStack_.begin();
+	std::advance(upd, random_->integer(updateStack_.size()));
+	upd->Update();
+
+      }
+    }
+
     McmcUpdate::McmcUpdate() :
         acceptance_(0), numUpdates_(0), params_(NULL)
     {

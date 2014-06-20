@@ -60,6 +60,11 @@ namespace EpiRisk
        {
          return new InfectionTimeUpdate;
        }
+       Mcmc*
+       CreateRandomScan()
+       {
+	 return new RandomScan;
+       }
      }
 
       /////// Provided Updater registrations
@@ -92,6 +97,9 @@ namespace EpiRisk
 
       const bool infectionTimeUpdate = McmcFactory::Instance().RegisterUpdater(
           "InfectionTimeUpdate", CreateInfectionTimeUpdate);
+
+      const bool randomScan = McmcFactory::Instance().RegisterUpdater(
+								      "RandomScan", CreateRandomScan);
     }
 
 

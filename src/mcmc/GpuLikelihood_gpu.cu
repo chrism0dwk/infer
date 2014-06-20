@@ -273,7 +273,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     __device__ __host__ float
     operator()(const float dsq, const float delta, const float omega)
     {
-      return delta / powf(delta*delta + dsq, omega);
+      //return delta / powf(delta*delta + dsq, omega);
+      return expf(-delta * (sqrt(dsq) - 5.0f));
     }
   };
     
@@ -2850,8 +2851,9 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
   {
     float tmp[phi_.size()];
     
-    for(int p=0; p<phi_.size(); ++p)
+    for(int p=0; p<phi_.size(); ++p) {
       tmp[p] = phi_[p];
+    }
     checkCudaError(
 		   cudaMemcpy(devPhi_, tmp, phi_.size()*sizeof(float), cudaMemcpyHostToDevice)
 		   );

@@ -449,15 +449,16 @@ main(int argc, char* argv[])
 
   // Parameters
   // Set up parameters
-  Parameter epsilon1(2.7e-8, GammaPrior(2.7, 1e8), "epsilon1");
+  //Parameter epsilon1(2.7e-8, GammaPrior(2.7, 1e8), "epsilon1");
+  Parameter epsilon1(1.0e-8, GammaPrior(1.0, 1e8), "epsilon1");
   Parameter gamma1(1.0, GammaPrior(1, 1), "gamma1");
   Parameter delta(1.0, GammaPrior(1, 1), "delta");
   Parameter omega(1.2, GammaPrior(1,1), "omega");
-  Parameter beta1(0.1, GammaPrior(1,1), "beta1");
-  Parameter beta2(0.1, GammaPrior(1,1), "beta2");
+  Parameter beta1(0.00025, GammaPrior(3.981,15923.57), "beta1");
+  Parameter beta2(0.1, GammaPrior(1.643,164.3), "beta2");
   Parameter nu(137.0, UniformPrior(0.0, 180), "nu");
-  Parameter alpha1(0.8f, BetaPrior(2, 2), "alpha1");
-  Parameter alpha2(0.8f, BetaPrior(2, 2), "alpha2");
+  Parameter alpha1(0.8f, BetaPrior(1, 8), "alpha1");
+  Parameter alpha2(0.8f, BetaPrior(1, 8), "alpha2");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
 
@@ -471,10 +472,10 @@ main(int argc, char* argv[])
       sprintf(tagbuff, "phi%i", it->tla10);
       cout << tagbuff << endl;
 
-      double startval;
-      if(it->total == 0) startval = 0.5;
-      else if(it->numpos == 0) startval = 0.1;
-      else startval = 0.99;//(double)it->numpos / (double)it->total;
+      double startval = 0.5;
+      // if(it->total == 0) startval = 0.5;
+      // else if(it->numpos == 0) startval = 0.1;
+      // else startval = (double)it->numpos / (double)it->total;
       phi[it->tla10] = Parameter(startval, BetaPrior(it->a + it->numpos, it->b + it->total - it->numpos), tagbuff);
     }
 
@@ -490,7 +491,7 @@ main(int argc, char* argv[])
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
   UpdateBlock txDelta;
-  //txDelta.add(epsilon1);
+  txDelta.add(epsilon1);
   //txDelta.add(gamma1);
   txDelta.add(beta1);
   txDelta.add(beta2);
@@ -520,6 +521,18 @@ main(int argc, char* argv[])
   // Mcmc::AdaptiveMultiMRW* updatePhi =
   //   (Mcmc::AdaptiveMultiMRW*) mcmc.Create("AdaptiveMultiMRW","phi");
   // updatePhi->SetParameters(updatePhiBlk);
+
+  Mcmc::RandomScan* updatePhi = (Mcmc::RandomScan*) mcmc.Create("RandomScan", "updatePhi");
+  updatePhi->SetNumReps(10);
+  for(list<TickSurv>::const_iterator it = tickdata.begin();
+      it != tickdata.end();
+      it++)
+    {
+      UpdateBlock* updBlock = new UpdateBlock;
+      updBlock->add(phi[it->tla10]);
+      Mcmc::AdaptiveSingleMRW* upd = (Mcmc::AdaptiveSingleMRW*) updatePhi->Create("AdaptiveSingleMRW",phi[it->tla10].GetTag());
+      upd->SetParameters(*updBlock);
+    }
 
   UpdateBlock infecPeriod;
   infecPeriod.add(a);

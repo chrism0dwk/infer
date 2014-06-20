@@ -113,6 +113,7 @@ namespace EpiRisk
     Parameter(const float value,const Prior& prior,const std::string tag) : value_(value), tag_(tag)
     {
       prior_ = prior.clone();
+      std::cout << "Prior val for '" << tag_ << "' = " << this->prior() << std::endl;
     }
     Parameter(const Parameter& param)
     {
