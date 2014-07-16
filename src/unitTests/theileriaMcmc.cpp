@@ -43,6 +43,8 @@
 #include <boost/bind.hpp>
 namespace po = boost::program_options;
 
+//#include <cuda_profiler_api.h>
+
 #include "config.h"
 #include "Mcmc.hpp"
 #include "McmcFactory.hpp"
@@ -456,9 +458,10 @@ main(int argc, char* argv[])
   Parameter omega(1.2, GammaPrior(1,1), "omega");
   Parameter beta1(0.00025, GammaPrior(3.981,15923.57), "beta1");
   Parameter beta2(0.1, GammaPrior(1.643,164.3), "beta2");
-  Parameter nu(137.0, UniformPrior(0.0, 180), "nu");
-  Parameter alpha1(0.8f, BetaPrior(1, 8), "alpha1");
-  Parameter alpha2(0.8f, BetaPrior(1, 8), "alpha2");
+  Parameter nu(137.0, UniformPrior(50, 150), "nu");
+  Parameter alpha1(0.1f, BetaPrior(1, 8), "alpha1");
+  Parameter alpha2(0.1f, BetaPrior(1, 8), "alpha2");
+  Parameter alpha3(0.8f, BetaPrior(1, 8), "alpha3");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
 
@@ -481,7 +484,7 @@ main(int argc, char* argv[])
 
   likelihood.SetMovtBan(0.0f);
   likelihood.SetParameters(epsilon1, gamma1, phi, delta, omega, beta1, beta2,
-			   nu, alpha1, alpha2, a, b);
+			   nu, alpha1, alpha2, alpha3, a, b);
 
 
   // Set up MCMC algorithm
@@ -499,6 +502,7 @@ main(int argc, char* argv[])
   //txDelta.add(nu);
   txDelta.add(alpha1);
   txDelta.add(alpha2);
+  txDelta.add(alpha3);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txDistance");
@@ -578,6 +582,7 @@ main(int argc, char* argv[])
     output.AddParameter(nu);
     output.AddParameter(alpha1);
     output.AddParameter(alpha2);
+    output.AddParameter(alpha3);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
@@ -592,6 +597,7 @@ main(int argc, char* argv[])
 
     // Run the chain
     cout << "Running MCMC" << endl;
+    //cudaProfilerStart();
     for(size_t k=0; k<atoi(argv[6]); ++k)
       {
         if(k % 100 == 0)
@@ -603,7 +609,7 @@ main(int argc, char* argv[])
         output.write();
 	likelihood.PrintLikelihoodComponents();
       }
-
+    //cudaProfilerStop();
     // Wrap up
     map<string, float> acceptance = mcmc.GetAcceptance();
 

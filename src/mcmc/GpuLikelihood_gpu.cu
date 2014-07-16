@@ -149,7 +149,7 @@ namespace EpiRisk
   };
 
  __device__ float
-_h(const float t, const float I, float nu, float ys, float yw)
+ _h(const float t, const float I, float nu, float ys, float yw, float ysp)
 {
   // Periodic piece-wise cubic spline
   float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
@@ -163,7 +163,7 @@ _h(const float t, const float I, float nu, float ys, float yw)
   tAdj = tAdj - floorf(tAdj);
 
   // Set up parameters
-  Y[0] = ys; Y[2] = yw; Y[4] = ys;
+  Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
   
   // Calculate spline value
   int epoch = (int)(tAdj*4.0f);
@@ -196,7 +196,7 @@ _h(const float t, const float I, float nu, float ys, float yw)
   }
 
 __global__ void
-_HIntegConst(const float ys, const float yw, float* cache)
+_HIntegConst(const float ys, const float yw, const float ysp, float* cache)
 {
   // Calculates cached integral -- requires only 4 threads
   float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
@@ -206,7 +206,7 @@ _HIntegConst(const float ys, const float yw, float* cache)
   
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   
-  Y[0] = ys; Y[2] = yw; Y[4] = ys;
+  Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
   
   if(tid < 4) {
     buff[tid] = _HIntegrand(T[tid+1], T+tid, Y+tid)
@@ -227,27 +227,27 @@ _HIntegConst(const float ys, const float yw, float* cache)
 }
   
   void
-  CalcHFuncIntegCache(const float ys, const float yw, float* cache, const bool setZero=false)
+  CalcHFuncIntegCache(const float ys, const float yw, const float ysp, float* cache, const bool setZero=false)
   {
     // Calculates the CUDA H function integral cache
     
     if(setZero)
       checkCudaError(cudaMemset(cache, 0, sizeof(float)));
     
-    _HIntegConst<<<1, 4>>>(ys, yw, cache);
+    _HIntegConst<<<1, 4>>>(ys, yw, ysp, cache);
 
     cudaDeviceSynchronize();
   }
   
 __device__ float
-_H(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float* hCache)
+_H(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float alpha3, const float* hCache)
 {
   // Returns the integral of the 'h' function over [a,b]
   float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
   float Y[] = {1.0f, 1.0f,  1.0f, 1.0f,  1.0f};
   float delta = 0.25f;
   
-  Y[0] = alpha1; Y[2] = alpha2; Y[4] = alpha1;
+  Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3, Y[4] = alpha1;
   
   if(b <= a) return 0.0f;
   
@@ -273,8 +273,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     __device__ __host__ float
     operator()(const float dsq, const float delta, const float omega)
     {
-      //return delta / powf(delta*delta + dsq, omega);
-      return expf(-delta * (sqrt(dsq) - 5.0f));
+      return delta / powf(delta*delta + dsq, omega);
+      //return expf(-delta * (sqrt(dsq) - 5.0f));
     }
   };
     
@@ -689,7 +689,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 		const CsrMatrix distance, float* eventTimes, 
 		const int eventTimesPitch,const float* susceptibility,
 		const float delta, const float omega, const float p, 
-		const float nu, const float alpha1, const float alpha2, const float* integCache, float* output)
+		const float nu, const float alpha1, const float alpha2, const float alpha3, const float* integCache, float* output)
   {
     // Each warp calculates a row i of the sparse matrix
 
@@ -716,7 +716,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
           {
             // Integrated infection pressure
             float Ij = eventTimes[distance.colInd[jj]];
-            float betaij = _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, integCache);
+            float betaij = _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, alpha3, integCache);
 
             // Apply distance kernel and suscep
 	    OP op;
@@ -770,7 +770,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 	       const int eventTimesPitch, const float* susceptibility,
 	       const float epsilon1,
 	       const float gamma1, const float delta, const float omega, const float p, const float nu,
-	       const float alpha1, const float alpha2, float* prodCache)
+	       const float alpha1, const float alpha2, const float alpha3, float* prodCache)
   {
     // Each warp calculates a row of the sparse matrix
 
@@ -802,7 +802,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
               {
                 float idxOnj = 0.0f;
                 if (Ii < Ij and Ij <= Ri)
-                  idxOnj += _h(Ij, Ii, nu, alpha1, alpha2);
+                  idxOnj += _h(Ij, Ii, nu, alpha1, alpha2, alpha3);
 		OP op;
                 threadProdCache[threadIdx.x] += idxOnj * p * op(distance.valtr[ii],delta,omega);
               }
@@ -857,7 +857,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			       const InfecIdx_t* infecIdx, const float newTime, const CsrMatrix distance,
 			       float* eventTimes, const int eventTimesPitch, const float* susceptibility,
 			       const float delta, const float omega, const float p,
-			       const float nu, const float alpha1, const float alpha2, const float* integCache, float* output)
+			       const float nu, const float alpha1, const float alpha2, const float alpha3, const float* integCache, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -885,8 +885,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
         if (Ij < Rj)
           {
             // Recalculate pressure from j on idx
-            jOnIdx = _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2, integCache); // New pressure
-            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2, integCache); // Old pressure
+            jOnIdx = _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2, alpha3, integCache); // New pressure
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2, alpha3, integCache); // Old pressure
 	    jOnIdx *= op(distance.valtr[begin+tid],delta,omega);
 	    // Apply infec and suscep
             jOnIdx *= susceptibility[i];
@@ -894,8 +894,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 	
 
         // Recalculate pressure from idx on j
-        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2, integCache);
-        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, integCache);
+        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2, alpha3, integCache);
+        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, alpha3, integCache);
         IdxOnj *= susceptibility[j];
 	IdxOnj *= op(distance.val[begin+tid],delta,omega);
     
@@ -923,7 +923,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			      float* eventTimes, const int eventTimesPitch, const float* susceptibility,
 			      const float epsilon1, const float gamma1,
 			      const float delta, const float omega, const float p, 
-			      const float nu, const float alpha1, const float alpha2, const int I1Idx, float* prodCache)
+			      const float nu, const float alpha1, const float alpha2, const float alpha3, const int I1Idx, float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     extern __shared__
@@ -953,10 +953,10 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
             // Adjust product cache from idx on others
             float idxOnj = 0.0f;
             if (Ii < Ij and Ij <= Ri)
-              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2);
+              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2, alpha3);
 
             if (newTime < Ij and Ij <= Ri)
-              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2);
+              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2, alpha3);
 
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta, omega);
             prodCache[j] += idxOnj;
@@ -964,7 +964,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
             // Recalculate instantaneous pressure on idx
             float jOnIdx = 0.0f;
             if (Ij < newTime and newTime <= Rj)
-              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2);
+              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2, alpha3);
 
             jOnIdx *= susceptibility[i] * p * op(distance.valtr[begin+tid],delta, omega);
             buff[threadIdx.x] = jOnIdx * gamma1;
@@ -989,7 +989,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			    const float newTime, const CsrMatrix distance, const float* eventTimes,
 			    const int eventTimesPitch, const float* susceptibility,
 			    const float delta, const float omega, const float p,
-			    const float nu, const float alpha1, const float alpha2, const float* integCache, float* output)
+			    const float nu, const float alpha1, const float alpha2, const float alpha3, const float* integCache, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1017,15 +1017,15 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
         if (Ij < Rj)
           {
             // Calculate pressure from j on idx
-            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ij, Ii), nu, alpha1, alpha2, integCache);
-            jOnIdx += _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2, integCache);
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ij, Ii), nu, alpha1, alpha2, alpha3, integCache);
+            jOnIdx += _H(fminf(Rj, newTime), fminf(Ij, newTime), nu, alpha1, alpha2, alpha3, integCache);
 	    jOnIdx *= op(distance.valtr[begin+tid], delta, omega);
             // Apply infec and suscep
             jOnIdx *= susceptibility[i];
           }
 
         // Add pressure from idx on j
-        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2, integCache);
+        float IdxOnj = _H(fminf(Ri, Ij), fminf(newTime, Ij), nu, alpha1, alpha2, alpha3, integCache);
 	IdxOnj *= op(distance.val[begin+tid], delta, omega);
         IdxOnj *= susceptibility[j];
 
@@ -1050,7 +1050,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			    const float newTime, const CsrMatrix distance, float* eventTimes,
 			    const int eventTimesPitch, const float* susceptibility,
 			    const float delta, const float omega, const float p,
-			    const float nu, const float alpha1, const float alpha2, const float* integCache, float* output)
+			    const float nu, const float alpha1, const float alpha2, const float alpha3, const float* integCache, float* output)
   {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1078,8 +1078,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
         if (Ij < Rj)
           {
             // Recalculate pressure from j on idx
-            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2, integCache); // Old pressure
-            jOnIdx += _H(fminf(Rj, Ri), fminf(Ij, Ri), nu, alpha1, alpha2, integCache); // New pressure
+            jOnIdx -= _H(fminf(Rj, Ii), fminf(Ii, Ij), nu, alpha1, alpha2, alpha3, integCache); // Old pressure
+            jOnIdx += _H(fminf(Rj, Ri), fminf(Ij, Ri), nu, alpha1, alpha2, alpha3, integCache); // New pressure
 	    jOnIdx *= op(distance.valtr[begin + tid], delta, omega);
 	    // Apply infec and suscep
             jOnIdx *= susceptibility[i];
@@ -1087,7 +1087,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
         // Subtract pressure from idx on j
         float IdxOnj = 0.0f;
-        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, integCache);
+        IdxOnj -= _H(fminf(Ri, Ij), fminf(Ii, Ij), nu, alpha1, alpha2, alpha3, integCache);
 	IdxOnj *= op(distance.val[begin+tid], delta, omega);
         IdxOnj *= susceptibility[j];
 
@@ -1114,7 +1114,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			   const int eventTimesPitch, const float* susceptibility,
 			   const float epsilon1, const float gamma1, const float delta, 
 			   const float omega, const float p, const float nu, 
-			   const float alpha1, const float alpha2, const int I1Idx, float* prodCache)
+			   const float alpha1, const float alpha2, const float alpha3, const int I1Idx, float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     extern __shared__
@@ -1143,7 +1143,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
             // Adjust product cache from idx on others
             float idxOnj = 0.0f;
             if (newTime < Ij and Ij <= Ri)
-              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2);
+              idxOnj += _h(Ij, newTime, nu, alpha1, alpha2, alpha3);
 	    
 	    OP op;
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta, omega);
@@ -1152,7 +1152,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
             // Calculate instantaneous pressure on idx
             float jOnIdx = 0.0f;
             if (Ij < newTime and newTime <= Rj)
-              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2);
+              jOnIdx = _h(newTime, Ij, nu, alpha1, alpha2, alpha3);
 
             jOnIdx *= gamma1 * susceptibility[i] * p * op(distance.valtr[begin+tid],delta,omega);
 
@@ -1177,7 +1177,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			   const float newTime, const CsrMatrix distance, float* eventTimes,
 			   const int eventTimesPitch, const float* susceptibility,
 			   const float gamma1, const float delta, const float omega, 
-			   const float p, const float nu, const float alpha1, const float alpha2,
+			   const float p, const float nu, const float alpha1, const float alpha2, const float alpha3,
 			   float* prodCache)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -1202,7 +1202,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
             // Adjust product cache from idx on others
             float idxOnj = 0.0;
             if (Ii < Ij and Ij <= Ri)
-              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2);
+              idxOnj -= _h(Ij, Ii, nu, alpha1, alpha2, alpha3);
 
 	    OP op;
             idxOnj *= gamma1 * susceptibility[j] * p * op(distance.val[begin+tid],delta,omega);
@@ -1579,6 +1579,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     nu_(other.nu_), 
     alpha1_(other.alpha1_),
     alpha2_(other.alpha2_), 
+    alpha3_(other.alpha3_),
     a_(other.a_), 
     b_(other.b_), 
     cuRand_(other.cuRand_)
@@ -1709,6 +1710,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     nu_ = other.nu_;
     alpha1_ = other.alpha1_;
     alpha2_ = other.alpha2_;
+    alpha3_ = other.alpha3_;
     a_ = other.a_;
     b_ = other.b_;
 
@@ -2001,24 +2003,24 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 									     devEventTimes_,eventTimesPitch_,
 									     devSusceptibility_,
 									     *epsilon1_, *gamma1_,*delta_,*omega_,
-									     *beta1_,*nu_, *alpha1_, *alpha2_, 
+									     *beta1_,*nu_, *alpha1_, *alpha2_, *alpha3_,
 									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _calcProduct<Identity,false><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devSusceptibility_,
     									*epsilon1_,*gamma1_,*delta_,*omega_,
-    									*beta2_,*nu_,*alpha1_, *alpha2_, 
+    									*beta2_,*nu_,*alpha1_, *alpha2_, *alpha3_, 
     									thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
     ReduceProductVector();
   }
 
-  inline
-  void
-  GpuLikelihood::CalcIntegral()
-  {
+   inline
+   void
+   GpuLikelihood::CalcIntegral()
+   {
     int numRequiredThreads = devInfecIdx_->size() * 32; // One warp per infection
     int integralBuffSize = (numRequiredThreads + THREADSPERBLOCK - 1)
       / THREADSPERBLOCK;
@@ -2027,7 +2029,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
 									     devSusceptibility_,
-									     *delta_,*omega_,*beta1_,*nu_,*alpha1_, *alpha2_, devHIntegCache_,
+									     *delta_,*omega_,*beta1_,*nu_,*alpha1_, *alpha2_, *alpha3_, devHIntegCache_,
 									     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -2035,7 +2037,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devSusceptibility_,
-    									*delta_,*omega_,*beta2_,*nu_, *alpha1_, *alpha2_, devHIntegCache_,
+    									*delta_,*omega_,*beta2_,*nu_, *alpha1_, *alpha2_, *alpha3_, devHIntegCache_,
     									thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     
@@ -2213,7 +2215,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 															  *omega_, 
 															  *beta1_, 
 															  *nu_, 
-															  *alpha1_, *alpha2_,
+															  *alpha1_, *alpha2_, *alpha3_,
 															  devHIntegCache_,
 															  thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _updateInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, 
@@ -2227,7 +2229,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														     *omega_, 
 														     *beta2_, 
 														     *nu_, 
-														     *alpha1_, *alpha2_, devHIntegCache_, 
+														     *alpha1_, *alpha2_, *alpha3_, devHIntegCache_, 
 														     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
     cudaDeviceSynchronize();
@@ -2258,7 +2260,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 												   *omega_, 
 												   *beta1_,
 												   *nu_, 
-															 *alpha1_, *alpha2_, 
+															 *alpha1_, *alpha2_, *alpha3_, 
 												   I1Idx_, 
 												   thrust::raw_pointer_cast(&(*devProduct_)[0]));
 
@@ -2275,7 +2277,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
      												   *omega_, 
      												   *beta2_,
      												   *nu_, 
-														     *alpha1_,*alpha2_, 
+														     *alpha1_,*alpha2_, *alpha3_, 
      												   I1Idx_, 
      												   thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
@@ -2382,7 +2384,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														 *omega_, 
 														 *beta1_,
 														 *nu_, 
-														       *alpha1_, *alpha2_,
+														       *alpha1_, *alpha2_, *alpha3_,
 														       devHIntegCache_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _addInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
@@ -2396,7 +2398,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														 *omega_, 
 														 *beta2_,
 														 *nu_, 
-														  *alpha1_,*alpha2_, 
+														  *alpha1_,*alpha2_, *alpha3_, 
 														  devHIntegCache_,
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
 
@@ -2428,7 +2430,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														*omega_, 
 														*beta1_,
 														*nu_, 
-														      *alpha1_,*alpha2_, 
+														      *alpha1_,*alpha2_,*alpha3_, 
 														I1Idx_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _addInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, 
@@ -2444,7 +2446,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     														*omega_, 
     														*beta2_,
     														*nu_, 
-														 *alpha1_,*alpha2_, 
+														 *alpha1_,*alpha2_,*alpha3_, 
     														I1Idx_, 
     														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
@@ -2533,7 +2535,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														 *omega_, 
 														 *beta1_,
 														 *nu_, 
-														       *alpha1_,*alpha2_,
+														       *alpha1_,*alpha2_,*alpha3_,
 														       devHIntegCache_, 
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     _delInfectionTimeIntegral<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
@@ -2547,7 +2549,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														 *omega_, 
 														 *beta2_,
 														 *nu_, 
-														  *alpha1_,*alpha2_, 
+														  *alpha1_,*alpha2_,*alpha3_, 
 														  devHIntegCache_,
 														 thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
     checkCudaError(cudaGetLastError());
@@ -2577,7 +2579,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														*omega_,
 														*beta1_,
 														*nu_, 
-														      *alpha1_,*alpha2_, 
+														      *alpha1_,*alpha2_,*alpha3_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     _delInfectionTimeProduct<Identity,false><<<blocksPerGridC, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, 
 														thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), 
@@ -2591,7 +2593,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 														*omega_,
 														*beta2_,
 														*nu_, 
-														 *alpha1_,*alpha2_, 
+														 *alpha1_,*alpha2_,*alpha3_, 
 														thrust::raw_pointer_cast(&(*devProduct_)[0]));
     checkCudaError(cudaGetLastError());
 
@@ -2858,7 +2860,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 		   cudaMemcpy(devPhi_, tmp, phi_.size()*sizeof(float), cudaMemcpyHostToDevice)
 		   );
     
-    CalcHFuncIntegCache(*alpha1_, *alpha2_, devHIntegCache_,true);
+    CalcHFuncIntegCache(*alpha1_, *alpha2_, *alpha3_, devHIntegCache_,true);
   }
 
   void
@@ -2881,6 +2883,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     cerr << "beta2:" << *beta2_ << "\n";
     cerr << "alpha1: " << *alpha1_ << "\n";
     cerr << "alpha2: " << *alpha2_ << "\n";
+    cerr << "alpha3: " << *alpha3_ << "\n";
     cerr << "a: " << *a_ << "\n";
     cerr << "b: " << *b_ << endl;
     cerr << "ObsTime: " << obsTime_ << "\n";

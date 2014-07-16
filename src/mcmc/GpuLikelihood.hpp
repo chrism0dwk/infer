@@ -55,7 +55,7 @@
 #endif
 
 // CUDA defines
-#define THREADSPERBLOCK 128
+#define THREADSPERBLOCK 256
 
 // Model defines
 #define NUMEVENTS 3
@@ -210,7 +210,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
 		  Parameter& beta2,
 		  Parameter& nu, 
 		  Parameter& alpha1,
-		  Parameter& alpha2, 
+		  Parameter& alpha2,
+		  Parameter& alpha3,
 		  Parameter& a, 
 		  Parameter& b);
     void
@@ -424,6 +425,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     float* nu_;
     float* alpha1_;
     float* alpha2_;
+    float* alpha3_;
     float* a_;
     float* b_;
 
