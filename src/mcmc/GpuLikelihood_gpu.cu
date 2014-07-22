@@ -1433,6 +1433,11 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
     checkCudaError(cudaSetDeviceFlags(cudaDeviceMapHost));
 
+    // Set compute streams
+    stream_ = new cudaStream_t[2];
+    cudaStreamCreate(&stream_[0]);
+    cudaStreamCreate(&stream_[1]);
+
     // Allocate infec indicies
     hostInfecIdx_ = new thrust::host_vector<InfecIdx_t>;
     devInfecIdx_ = new thrust::device_vector<InfecIdx_t>;
@@ -1553,6 +1558,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
   // Copy constructor
   GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
+    stream_(other.stream_),
     popSize_(other.popSize_), 
     numKnownInfecs_(other.numKnownInfecs_), 
     maxInfecs_(other.maxInfecs_), 
@@ -1807,6 +1813,9 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 	if(crsDescr_)
 	  cusparseDestroyMatDescr(crsDescr_);
 	
+	cudaStreamDestroy(stream_[0]);
+	cudaStreamDestroy(stream_[1]);
+
 	cudaDeviceSynchronize();
 	checkCudaError(cudaDeviceReset());
       }
@@ -1995,23 +2004,93 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
   inline
   void
-  GpuLikelihood::CalcProduct()
+  GpuLikelihood::CalcProdInteg()
   {
+    //    cudaStream_t stream[2];
+    //for(int i=0; i<2; ++i) cudaStreamCreate(&stream[i]);
+    
+    int numThreads = devInfecIdx_->size() * 32; // One warp per infection
+    int numBlocks = (numThreads + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
 
-    _calcProduct<DistanceKernel,true><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+
+    // Calculate Product in Stream 0
+    _calcProduct<DistanceKernel,true><<<numBlocks,THREADSPERBLOCK,0,stream_[0]>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
 									     devInfecIdx_->size(),*devD_,
 									     devEventTimes_,eventTimesPitch_,
 									     devSusceptibility_,
 									     *epsilon1_, *gamma1_,*delta_,*omega_,
 									     *beta1_,*nu_, *alpha1_, *alpha2_, *alpha3_,
 									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
-    _calcProduct<Identity,false><<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    // Calculate Integral in Stream 1
+    _calcIntegral<DistanceKernel,true><<<numBlocks,THREADSPERBLOCK,0,stream_[1]>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+									     devInfecIdx_->size(),*devD_,
+									     devEventTimes_,eventTimesPitch_,
+									     devSusceptibility_,
+									     *delta_,*omega_,*beta1_,*nu_,*alpha1_, *alpha2_, *alpha3_, devHIntegCache_,
+									     thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    _calcProduct<Identity,false><<<numBlocks,THREADSPERBLOCK,0,stream_[0]>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
     									devInfecIdx_->size(),*devC_,
     									devEventTimes_,eventTimesPitch_,
     									devSusceptibility_,
     									*epsilon1_,*gamma1_,*delta_,*omega_,
     									*beta2_,*nu_,*alpha1_, *alpha2_, *alpha3_, 
     									thrust::raw_pointer_cast(&(*devProduct_)[0]));
+
+    _calcIntegral<Identity,false><<<numBlocks,THREADSPERBLOCK,0,stream_[0]>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    									devInfecIdx_->size(),*devC_,
+    									devEventTimes_,eventTimesPitch_,
+    									devSusceptibility_,
+    									*delta_,*omega_,*beta2_,*nu_, *alpha1_, *alpha2_, *alpha3_, devHIntegCache_,
+    									thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+
+    // Destroy streams, implicitly synchronising the calculation
+    //for(int i=0; i<2; ++i) cudaStreamDestroy(stream[i]);
+    //cudaStreamSynchronize();
+    checkCudaError(cudaGetLastError());
+
+    // Reduce integral buffer
+    if(numBlocks > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), numBlocks);
+      if (res != CUDPP_SUCCESS)
+        throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::CalcIntegral()");
+    }
+    else checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
+    
+    // Reduce product vector
+    ReduceProductVector();
+
+    
+    
+
+  }
+
+
+  inline
+  void
+  GpuLikelihood::CalcProduct()
+  {
+    int numThreads = devInfecIdx_->size() * 32; // One warp per infection
+    int numBlocks = (numThreads + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
+
+    _calcProduct<DistanceKernel,true><<<numBlocks,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+									     devInfecIdx_->size(),*devD_,
+									     devEventTimes_,eventTimesPitch_,
+									     devSusceptibility_,
+									     *epsilon1_, *gamma1_,*delta_,*omega_,
+									     *beta1_,*nu_, *alpha1_, *alpha2_, *alpha3_,
+									     thrust::raw_pointer_cast(&(*devProduct_)[0]));
+    _calcProduct<Identity,false><<<numBlocks,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
+    									devInfecIdx_->size(),*devC_,
+    									devEventTimes_,eventTimesPitch_,
+    									devSusceptibility_,
+    									*epsilon1_,*gamma1_,*delta_,*omega_,
+    									*beta2_,*nu_,*alpha1_, *alpha2_, *alpha3_, 
+    									thrust::raw_pointer_cast(&(*devProduct_)[0]));
+
+
+
     checkCudaError(cudaGetLastError());
 
     ReduceProductVector();
@@ -2066,8 +2145,9 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     UpdateI1();
     CalcSusceptibility();
     //CheckSuscep();
-    CalcIntegral();
-    CalcProduct();
+    //CalcIntegral();
+    //CalcProduct();
+    CalcProdInteg();
     CalcBgIntegral();
 
     cudaDeviceSynchronize();

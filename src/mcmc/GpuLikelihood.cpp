@@ -270,7 +270,8 @@ namespace EpiRisk
 	      // Fwd insert
 	      Cimport(i->second, j->second) = record.data.val + CONTACTIMPORTOFFSET;
 	      //cout << "nnz=" << Cimport.nnz() << endl;
-	      if(Cimport(j->second,i->second) == 0.0f) {
+	      float lmij = const_cast<const Import_t*>(&Cimport)->operator()(j->second, i->second);
+	      if(lmij == 0.0f) {
 		//cout << "Symmetricising" << endl;
 		Cimport(j->second, i->second) = CONTACTIMPORTOFFSET;
 		//cout << "nnz(s)=" << Cimport.nnz() << endl;

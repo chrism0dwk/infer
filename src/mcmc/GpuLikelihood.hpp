@@ -259,6 +259,8 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     void
     CalcIntegral();
     void
+    CalcProdInteg();
+    void
     FullCalculate();
     void
     Calculate();
@@ -380,6 +382,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     LikelihoodComponents* devComponents_;
 
     // GPU data structures
+    cudaStream_t* stream_;
 
     // Covariate data is shared over a copy
     size_t* covariateCopies_;

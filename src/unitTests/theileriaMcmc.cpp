@@ -43,7 +43,7 @@
 #include <boost/bind.hpp>
 namespace po = boost::program_options;
 
-//#include <cuda_profiler_api.h>
+#include <cuda_profiler_api.h>
 
 #include "config.h"
 #include "Mcmc.hpp"
