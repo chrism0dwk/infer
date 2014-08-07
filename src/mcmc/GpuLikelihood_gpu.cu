@@ -207,6 +207,7 @@ _HIntegConst(const float ys, const float yw, const float ysp, float* cache)
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   
   Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
+
   
   if(tid < 4) {
     buff[tid] = _HIntegrand(T[tid+1], T+tid, Y+tid)
@@ -247,7 +248,8 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
   float Y[] = {1.0f, 1.0f,  1.0f, 1.0f,  1.0f};
   float delta = 0.25f;
   
-  Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3, Y[4] = alpha1;
+  Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3; Y[4] = alpha1;
+
   
   if(b <= a) return 0.0f;
   
@@ -676,11 +678,11 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
   }
 
   __global__ void
-  _calcSusceptibility(const int* tickLevel, const int popSize, const float* phi, float* susceptibility)
+  _calcSusceptibility(const int* tickLevel, const int popSize, const int pitch, const float* phi, const float zeta, float* susceptibility)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     if (tid < popSize)
-      susceptibility[tid] = phi[tickLevel[tid]];
+      susceptibility[tid] = phi[tickLevel[tid]] * powf(zeta, tickLevel[tid+pitch]);
   }
 
   template <class OP, bool zeroFirst>
@@ -1409,7 +1411,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 			       const float dLimit, 
 			       const bool occultsOnlyDC, 
 			       const int gpuId) : popSize_(0), 
-						  numSpecies_(nSpecies), 
+						  numSpecies_(2), 
 						  obsTime_(obsTime), 
 						  I1Time_(0.0), 
 						  I1Idx_(0), 
@@ -1586,6 +1588,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     alpha1_(other.alpha1_),
     alpha2_(other.alpha2_), 
     alpha3_(other.alpha3_),
+    zeta_(other.zeta_),
     a_(other.a_), 
     b_(other.b_), 
     cuRand_(other.cuRand_)
@@ -1905,6 +1908,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     for (size_t i = 0; i < hostPopulation_.size(); ++i)
       {
 	speciesMatrix[i] = (int)it->ticks;
+	speciesMatrix[i+popSize_] = (int)it->isDairy;
         ++it;
       }
 
@@ -1975,7 +1979,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
   GpuLikelihood::CalcSusceptibility()
   {
     int numBlocks = (popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
-    _calcSusceptibility<<<numBlocks, THREADSPERBLOCK>>>(devAnimals_,popSize_,devPhi_,devSusceptibility_);
+    _calcSusceptibility<<<numBlocks, THREADSPERBLOCK>>>(devAnimals_,popSize_,animalsPitch_,devPhi_,*zeta_,devSusceptibility_);
   }
 
   inline

@@ -39,6 +39,7 @@ struct TestCovars {
   double x;
   double y;
   double ticks;
+  bool isDairy;
 };
 
 

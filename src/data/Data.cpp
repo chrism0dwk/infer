@@ -89,6 +89,7 @@ PopDataImporter::next()
   record.data.x = atof(tokens[1].c_str()) / 1000;
   record.data.y = atof(tokens[2].c_str()) / 1000;
   record.data.ticks = atof(tokens[3].c_str());
+  record.data.isDairy = atoi(tokens[6].c_str());
   
   return record;
 }

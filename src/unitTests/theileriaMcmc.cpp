@@ -451,17 +451,19 @@ main(int argc, char* argv[])
 
   // Parameters
   // Set up parameters
-  //Parameter epsilon1(2.7e-8, GammaPrior(2.7, 1e8), "epsilon1");
-  Parameter epsilon1(1.0e-8, GammaPrior(1.0, 1e8), "epsilon1");
+  Parameter epsilon1(2.7e-8, GammaPrior(2.7, 1e8), "epsilon1");
+  //Parameter epsilon1(1.0e-8, GammaPrior(1.0, 1e6), "epsilon1");
   Parameter gamma1(1.0, GammaPrior(1, 1), "gamma1");
   Parameter delta(1.0, GammaPrior(1, 1), "delta");
   Parameter omega(1.2, GammaPrior(1,1), "omega");
   Parameter beta1(0.00025, GammaPrior(3.981,15923.57), "beta1");
   Parameter beta2(0.1, GammaPrior(1.643,164.3), "beta2");
-  Parameter nu(137.0, UniformPrior(50, 150), "nu");
-  Parameter alpha1(0.1f, BetaPrior(1, 8), "alpha1");
-  Parameter alpha2(0.1f, BetaPrior(1, 8), "alpha2");
-  Parameter alpha3(0.8f, BetaPrior(1, 8), "alpha3");
+  //Parameter nu(140.4647, UniformPrior(50, 150), "nu");
+  Parameter nu(0, GaussianPrior(0, 30), "nu");
+  Parameter alpha1(0.1f, BetaPrior(1, 50), "alpha1");
+  Parameter alpha2(0.1f, BetaPrior(1, 50), "alpha2");
+  Parameter alpha3(1.0f, GammaPrior(1, 8), "alpha3");
+  Parameter zeta(2.0f, GammaPrior(5,2), "zeta");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
 
@@ -484,7 +486,7 @@ main(int argc, char* argv[])
 
   likelihood.SetMovtBan(0.0f);
   likelihood.SetParameters(epsilon1, gamma1, phi, delta, omega, beta1, beta2,
-			   nu, alpha1, alpha2, alpha3, a, b);
+			   nu, alpha1, alpha2, alpha3, zeta, a, b);
 
 
   // Set up MCMC algorithm
@@ -494,15 +496,15 @@ main(int argc, char* argv[])
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
   UpdateBlock txDelta;
-  txDelta.add(epsilon1);
+  //txDelta.add(epsilon1);
   //txDelta.add(gamma1);
   txDelta.add(beta1);
   txDelta.add(beta2);
   txDelta.add(delta);
-  //txDelta.add(nu);
   txDelta.add(alpha1);
   txDelta.add(alpha2);
-  txDelta.add(alpha3);
+  //txDelta.add(alpha3);
+  txDelta.add(zeta);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
           "txDistance");
@@ -583,6 +585,7 @@ main(int argc, char* argv[])
     output.AddParameter(alpha1);
     output.AddParameter(alpha2);
     output.AddParameter(alpha3);
+    output.AddParameter(zeta);
     output.AddParameter(b);
 
     boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);

@@ -212,6 +212,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
 		  Parameter& alpha1,
 		  Parameter& alpha2,
 		  Parameter& alpha3,
+		  Parameter& zeta,
 		  Parameter& a, 
 		  Parameter& b);
     void
@@ -337,6 +338,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
       float N;
       float R;
       float ticks;
+      bool isDairy;
     };
 
     map<string, size_t> idMap_;
@@ -429,6 +431,7 @@ __checkCudaError(const cudaError_t err, const char* file, const int line);
     float* alpha1_;
     float* alpha2_;
     float* alpha3_;
+    float* zeta_;
     float* a_;
     float* b_;
 

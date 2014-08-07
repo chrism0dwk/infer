@@ -59,6 +59,7 @@ namespace EpiRisk
             covars.N = obsTime_; //EpiRisk::POSINF;
             covars.R = obsTime_; //EpiRisk::POSINF;
             covars.ticks = record.data.ticks;
+	    covars.isDairy = record.data.isDairy;
             idMap_.insert(make_pair(covars.id, idx));
             idx++;
             hostPopulation_.push_back(covars);
@@ -358,7 +359,7 @@ namespace EpiRisk
   GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& gamma1, Parameters& phi,
 			       Parameter& delta, Parameter& omega, Parameter& beta1, Parameter& beta2, 
 			       Parameter& nu, Parameter& alpha1, Parameter& alpha2, Parameter& alpha3,
-			       Parameter& a, Parameter& b)
+			       Parameter& zeta, Parameter& a, Parameter& b)
   {
 
     epsilon1_ = epsilon1.GetValuePtr();
@@ -371,6 +372,7 @@ namespace EpiRisk
     alpha1_ = alpha1.GetValuePtr();
     alpha2_ = alpha2.GetValuePtr();
     alpha3_ = alpha3.GetValuePtr();
+    zeta_ = zeta.GetValuePtr();
     a_ = a.GetValuePtr();
     b_ = b.GetValuePtr();
 
