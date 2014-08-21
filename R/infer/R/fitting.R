@@ -40,7 +40,8 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
 
               if(is.null(control$powers)) control$powers <- TRUE
               else control$powers <- as.logical(control$powers)
-              
+              if(is.null(control$doomega)) control$omega <- FALSE
+              else control$doomega <- as.logical(control$doomega)
               if(is.null(control$seed)) control$seed <- as.integer(round((2^31-1) * runif(1)))
               else control$seed <- as.integer(control$seed)
 
@@ -53,7 +54,7 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
               if(is.null(control$reps.I))
                 control$reps.I <- ceiling(sum(model@epidemic$type == 'IP') * 0.1)
               else control$reps.I <- as.integer(control$reps.I)
-
+              
               if(is.null(control$infer.latent.period.scale)) control$infer.latent.period.scale <- FALSE
               else control$infer.latent.period.scale <- as.logical(control$infer.latent.period.scale)
               
