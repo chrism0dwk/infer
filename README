@@ -1,8 +1,63 @@
 InFER: Inference For Epidemic related Risk
 ==========================================
 
-InFER master branch contains the backbone of the code for the InFER project.
+InFER-ausei Version 4.0 implements an MCMC sampler for a two-level mixing model
+for the Australian Equine Influenza outbreak in 2007.
 
-The code contained in this repository runs alongside research conducted between Warwick and Massey Universities.  The software is distributed under the GPLv3 license, allowing users to modify and redistribute the source code.  It is provided WITHOUT WARRANTY and is intended for academic research purposes.
+The code contained in this repository runs alongside research conducted between Warwick and Massey Universities.
+The software is distributed under the GPLv3 license, allowing users to modify and redistribute the source code.  
+It is provided WITHOUT WARRANTY and is intended for academic research purposes.
 
 Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
+
+
+
+System requirements
+====================
+
+Boost >= 1.51.0 with program_options and boost_mpi compiled in.
+GNU Scientific Library >= 1.15
+
+Compiling
+=========
+
+InFER-ausei is built using GNU Autotools.  The process is as follows:
+
+$ tar zxvf infer-ausei-4.0.tar.gz
+$ cd infer-ausei-4.0
+$ ./configure
+$ make
+$ make install
+
+Non-standard library locations
+==============================
+
+To point the build process at non-standard library locations
+(e.g. for GSL and Boost), use the CXXFLAGS and LDFLAGS environment
+variables.  For example:
+
+$ ./configure CXXFLAGS="-I/usr/local/packages/gsl-1.15/include -I/usr/local/packages/boost_1_51_0/include" \
+          LDFLAGS="-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/boost_1_51_0/lib"
+
+
+Running infer-ausei
+===================
+
+InFER-ausei provides the "auseiMcmc" binary which will be installed into "prefix" (see ./configure --help).  This 
+binary provides some command line switches:
+
+$ auseiMcmc --help
+infer-ausei 4.0 (c) 2014 Chris Jewell <chrism0dwk@gmail.com>
+
+Allowed options:
+  -h [ --help ]                display help message
+  -c [ --config ] arg          xml config file (required)
+  -n [ --niter ] arg (=10000)  number of iterations
+  -s [ --seed ] arg (=0)       random seed
+  -o [ --output ] arg (=ausei) output file prefix
+  
+The main configuration is set by using 
+
+
+
+
