@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/sim
+AM_CPPFLAGS = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/sim @GSL_CFLAGS@ @BOOST_CPPFLAGS@
 
 METASOURCES = AUTO
 noinst_LTLIBRARIES = libmcmc.la

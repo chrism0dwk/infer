@@ -16,50 +16,24 @@ AC_LANG([C++])
 AM_PROG_LIBTOOL
 
 
-
-# Checks for libraries.
-AC_CHECK_LIB(gsl, gsl_ran_gaussian,
-	     [GSL_LIBS="${LIBS} -lgsl -lgslcblas"],
-	     [AC_MSG_ERROR([GNU Scientific Library not found.  You may need to supply -L<path to GSL libs> to LDFLAGS.])],
-	     [-lgsl -lgslcblas])
-
-
 # Checks for header files.
 AC_CHECK_HEADER([math.h])
-AC_CHECK_HEADER([boost/property_tree/ptree.hpp], ,
-		[AC_MSG_ERROR([Boost Property Tree header not found])])
-AC_CHECK_HEADER([boost/program_options.hpp], ,
-		[AC_MSG_ERROR([Boost Program Options header not found])])
-AC_CHECK_HEADER([boost/mpi/communicator.hpp], ,
-		[AC_MSG_ERROR([Boost MPI header not found])])
 
-AC_CHECK_HEADER([gsl/gsl_version.h], ,
-		[AC_MSG_ERROR([GNU Scientific Library headers not found.  You may need to supply -I<path to gsl headers> to CXXFLAGS.])])
+# Check for GSL availability
+AX_PATH_GSL([1.15], ,
+		    [AC_MSG_ERROR([GNU Scientific Library >= 1.15 required])])
 
-# Checks for typedefs, structures, and compiler characteristics.
-
-# Checks for library functions.
+# Boost 1.51.0
+AX_BOOST_BASE([1.51.0], ,
+ 			[AC_MSG_ERROR([Boost >= 1.51.0 required])])
+AX_BOOST_PROGRAM_OPTIONS
+AX_BOOST_SERIALIZATION
 
 # Set up MPI build
 AX_MPI
 CC="$MPICC"
 CXX="$MPICXX"
+AX_BOOST_MPI
 
-# Debug option
-AC_ARG_ENABLE(debug,
-AS_HELP_STRING([--enable-debug],
-               [enable debugging, default: no]),
-[case "${enableval}" in
-             yes) debug=true ;;
-             no)  debug=false ;;
-             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
-esac],
-[debug=false])
-
-AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
-
-# Substitutions
-AC_SUBST([OPENMP_CXXFLAGS])
-AC_SUBST([GSL_LIBS])
 
 AC_OUTPUT(Makefile src/Makefile src/Framework/Makefile src/data/Makefile src/mcmc/Makefile src/unitTests/Makefile src/sim/Makefile)
