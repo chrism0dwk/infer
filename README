@@ -21,10 +21,10 @@ GNU Scientific Library >= 1.15
 Compiling
 =========
 
-InFER-ausei is built using GNU Autotools.  The process is as follows:
+%PACKAGE% is built using GNU Autotools.  The process is as follows:
 
-$ tar zxvf infer-ausei-4.0.tar.gz
-$ cd infer-ausei-4.0
+$ tar zxvf %PACKAGE%-%VERSION%.tar.gz
+$ cd %PACKAGE%-%VERSION%
 $ ./configure
 $ make
 $ make install
@@ -40,14 +40,14 @@ $ ./configure CXXFLAGS="-I/usr/local/packages/gsl-1.15/include -I/usr/local/pack
           LDFLAGS="-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/boost_1_51_0/lib"
 
 
-Running infer-ausei
+Running %PACKAGE%
 ===================
 
-InFER-ausei provides the "auseiMcmc" binary which will be installed into "prefix" (see ./configure --help).  This 
+%PACKAGE% provides the "auseiMcmc" binary which will be installed into "prefix" (see ./configure --help).  This 
 binary provides some command line switches:
 
 $ auseiMcmc --help
-infer-ausei 4.0 (c) 2014 Chris Jewell <chrism0dwk@gmail.com>
+%PACKAGE% %VERSION% (c) 2014 Chris Jewell <chrism0dwk@gmail.com>
 
 Allowed options:
   -h [ --help ]                display help message
