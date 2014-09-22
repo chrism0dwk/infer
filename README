@@ -56,7 +56,33 @@ Allowed options:
   -s [ --seed ] arg (=0)       random seed
   -o [ --output ] arg (=ausei) output file prefix
   
-The main configuration is set by using 
+The main configuration is set by using the -c switch.  See $(PREFIX)/share/examples/@PACKAGE@ for 
+an example config file which you can edit.  Change the values in this file, BUT DO NOT ALTER THE 
+STRUCTURE OF THE XML.
+
+Population file format
+======================
+
+The population file uses a CSV file with column header.  The columns should be:
+
+<id>, <easting>, <northing>, <num horses>, <property area>, <day of vaccination>
+
+Epidemic file format
+====================
+
+The epidemic file is in CSV format with column headers.  The columns should be:
+
+<id>, <infection day>, <onset day>
+
+Notes
+=====
+1) The ids in the epidemic file must match those in the population file.
+2) Days of infection, onset, and vaccination are in days since the first onset.  They
+    are not dates.
+3) The easting/northing coordinates should be in a Mercatorial projection that allows 
+    calculation of Euclidean distance.  Since most coordinate systems use metres as the map unit,
+    the algorithm automatically divides by 1000, to give units for parameter delta in km.
+
 
 
 
