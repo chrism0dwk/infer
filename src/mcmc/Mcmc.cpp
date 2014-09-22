@@ -143,6 +143,7 @@ Mcmc::newSingleSiteMRW(Parameter& param, double tuning)
 {
   SingleSiteMRW* update = new SingleSiteMRW(param.getTag(), param, tuning, *random_, logLikelihood_,this);
   updateStack_.push_back(update);
+  return update;
 }
 
 //! Pushes an updater onto the MCMC stack
@@ -151,6 +152,7 @@ Mcmc::newSingleSiteLogMRW(Parameter& param, const double tuning)
 {
   SingleSiteLogMRW* update = new SingleSiteLogMRW(param.getTag(), param, tuning, *random_, logLikelihood_, this);
   updateStack_.push_back(update);
+  return update;
 }
 
 
@@ -841,40 +843,19 @@ Mcmc::run(const size_t numIterations,
   cout << "Running MCMC..." << flush;
   for (size_t k = 0; k < numIterations; ++k)
     {
-      if (mpirank_ == 0 && k % 1 == 0)
+      if (mpirank_ == 0 && k % 10 == 0)
         cout << "Iteration " << k << endl;
-
-      if(k % 100 == 0) {
-//          DIC myDIC = getDIC();
-//          if (mpirank_ == 0) {
-//              cout << "=======DIC=======\n"
-//                   << "Dbar: " << myDIC.Dbar << "\n"
-//                   << "Dhat: " << myDIC.Dhat << "\n"
-//                   << "pD: " << myDIC.pD << "\n"
-//                   << "DIC: " << myDIC.DIC << endl;
-//          }
-      }
 
       for(boost::ptr_list<McmcUpdate>::iterator it = updateStack_.begin();
           it != updateStack_.end();
           ++it) it->update();
-
-//      for (size_t infec = 0; infec < numRUpdates; ++infec)
-//        {
-//          toMove = random_->integer(pop_.numInfected());
-//          acceptance["R"] += updateR(toMove);
-//        }
-//
-//      acceptance["gamma"] += updateBpnc();
-
-      //updateDIC();
 
       if(mpirank_ == 0) cout << "gLogLikelihood: " << logLikelihood_.global << endl;
 
       // Update the adaptive mcmc
       if (mpirank_ == 0)
         {
-          writer.write(pop_);
+          //writer.write(pop_);
           writer.write(txparams_);
         }
     }

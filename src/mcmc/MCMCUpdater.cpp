@@ -103,19 +103,15 @@ namespace EpiRisk
     // q-ratio
     double qratio = 0.0; // Gaussian proposals cancel
 
-    cout << param_.getTag() << ": " << logPiCan << ", " << logPiCur << "; ";
-
     // Accept or reject
     if(log(random_.uniform()) < logPiCan - logPiCur + qratio)
       {
         logLikelihood_ = logLikCan;
         acceptance_++;
-        cout << "ACCEPT" << endl;
       }
     else
       {
         param_ = oldValue;
-        cout << "REJECT" << endl;
       }
 
     numUpdates_++;

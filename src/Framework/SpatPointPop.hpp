@@ -300,14 +300,14 @@ namespace EpiRisk
       PopulationIterator
       asPop(const IteratorType& it)
       {
-        return population_.project<bySeq>(it);
+        return population_.template project<bySeq>(it);
       }
       /// Converts an iterator to an InfectiveIterator
       template<typename IteratorType>
       InfectiveIterator
       asI(const IteratorType& it)
       {
-        return population_.project<byI>(it);
+        return population_.template project<byI>(it);
       }
       //@}
 
@@ -318,7 +318,7 @@ namespace EpiRisk
       void
       dumpInfected()
       {
-        InfectiveIndex& iIndex = population_.get<byI>();
+        InfectiveIndex& iIndex = population_.template get<byI>();
         typename InfectiveIndex::iterator it = iIndex.begin();
         while(it->getI() < obsTime_) {
             cerr << it->getId() << "\t"
@@ -422,9 +422,9 @@ namespace EpiRisk
   template<typename Covars>
     Population<Covars>::Population() :
       obsTime_(POSINF), knownInfections_(0),
-      idIndex_(population_.get<byId>()),
-      infIndex_(population_.get<byI>()),
-      seqIndex_(population_.get<bySeq>())
+      idIndex_(population_.template get<byId>()),
+      infIndex_(population_.template get<byI>()),
+      seqIndex_(population_.template get<bySeq>())
     {
 
     }
@@ -458,7 +458,7 @@ namespace EpiRisk
 
       try
         {
-          InfectiveIndex& index = population_.get<byI>();
+          InfectiveIndex& index = population_.template get<byI>();
           while (1)
             {
               record = popDataImporter.next();
@@ -481,7 +481,7 @@ namespace EpiRisk
       epiDataImporter.open();
       try
         {
-          IdIndex& idIndex = population_.get<byId>();
+          IdIndex& idIndex = population_.template get<byId>();
           while (1)
             {
               record = epiDataImporter.next();
@@ -641,7 +641,7 @@ namespace EpiRisk
     {
       typename IdIndex::iterator idIter = idIndex_.find(id);
       if (idIter == idIndex_.end()) throw data_exception("Id not found");
-      typename InfectiveIndex::iterator infIter = population_.project<byI>(idIter);
+      typename InfectiveIndex::iterator infIter = population_.template project<byI>(idIter);
 
       return moveInfectionTime(infIter, newTime);
     }

@@ -1,3 +1,5 @@
+AM_CPPFLAGS = -I$(top_srcdir)/src/Framework -I$(top_srcdir)/src/data -I$(top_srcdir)/src/sim
+
 METASOURCES = AUTO
 noinst_LTLIBRARIES = libstlstrtok.la librandom.la
 noinst_HEADERS = stlStrTok.hpp Random.hpp Individual.hpp \

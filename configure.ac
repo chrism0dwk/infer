@@ -2,11 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 #AC_PREREQ([2.61])
-AC_INIT(infer-ausei, 1.0, Chris Jewell <chrism0dwk@gmail.com>)
+AC_INIT(infer-ausei, 4.0, Chris Jewell <chrism0dwk@gmail.com>)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE(infer-ausei, 1.0)
+AM_INIT_AUTOMAKE(infer-ausei, 4.0)
 
 # Checks for programs.
 AC_PROG_CXXCPP
@@ -26,6 +26,12 @@ AC_CHECK_LIB(gsl, gsl_ran_gaussian,
 
 # Checks for header files.
 AC_CHECK_HEADER([math.h])
+AC_CHECK_HEADER([boost/property_tree/ptree.hpp], ,
+		[AC_MSG_ERROR([Boost Property Tree header not found])])
+AC_CHECK_HEADER([boost/program_options.hpp], ,
+		[AC_MSG_ERROR([Boost Program Options header not found])])
+AC_CHECK_HEADER([boost/mpi/communicator.hpp], ,
+		[AC_MSG_ERROR([Boost MPI header not found])])
 
 AC_CHECK_HEADER([gsl/gsl_version.h], ,
 		[AC_MSG_ERROR([GNU Scientific Library headers not found.  You may need to supply -I<path to gsl headers> to CXXFLAGS.])])
@@ -38,6 +44,19 @@ AC_CHECK_HEADER([gsl/gsl_version.h], ,
 AX_MPI
 CC="$MPICC"
 CXX="$MPICXX"
+
+# Debug option
+AC_ARG_ENABLE(debug,
+AS_HELP_STRING([--enable-debug],
+               [enable debugging, default: no]),
+[case "${enableval}" in
+             yes) debug=true ;;
+             no)  debug=false ;;
+             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+esac],
+[debug=false])
+
+AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
 # Substitutions
 AC_SUBST([OPENMP_CXXFLAGS])
