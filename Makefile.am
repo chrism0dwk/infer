@@ -8,6 +8,7 @@ EXTRA_DIST = $(top_srcdir)/auseiConfig.xml
 dist-hook:
 	chmod u+w $(distdir)/README
 	sed -i 's/%PACKAGE%/@PACKAGE@/g' $(distdir)/README
+	sed -i 's/%VERSION%/@VERSION@/g' $(distdir)/README
 	chmod u-w $(distdir)/README
 
 docdir = $(datadir)/doc/@PACKAGE@

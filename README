@@ -1,7 +1,7 @@
 InFER: Inference For Epidemic related Risk
 ==========================================
 
-%PACKAGE% implements an MCMC sampler for a two-level mixing model
+%PACKAGE% version %VERSION% implements an MCMC sampler for a two-level mixing model
 for the Australian Equine Influenza outbreak in 2007.
 
 The code contained in this repository runs alongside research conducted between Warwick and Massey Universities.
