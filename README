@@ -1,7 +1,7 @@
 InFER: Inference For Epidemic related Risk
 ==========================================
 
-InFER-ausei Version 4.0 implements an MCMC sampler for a two-level mixing model
+%PACKAGE% implements an MCMC sampler for a two-level mixing model
 for the Australian Equine Influenza outbreak in 2007.
 
 The code contained in this repository runs alongside research conducted between Warwick and Massey Universities.
@@ -56,7 +56,7 @@ Allowed options:
   -s [ --seed ] arg (=0)       random seed
   -o [ --output ] arg (=ausei) output file prefix
   
-The main configuration is set by using the -c switch.  See $(PREFIX)/share/examples/@PACKAGE@ for 
+The main configuration is set by using the -c switch.  See $(PREFIX)/share/%PACKAGE%/examples for 
 an example config file which you can edit.  Change the values in this file, BUT DO NOT ALTER THE 
 STRUCTURE OF THE XML.
 
