@@ -8,14 +8,15 @@ The code contained in this repository runs alongside research conducted between 
 The software is distributed under the GPLv3 license, allowing users to modify and redistribute the source code.  
 It is provided WITHOUT WARRANTY and is intended for academic research purposes.
 
-Copyright Chris Jewell <chrism0dwk@gmail.com> 2012
+Copyright Chris Jewell <chrism0dwk@gmail.com> 2014
 
-
+See $(PREFIX)/doc/%PACKAGE%/model.pdf for technical model details.
 
 System requirements
 ====================
 
-Boost >= 1.51.0 with program_options and boost_mpi compiled in.
+MPI library compatible with Boost::MPI >= 1.51.0
+Boost >= 1.51.0 with boost_program_options, boost_serialization and boost_mpi compiled in.
 GNU Scientific Library >= 1.15
 
 Compiling
@@ -33,11 +34,12 @@ Non-standard library locations
 ==============================
 
 To point the build process at non-standard library locations
-(e.g. for GSL and Boost), use the CXXFLAGS and LDFLAGS environment
-variables.  For example:
+(e.g. for GSL and Boost), use the --with-gsl-prefix and --with-boost
+options to configure. For example:
 
-$ ./configure CXXFLAGS="-I/usr/local/packages/gsl-1.15/include -I/usr/local/packages/boost_1_51_0/include" \
-          LDFLAGS="-L/usr/local/packages/gsl-1.15/lib -L/usr/local/packages/boost_1_51_0/lib"
+$ ./configure --with-gsl-prefix=/usr/local/packages/gsl-1.15 --with-boost=/usr/local/packages/boost_1_51_0
+
+See ./configure --help for further options for selecting GSL and Boost locations.
 
 
 Running %PACKAGE%
@@ -59,6 +61,18 @@ Allowed options:
 The main configuration is set by using the -c switch.  See $(PREFIX)/share/%PACKAGE%/examples for 
 an example config file which you can edit.  Change the values in this file, BUT DO NOT ALTER THE 
 STRUCTURE OF THE XML.
+
+The output files are named according to the output file prefix, with .parms and .occ appended.  This 
+version of %PACKAGE% writes nothing to the .occ file, and the posterior draws for the parameters are 
+contained in the .parms file.  The latter is CSV format, with the names of the parameters as column headings.
+Each row then contains a sample of the chain for each iteration.
+
+Since auseiMcmc is built using MPI, you can run it under 'mpirun' for parallel execution. The MCMC
+algorithm requires /fast/ interconnects, so it is recommended to either run the package on a large
+multicore machine, or on a specialised distributed HPC system.  For example:
+
+$ mpirun -np 128 auseiMcmc -c myConf.xml
+
 
 Population file format
 ======================

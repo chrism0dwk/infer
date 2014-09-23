@@ -1,0 +1,85 @@
+\documentclass[english]{article}
+\usepackage[T1]{fontenc}
+\usepackage[latin9]{inputenc}
+\usepackage{geometry}
+\geometry{verbose,tmargin=2cm,bmargin=2cm,lmargin=2cm,rmargin=2cm}
+\setlength{\parskip}{\medskipamount}
+\setlength{\parindent}{0pt}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{babel}
+\begin{document}
+
+\title{Australian Equine Influenza model}
+
+\maketitle
+
+\section{infer-ausei version 4.0}
+
+The following documentation describes the model used in infer-ausei
+version 4.0. Please refer to the \texttt{README} file for details
+of how to make inference on this model.
+
+
+\subsection{Between-property model}
+
+The state of properties during the epidemic is modelled as a continuous
+time SIO (Susceptible, Infected, Onset) process, with pairwise transmission
+rate
+\[
+\beta_{ij}(t)=\mu\cdot h_{i}(t-I_{i})n_{i}a_{i}^{\xi}\cdot n_{j}a_{j}^{\zeta}\theta^{\bm{1}[j\in\mathcal{V}(t)]}\frac{\delta}{\delta^{2}+\rho_{ij}^{2}}\hspace{1em}i\in\mathcal{I},j\in\mathcal{S}
+\]
+and assumes a fixed 2 day time from infection to onset \emph{at the
+between property level}. $\mu$ is the baseline transmission rate,
+$n_{k}$ is the number of horses on property $k$, $a_{k}$ is the
+area of property $k$ with non-linear parameters $\xi$ and $\zeta$
+giving the effect (note that if these non-linear parameters were 0,
+this would imply no effect of area). $\theta$ is the effect of vaccination
+on the susceptible properties with $\mathcal{V}(t)$ the set of vaccinated
+properties at time $t$. $\rho_{ij}$ is the Euclidean distances (map-units/1000)
+between centroids(?) of the properties $i$ and $j$, and $\delta$
+is the decay parameter for our Cauchy distance kernel. The function
+$h_{i}(t-I_{i})$ is the infectivity of property $i$, taken to be
+proportional to the number of animals infected according to the within-property
+model described below.
+
+At time $t$, the \emph{infectious pressure} $\lambda_{j}(t)$ on
+property $j$ is
+\[
+\lambda_{j}(t)=\epsilon_{t}+\sum_{i\in}\beta_{ij}(t)
+\]
+where
+\[
+\epsilon_{t}=\begin{cases}
+\epsilon_{0} & \mbox{ if }t<10\\
+\epsilon_{10} & \mbox{if }10\leq t<44\\
+\epsilon_{44} & \mbox{if }44\leq t
+\end{cases}
+\]
+corresponding to control events at $t=10$ and $t=44$ (remind me
+what these events were?).
+
+
+\subsection{Within-property model}
+
+At the \emph{within property level}, $h_{i}(s)=I_{i}(s)/n_{i}$ function
+returns the proportion of horses infected on property $i$ at time
+$s$ after $i$'s infection time, where $I_{i}(s)$ is the solution
+to a deterministic SEIR model 
+
+\begin{eqnarray*}
+\frac{dS_{i}(t)}{dt} & = & -\beta\frac{S_{i}(t)I_{i}(t)}{n_{i}}\\
+\frac{dE_{i}(t)}{dt} & = & \beta\frac{S_{i}(t)I_{i}(t)}{n_{i}}-\omega E_{i}(t)\\
+\frac{dI_{i}(t)}{dt} & = & \omega E_{i}(t)-\nu I_{i}(t)\\
+\frac{dR_{i}(t)}{dt} & = & \nu I_{i}(t)
+\end{eqnarray*}
+
+
+where $\omega=$1 and $\nu=1/6$. We set $h(s)$=0 for $I_{i}(s)<0.5$
+horses. 
+
+Note that a property ``runs out'' of infectiousness as all the horses
+recover. This is why the SIO model above does not have an ``R''
+compartment -- ``O'' stage properties simply stop being infectious
+after a while.
+\end{document}

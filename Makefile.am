@@ -6,7 +6,7 @@ DISTCHECK_CONFIGURE_FLAGS="CXXFLAGS=-O3 -fomit-frame-pointer -DNDEBUG -DBOOST_MP
 
 exampledir = $(pkgdatadir)/examples
 example_DATA = $(top_srcdir)/auseiConfig.xml
-EXTRA_DIST = $(top_srcdir)/auseiConfig.xml
+EXTRA_DIST = $(top_srcdir)/auseiConfig.xml $(top_srcdir)/doc/model.pdf
 dist-hook:
 	chmod u+w $(distdir)/README
 	sed -i 's/%PACKAGE%/@PACKAGE@/g' $(distdir)/README
@@ -14,4 +14,4 @@ dist-hook:
 	chmod u-w $(distdir)/README
 
 docdir = $(datadir)/doc/@PACKAGE@
-doc_DATA = $(top_srcdir)/README
+doc_DATA = $(top_srcdir)/README $(top_srcdir)/doc/model.pdf
