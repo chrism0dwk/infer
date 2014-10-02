@@ -17,6 +17,9 @@
 #include <gsl/gsl_cdf.h>
 #include <boost/numeric/ublas/operation.hpp>
 #include <omp.h>
+
+#include "vectorclass/vectorclass.h"
+#include "vectorclass/vectormath_exp.h"
 #include "CpuLikelihood.hpp"
 
 namespace EpiRisk
@@ -81,18 +84,35 @@ namespace EpiRisk
   }
 
   inline
+  Vec8f
+  HVec8f(const Vec8f t, const float nu, const float alpha)
+  {
+    Vec8f integral = t - alpha;
+    return min(0.0f, integral);
+  }
+
+
+
+  inline
   fp_t
   K(const float dsq, const float delta, const float omega)
   {
     return delta / powf(delta*delta + dsq, omega);
-  } 
+  }
+
+  inline
+  Vec8f
+  KVec8f(const Vec8f dsq, const float delta, const float omega)
+  {
+    return delta / pow(delta*delta + dsq, omega);
+  }
 
 
   CpuLikelihood::CpuLikelihood(PopDataImporter& population,
       EpiDataImporter& epidemic, const size_t nSpecies, const float obsTime,
       const float dLimit, const bool occultsOnlyDC) :
       popSize_(0), numSpecies_(nSpecies), obsTime_(obsTime), I1Time_(0.0), I1Idx_(
-          0), occultsOnlyDC_(occultsOnlyDC), movtBan_(obsTime)
+										  0), occultsOnlyDC_(occultsOnlyDC), movtBan_(obsTime), workspaceA_(NULL), workspaceB_(NULL), workspaceC_(NULL)
   {
 
     // Load data into host memory
@@ -128,7 +148,9 @@ namespace EpiRisk
 
   CpuLikelihood::~CpuLikelihood()
   {
-
+    if(workspaceA_) delete[] workspaceA_;
+    if(workspaceB_) delete[] workspaceB_;
+    if(workspaceC_) delete[] workspaceC_;
   }
 
 
@@ -389,6 +411,9 @@ namespace EpiRisk
     animalsSuscPow_.resize(popSize_,numSpecies_);
     infectivity_.resize(maxInfecs_);
     animalsInfPow_.resize(maxInfecs_,numSpecies_);
+    workspaceA_ = new float[popSize_];
+    workspaceB_ = new float[popSize_];
+    workspaceC_ = new float[popSize_];
   }
 
   inline
@@ -547,20 +572,47 @@ namespace EpiRisk
     for(int ii=0; ii<infecIdx_.size(); ++ii)
       {
 	int i = infecIdx_(ii).ptr;
-	int begin = D_.index1_data()[i];
-	int end = D_.index1_data()[i+1];
+	size_t begin = D_.index1_data()[i];
+	size_t end = D_.index1_data()[i+1];
 	float Ii = eventTimes_(i,0);
 	float Ni = eventTimes_(i,1);
 	float Ri = eventTimes_(i,2);
 	float pressureFromI = 0.0f;
-	for(int jj = begin; jj < end; jj++)
+	
+	//////// VECTORIZATION ATTEMPT ////////
+	
+	// Load data
+	size_t dataSize = end-begin;
+	size_t arrSize = (dataSize + 8 - 1) & (-8);
+	for(int jj = 0; jj < dataSize; jj++) 
 	  {
-	    float Ij = eventTimes_(D_.index2_data()[jj],0);
-	    float betaij = H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
-	    betaij += *gamma2_ * (H(fminf(Ri, Ij) - Ii,*nu_,*alpha_));
-	    betaij *= K(D_.value_data()[jj], *delta_, *omega_);
-	    betaij *= susceptibility_[D_.index2_data()[jj]];
-	    pressureFromI += betaij;
+	    size_t j = D_.index2_data()[jj+begin];
+	    workspaceA_[jj] = susceptibility_[j];
+	    workspaceB_[jj] = eventTimes_(j,0);
+	    workspaceC_[jj] = D_.value_data()[jj+begin];
+	  }
+	for(size_t jj=dataSize; jj<arrSize; ++jj) 
+	  {
+	  workspaceA_[jj] = 0.0f;
+	  workspaceB_[jj] = 0.0f;
+	  workspaceC_[jj] = POSINF;
+	  }
+	
+	// Vector processing 
+	for(int j = 0; j < dataSize; j+=8)
+	  {
+	    // Load into vector types
+	    Vec8f Ij, suscep, d;
+	    Ij.load(workspaceB_+j);
+	    suscep.load(workspaceA_+j);
+	    d.load(workspaceC_+j);
+
+	    // Calculate
+	    Vec8f betaij = HVec8f(min(Ni, Ij) - min(Ii, Ij), *nu_, *alpha_);
+	    betaij += *gamma2_ * (HVec8f(min(Ri, Ij) - Ii,*nu_,*alpha_));
+	    betaij *= KVec8f(d, *delta_, *omega_);
+	    betaij *= suscep;
+	    pressureFromI += horizontal_add(betaij);
 	  }
 
 	res += pressureFromI * infectivity_[i];

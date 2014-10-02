@@ -267,7 +267,7 @@ namespace EpiRisk
       float cattle;
       float pigs;
       float sheep;
-    };
+    } __attribute__ ((aligned (16)));
 
     map<string, size_t> idMap_;
     typedef std::vector<Covars> Population;
@@ -324,6 +324,9 @@ namespace EpiRisk
     ublas::vector<float> susceptibility_;
     ublas::vector<float> infectivity_;
     ublas::vector<float> devProduct_;
+    float* workspaceA_;
+    float* workspaceB_;
+    float* workspaceC_;
 
     int integralBuffSize_;
 
