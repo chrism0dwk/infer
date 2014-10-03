@@ -200,10 +200,16 @@ main(int argc, char* argv[])
       nu, alpha, a, b);
   
   cout << "Timing likelihood..." << flush;
-  gettimeofday(&start, NULL);
-  likelihood.FullCalculate();
-  gettimeofday(&end, NULL);
-  cout << "Likelihood took: " << timeinseconds(start,end) << " seconds" << endl;
+  double timing[100];
+  
+  for(int i=0; i<100; ++i) {
+    gettimeofday(&start, NULL);
+    likelihood.FullCalculate();
+    gettimeofday(&end, NULL);
+    timing[i] = timeinseconds(start,end);
+  }
+  for(int i=1; i<100; ++i) timing[0] += timing[i];
+  cout << "Likelihood took: " << timing[0]/100.0 << " seconds" << endl;
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
   return EXIT_SUCCESS;

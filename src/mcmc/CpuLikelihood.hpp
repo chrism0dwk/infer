@@ -294,8 +294,9 @@ namespace EpiRisk
 
     // Host vars
     const size_t popSize_;
+    size_t popSizePitch_;
     size_t numKnownInfecs_;
-    size_t maxInfecs_;
+    size_t maxInfecs_,maxInfecsPitch_;
     size_t occultsOnlyDC_;
 
     ublas::vector<InfecIdx_t> infecIdx_;
@@ -312,14 +313,14 @@ namespace EpiRisk
     // GPU data structures
 
     // Covariate data is shared over a copy
-    ublas::matrix<float> animals_;
+    ublas::matrix<float,ublas::column_major> animals_;
     ublas::compressed_matrix<float> D_;
 
     size_t dnnz_; //CRS
 
-    ublas::matrix<float> animalsInfPow_;
-    ublas::matrix<float> animalsSuscPow_;
-    ublas::matrix<float> eventTimes_;
+    ublas::matrix<float,ublas::column_major> animalsInfPow_;
+    ublas::matrix<float,ublas::column_major> animalsSuscPow_;
+    ublas::matrix<float,ublas::column_major> eventTimes_;
 
     ublas::vector<float> susceptibility_;
     ublas::vector<float> infectivity_;

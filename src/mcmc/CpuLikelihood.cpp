@@ -22,6 +22,8 @@
 #include "vectorclass/vectormath_exp.h"
 #include "CpuLikelihood.hpp"
 
+#define VECSIZE 8
+
 namespace EpiRisk
 {
 // Constants
@@ -88,7 +90,7 @@ namespace EpiRisk
   HVec8f(const Vec8f t, const float nu, const float alpha)
   {
     Vec8f integral = t - alpha;
-    return min(0.0f, integral);
+    return max(0.0f, integral);
   }
 
 
@@ -116,10 +118,15 @@ namespace EpiRisk
   {
 
     // Load data into host memory
+    int np;
+#pragma omp parallel
+    {
+      np = omp_get_num_threads();
+    }
+    cout << "Using " << np << " threads" << endl;
     LoadPopulation(population);
     LoadEpidemic(epidemic);
     SortPopulation();
-    int np = omp_get_num_threads();
     omp_set_num_threads(8);
     CalcDistanceMatrix(dLimit);
     omp_set_num_threads(np);
@@ -129,7 +136,7 @@ namespace EpiRisk
     SetEvents();
 
     // Allocate product cache
-    productCache_.resize(maxInfecs_);
+    productCache_.resize(maxInfecsPitch_);
     fill(productCache_.begin(), productCache_.end(), 1.0f);
 
     // Components
@@ -372,7 +379,7 @@ namespace EpiRisk
   {
 
     // Set up Species and events
-    eventTimes_.resize(popSize_, NUMEVENTS);
+    eventTimes_.resize(popSizePitch_, NUMEVENTS);
     Population::iterator it = population_.begin();
     for (size_t i = 0; i < popSize_; ++i)
       {
@@ -380,6 +387,12 @@ namespace EpiRisk
 	eventTimes_(i,1) = it->N;
         eventTimes_(i,2) = it->R;
 	++it;
+      }
+    for(size_t i = popSize_; i < popSizePitch_; ++i)
+      {
+	eventTimes_(i,0) = NEGINF;
+	eventTimes_(i,1) = NEGINF;
+	eventTimes_(i,2) = NEGINF;
       }
 
     infecIdx_.resize(numKnownInfecs_);
@@ -394,7 +407,9 @@ namespace EpiRisk
   {
 
     // Set up Species and events
-    animals_.resize(popSize_,numSpecies_);
+    popSizePitch_ = (popSize_ + VECSIZE -1) & (-VECSIZE);
+    animals_.resize(popSizePitch_,numSpecies_);
+
     Population::const_iterator it = population_.begin();
     int i=0;
     for (it = population_.begin(); it != population_.end(); ++it)
@@ -406,57 +421,75 @@ namespace EpiRisk
 	  animals_(i,2) = it->sheep;
 	++i;
       }
+    for(int i=popSize_; i<popSizePitch_; ++i) {
+      animals_(i,0) = 0.0f;
+      animals_(i,1) = 0.0f;
+      animals_(i,2) = 0.0f;
+    }
 
-    susceptibility_.resize(popSize_);
-    animalsSuscPow_.resize(popSize_,numSpecies_);
-    infectivity_.resize(maxInfecs_);
-    animalsInfPow_.resize(maxInfecs_,numSpecies_);
-    workspaceA_ = new float[popSize_];
-    workspaceB_ = new float[popSize_];
-    workspaceC_ = new float[popSize_];
+    susceptibility_.resize(popSizePitch_);
+    animalsSuscPow_.resize(popSizePitch_,numSpecies_);
+
+    maxInfecsPitch_ = (maxInfecs_ + VECSIZE - 1) & (-VECSIZE);
+    infectivity_.resize(maxInfecsPitch_);
+    animalsInfPow_.resize(maxInfecsPitch_,numSpecies_);
   }
 
   inline
   void
   CpuLikelihood::CalcInfectivityPow()
   {
+    
+    for(size_t k=0; k<numSpecies_; ++k) {
+      Vec8f input,output;
 
-    for(int i=0; i<maxInfecs_; ++i)
-      {
-	for(int k=0; k<numSpecies_; ++k)
-	  animalsInfPow_(i,k) = powf(animals_(i,k),psi_[k]);
+#pragma omp parallel for
+      for(size_t i=0; i<maxInfecsPitch_; i+=VECSIZE) {
+	input.load(&animals_(i,k));
+	output = pow(input, psi_[k]);
+	output.store(&animalsInfPow_(i,k));
       }
+    }
   }
     
   inline
   void
   CpuLikelihood::CalcInfectivity()
   {
-    ublas::vector<float> xi(3);
-    for(int i=0; i<numSpecies_;++i)
-      xi(i) = xi_[i];
 
+    Vec8f input,output;
     // Now calculate infectivity
-    //ublas::axpy_prod(animalsInfPow_, xi, infectivity_,false);
 #pragma omp parallel for
-    for(int i = 0; i<maxInfecs_; ++i) {
-      float infectivity = 0.0f;
-      
-      for(int j = 0; j<numSpecies_; ++j)
-	infectivity += xi(j) * animalsInfPow_(i,j);
-     
-      infectivity_(i) = infectivity;
+    for(size_t i = 0; i<maxInfecsPitch_; i+=VECSIZE) {
+
+      Vec8f output = 0.0f;
+      for(size_t k = 0; k<numSpecies_; ++k) {
+	input.load(&animalsInfPow_(i,k));
+	output += input * xi_[k];
+      }
+
+      output.store(&infectivity_[i]);
     }
+
+
   }
 
   inline
   void
   CpuLikelihood::CalcSusceptibilityPow()
   {
-    for(int i=0; i<popSize_; ++i)
+    for(size_t k=0; k<numSpecies_; ++k)
       {
-	for(int k=0; k<numSpecies_; ++k)
-	  animalsSuscPow_(i,k) = powf(animals_(i,k),phi_[k]);
+	Vec8f input, output;
+
+#pragma omp parallel for
+	for(int i=0; i<popSizePitch_; i+=VECSIZE)
+	  {
+	    input.load(&animals_(i,k));
+	    output = pow(input, phi_[k]);
+	    output.store(&animalsSuscPow_(i,k));
+	  }
+
       }
   }
 
@@ -465,20 +498,17 @@ namespace EpiRisk
   CpuLikelihood::CalcSusceptibility()
   {
     // Calculates susceptibility powers and sums over suscept.
-    ublas::vector<float> zeta(3);
-    for(int i=0; i<numSpecies_; ++i)
-      zeta(i) = zeta_[i];
-    //ublas::axpy_prod(animalsSuscPow_, zeta, susceptibility_, false);
-#pragma omp parallel for
-    for(int i = 0; i<popSize_; ++i) {
-      float susc = 0.0f;
-      
-      for(int j = 0; j<numSpecies_; ++j)
-	susc += zeta(j) * animalsSuscPow_(i,j);
-     
-      susceptibility_[i] = susc;
-    }
 
+#pragma omp parallel for
+    for(int i = 0; i<popSizePitch_; i+=VECSIZE) {
+      Vec8f output = 0.0f;     
+      for(int k = 0; k<numSpecies_; ++k) {
+	Vec8f input; 
+	input.load(&animalsSuscPow_(i,k));
+	output += input * zeta_[k];
+      }
+      output.store(&susceptibility_[i]);
+    }
 
   }
 
@@ -501,11 +531,13 @@ namespace EpiRisk
   {
     float res = 0.0f;
 #pragma omp parallel for reduction(+:res)
-    for(int i=0; i<popSize_; ++i)
+    for(int i=0; i<popSizePitch_; i+= VECSIZE)
       {
-	float I = eventTimes_(i,0);
-	res += *epsilon1_ * max((min(I, movtBan_) - I1Time_),0.0f);
-        res += *epsilon1_ * *epsilon2_ * max(I - max(movtBan_, I1Time_),0.0f);
+	Vec8f I;
+	I.load(&eventTimes_(i,0));
+	Vec8f partial = *epsilon1_ * max((min(I, movtBan_) - I1Time_),0.0f);
+        partial += *epsilon1_ * *epsilon2_ * max(I - max(movtBan_, I1Time_),0.0f);
+	res += horizontal_add(partial);
       }
     likComponents_.bgIntegral = res;
 
@@ -516,15 +548,21 @@ namespace EpiRisk
   void
   CpuLikelihood::ReduceProductVector()
   {
-    float res = 0.0f;
+
+    float logprod = 0.0f;
     productCache_(infecIdx_(I1Idx_).ptr) = 1.0f;
-#pragma omp parallel for reduction(+:res)
-    for(int i=0; i<productCache_.size(); ++i)
+
+#pragma omp parallel for reduction(+:logprod)
+    for(int i=0; i<productCache_.size(); i+=VECSIZE)
       {
-	res += logf(productCache_(i));
+	Vec8f prod, input;
+	input.load(&productCache_(i));
+	prod = log(input);
+	
+	logprod += horizontal_add(prod);
       }
 
-    likComponents_.logProduct = res;
+    likComponents_.logProduct = logprod;
   }
 
   inline
@@ -540,6 +578,9 @@ namespace EpiRisk
 
 	float Ij = eventTimes_(j,0);
 	float sumPressure = 0.0f;
+
+	
+
 	for(int ii=begin; ii<end; ++ii) {
 	  int i = D_.index2_data()[ii];
 	  float Ii = eventTimes_(i,0);
@@ -583,38 +624,40 @@ namespace EpiRisk
 	
 	// Load data
 	size_t dataSize = end-begin;
-	size_t arrSize = (dataSize + 8 - 1) & (-8);
+	size_t arrSize = (dataSize + VECSIZE - 1) & (-VECSIZE);
+	float* workA = new float[arrSize];
+	float* workB = new float[arrSize];
+
 	for(int jj = 0; jj < dataSize; jj++) 
 	  {
 	    size_t j = D_.index2_data()[jj+begin];
-	    workspaceA_[jj] = susceptibility_[j];
-	    workspaceB_[jj] = eventTimes_(j,0);
-	    workspaceC_[jj] = D_.value_data()[jj+begin];
+	    workA[jj] = susceptibility_[j];
+	    workB[jj] = eventTimes_(j,0);
 	  }
 	for(size_t jj=dataSize; jj<arrSize; ++jj) 
 	  {
-	  workspaceA_[jj] = 0.0f;
-	  workspaceB_[jj] = 0.0f;
-	  workspaceC_[jj] = POSINF;
+	    workA[jj] = 0.0f;
+	    workB[jj] = 0.0f;
 	  }
 	
 	// Vector processing 
-	for(int j = 0; j < dataSize; j+=8)
+	for(int j = 0; j < dataSize; j+=VECSIZE)
 	  {
 	    // Load into vector types
 	    Vec8f Ij, suscep, d;
-	    Ij.load(workspaceB_+j);
-	    suscep.load(workspaceA_+j);
-	    d.load(workspaceC_+j);
+	    Ij.load(workB+j);
+	    suscep.load(workA+j);
+	    d.load(&D_.value_data()[begin+j]);
 
 	    // Calculate
 	    Vec8f betaij = HVec8f(min(Ni, Ij) - min(Ii, Ij), *nu_, *alpha_);
 	    betaij += *gamma2_ * (HVec8f(min(Ri, Ij) - Ii,*nu_,*alpha_));
 	    betaij *= KVec8f(d, *delta_, *omega_);
 	    betaij *= suscep;
+	     
 	    pressureFromI += horizontal_add(betaij);
 	  }
-
+	delete[] workA; delete[] workB;
 	res += pressureFromI * infectivity_[i];
       }
 
