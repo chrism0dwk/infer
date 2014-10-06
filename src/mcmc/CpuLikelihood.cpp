@@ -595,16 +595,22 @@ namespace EpiRisk
 	float* workB = new float[arrSize];
 	float* workC = new float[arrSize];
 
+	size_t shortDataSize = 0;
 	for(size_t ii = 0; ii < dataSize; ii++)
 	  {
 	    size_t i = D_.index2_data()[ii+begin];
-	    workA[ii]           = eventTimes_(i,0);
-	    workA[ii+arrSize]   = eventTimes_(i,1);
-	    workA[ii+arrSize*2] = eventTimes_(i,2);
-	    workB[ii]           = infectivity_(i);
-	    workC[ii]           = D_.value_data()[ii+begin];
+	    if(eventTimes_(i,0) < eventTimes_(i,1))
+	      {
+		workA[ii]           = eventTimes_(i,0);
+		workA[ii+arrSize]   = eventTimes_(i,1);
+		workA[ii+arrSize*2] = eventTimes_(i,2);
+		workB[ii]           = infectivity_(i);
+		workC[ii]           = D_.value_data()[ii+begin];
+		shortDataSize++;
+	      }
 	  }
-	for(size_t ii = dataSize; ii < arrSize; ii++)
+	size_t shortArrSize = (shortDataSize + VECSIZE -1) & (-VECSIZE);
+	for(size_t ii = shortDataSize; ii < shortArrSize; ii++)
 	  {
 	    workA[ii]           = 0.0f;
 	    workA[ii+arrSize]   = 0.0f;
@@ -613,7 +619,7 @@ namespace EpiRisk
 	    workC[ii]           = 0.0f;
 	  }
 
-	for(int i=0; i<arrSize; i+=VECSIZE) {
+	for(int i=0; i<shortArrSize; i+=VECSIZE) {
 	  Vec8f Ii; Ii.load(workA+i);
 	  Vec8f Ni; Ni.load(workA+i+arrSize);
 	  Vec8f Ri; Ri.load(workA+i+arrSize*2);
@@ -622,14 +628,8 @@ namespace EpiRisk
 	  Vec8f idxOnj = 0.0f;
 	  
 	  idxOnj = hVec8f(Ij - Ii, *nu_, *alpha_) * infec * KVec8f(d, *delta_, *omega_);
-	  idxOnj = select(Ii < Ni, idxOnj, 0.0f);
-	  //if (Ii < Ij and Ij <= Ni)	  
 	  Vec8f state = select(Ii<Ij & Ij<=Ni, 1.0f, 0.0f);
 	  state = select(Ni < Ij & Ij <= Ri, *gamma2_, state);
-	  //idxOnj *= select(Ii < Ij & Ij <= Ni, 1.0f, 0.0f);
-	  //else if (Ni < Ij and Ij <= Ri)
-	  //idxOnj *= select(Ni < Ij & Ij <= Ri, *gamma2_, 0.0f);
-	  //if(Ii < Ni)
 	  idxOnj *= state;
 	  sumPressure += horizontal_add(idxOnj);
 	}
