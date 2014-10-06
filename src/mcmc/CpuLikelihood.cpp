@@ -78,6 +78,13 @@ namespace EpiRisk
   }
 
   inline
+  Vec8f
+  hVec8f(const Vec8f t, float nu, float alpha)
+  {
+    return select(t < alpha, 0.0f, 1.0f);
+  }
+
+  inline
   fp_t
   H(const float t, const float nu, const float alpha)
   {
@@ -579,26 +586,59 @@ namespace EpiRisk
 	float Ij = eventTimes_(j,0);
 	float sumPressure = 0.0f;
 
+	/////////// VECTORIZATION ATTEMPT ////////////
 	
+	// Load data
+	size_t dataSize = end-begin;
+	size_t arrSize = (dataSize + VECSIZE - 1) & (-VECSIZE);
+	float* workA = new float[arrSize*3];
+	float* workB = new float[arrSize];
+	float* workC = new float[arrSize];
 
-	for(int ii=begin; ii<end; ++ii) {
-	  int i = D_.index2_data()[ii];
-	  float Ii = eventTimes_(i,0);
-	  float Ni = eventTimes_(i,1);
-	  float Ri = eventTimes_(i,2);
-	  float idxOnj = 0.0f;
-	  if(Ii < Ni)
-	    {
-	      if (Ii < Ij and Ij <= Ni)
-		idxOnj += h(Ij - Ii, *nu_, *alpha_);
-	      else if (Ni < Ij and Ij <= Ri)
-		idxOnj += *gamma2_ * h(Ij - Ii, *nu_, *alpha_);
-	    }
-	  sumPressure += idxOnj;
+	for(size_t ii = 0; ii < dataSize; ii++)
+	  {
+	    size_t i = D_.index2_data()[ii+begin];
+	    workA[ii]           = eventTimes_(i,0);
+	    workA[ii+arrSize]   = eventTimes_(i,1);
+	    workA[ii+arrSize*2] = eventTimes_(i,2);
+	    workB[ii]           = infectivity_(i);
+	    workC[ii]           = D_.value_data()[ii+begin];
+	  }
+	for(size_t ii = dataSize; ii < arrSize; ii++)
+	  {
+	    workA[ii]           = 0.0f;
+	    workA[ii+arrSize]   = 0.0f;
+	    workA[ii+arrSize*2] = 0.0f;
+	    workB[ii]           = 0.0f;
+	    workC[ii]           = 0.0f;
+	  }
+
+	for(int i=0; i<arrSize; i+=VECSIZE) {
+	  Vec8f Ii; Ii.load(workA+i);
+	  Vec8f Ni; Ni.load(workA+i+arrSize);
+	  Vec8f Ri; Ri.load(workA+i+arrSize*2);
+	  Vec8f infec; infec.load(workB+i);
+	  Vec8f d; d.load(workC+i);
+	  Vec8f idxOnj = 0.0f;
+	  
+	  idxOnj = hVec8f(Ij - Ii, *nu_, *alpha_) * infec * KVec8f(d, *delta_, *omega_);
+	  idxOnj = select(Ii < Ni, idxOnj, 0.0f);
+	  //if (Ii < Ij and Ij <= Ni)	  
+	  Vec8f state = select(Ii<Ij & Ij<=Ni, 1.0f, 0.0f);
+	  state = select(Ni < Ij & Ij <= Ri, *gamma2_, state);
+	  //idxOnj *= select(Ii < Ij & Ij <= Ni, 1.0f, 0.0f);
+	  //else if (Ni < Ij and Ij <= Ri)
+	  //idxOnj *= select(Ni < Ij & Ij <= Ri, *gamma2_, 0.0f);
+	  //if(Ii < Ni)
+	  idxOnj *= state;
+	  sumPressure += horizontal_add(idxOnj);
 	}
+
+	///////////////////////////////////////////////
 	float epsilon = *epsilon1_;
 	epsilon *= Ij < movtBan_ ? 1.0f : *epsilon2_;
-	productCache_[j] = sumPressure * *gamma1_ + epsilon;
+	productCache_[j] = sumPressure * *gamma1_ * susceptibility_(j) + epsilon;
+	delete[] workA; delete[] workB; delete[] workC;
       }
 
     ReduceProductVector();
@@ -627,17 +667,20 @@ namespace EpiRisk
 	size_t arrSize = (dataSize + VECSIZE - 1) & (-VECSIZE);
 	float* workA = new float[arrSize];
 	float* workB = new float[arrSize];
+	float* workC = new float[arrSize];
 
 	for(int jj = 0; jj < dataSize; jj++) 
 	  {
 	    size_t j = D_.index2_data()[jj+begin];
 	    workA[jj] = susceptibility_[j];
 	    workB[jj] = eventTimes_(j,0);
+	    workC[jj] = D_.value_data()[jj+begin];
 	  }
 	for(size_t jj=dataSize; jj<arrSize; ++jj) 
 	  {
 	    workA[jj] = 0.0f;
 	    workB[jj] = 0.0f;
+	    workC[jj] = POSINF;
 	  }
 	
 	// Vector processing 
@@ -647,21 +690,21 @@ namespace EpiRisk
 	    Vec8f Ij, suscep, d;
 	    Ij.load(workB+j);
 	    suscep.load(workA+j);
-	    d.load(&D_.value_data()[begin+j]);
+	    d.load(workC+j);
 
 	    // Calculate
 	    Vec8f betaij = HVec8f(min(Ni, Ij) - min(Ii, Ij), *nu_, *alpha_);
-	    betaij += *gamma2_ * (HVec8f(min(Ri, Ij) - Ii,*nu_,*alpha_));
+	    betaij += *gamma2_ * (HVec8f(min(Ri, Ij) - Ii, *nu_,*alpha_) - HVec8f(min(Ni, Ij) - Ii, *nu_, *alpha_));
 	    betaij *= KVec8f(d, *delta_, *omega_);
 	    betaij *= suscep;
 	     
 	    pressureFromI += horizontal_add(betaij);
 	  }
-	delete[] workA; delete[] workB;
+	delete[] workA; delete[] workB; delete[] workC;
 	res += pressureFromI * infectivity_[i];
       }
 
-    likComponents_.integral = res;
+    likComponents_.integral = res * *gamma1_;
   }
 
   void
@@ -756,7 +799,7 @@ namespace EpiRisk
 
   void CpuLikelihood::PrintProdCache() const
   {
-    for(int i=0; i<productCache_.size(); ++i)
+    for(int i=0; i<popSize_; ++i)
       {
 	cout << population_[i].id << ": " << productCache_(i) << "\n";
       }

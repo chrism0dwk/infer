@@ -86,8 +86,8 @@ PopDataImporter::next()
   if (tokens.size() != 8) throw EpiRisk::fileEOF();
 
   record.id = tokens[0];
-  record.data.x = atof(tokens[1].c_str());
-  record.data.y = atof(tokens[2].c_str());
+  record.data.x = atof(tokens[1].c_str()) / 1000.0f;
+  record.data.y = atof(tokens[2].c_str()) / 1000.0f;
   record.data.cattle = atof(tokens[3].c_str());
   record.data.pigs = atof(tokens[4].c_str());
   record.data.sheep = atof(tokens[5].c_str());

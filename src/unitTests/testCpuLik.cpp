@@ -159,7 +159,7 @@ main(int argc, char* argv[])
   cout << "Timing constructor..." << flush;
   gettimeofday(&start, NULL);
   CpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
-      (size_t) 3, obsTime, 25000.0f);
+      (size_t) 3, obsTime, 25.0f);
   gettimeofday(&end, NULL);
   cout << "Done.\nConstructor took " << timeinseconds(start,end) << " seconds" << endl;
 
@@ -188,9 +188,9 @@ main(int argc, char* argv[])
   phi[0] = Parameter(0.4061, BetaPrior(15, 15), "phi_c");
   phi[1] = Parameter(0.4365, BetaPrior(15, 15), "phi_p");
   phi[2] = Parameter(0.3372, BetaPrior(15, 15), "phi_s");
-  Parameter delta(0.2431, GammaPrior(1, 1), "delta");
+  Parameter delta(2.0, GammaPrior(1, 1), "delta");
   Parameter nu(0.001, GammaPrior(1, 1), "nu");
-  Parameter alpha(60, GammaPrior(1, 1), "alpha");
+  Parameter alpha(4.0, GammaPrior(1, 1), "alpha");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.5, GammaPrior(4.0, 8), "b");
   Parameter omega(1.5, GammaPrior(1,1), "omega");
@@ -209,6 +209,7 @@ main(int argc, char* argv[])
     timing[i] = timeinseconds(start,end);
   }
   for(int i=1; i<100; ++i) timing[0] += timing[i];
+
   cout << "Likelihood took: " << timing[0]/100.0 << " seconds" << endl;
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
