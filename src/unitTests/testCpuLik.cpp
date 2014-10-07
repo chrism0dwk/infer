@@ -199,18 +199,20 @@ main(int argc, char* argv[])
   likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
       nu, alpha, a, b);
   
-  cout << "Timing likelihood..." << flush;
-  double timing[100];
+  cout << "Timing likelihood..." << endl;
+
+  const size_t numreps = 1000;
+  double timing[numreps];
   
-  for(int i=0; i<100; ++i) {
+  for(int i=0; i<numreps; ++i) {
     gettimeofday(&start, NULL);
     likelihood.FullCalculate();
     gettimeofday(&end, NULL);
     timing[i] = timeinseconds(start,end);
   }
-  for(int i=1; i<100; ++i) timing[0] += timing[i];
+  for(int i=1; i<numreps; ++i) timing[0] += timing[i];
 
-  cout << "Likelihood took: " << timing[0]/100.0 << " seconds" << endl;
+  cout << "Likelihood took: " << timing[0]/(double)numreps << " seconds" << endl;
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
   return EXIT_SUCCESS;

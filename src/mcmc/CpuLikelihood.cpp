@@ -7,9 +7,11 @@
 #include <stdexcept>
 #include <string>
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <numeric>
 #include <utility>
 #include <cmath>
 #include <cassert>
@@ -69,6 +71,21 @@ namespace EpiRisk
       }
     return false;
   }
+
+  float 
+  sumPairwise(const float* x, const size_t n)
+  {
+    float s;
+    if(n <= 16) {
+      s = 0.0f;
+      for(size_t i=0; i<n; ++i) s += x[i];
+    } else {
+      size_t m = n/2;
+      s = sumPairwise(x,m) + sumPairwise(x+m,n-m);
+    }
+    return s;
+  }
+
 
   inline
   fp_t
@@ -448,14 +465,15 @@ namespace EpiRisk
   {
     
     for(size_t k=0; k<numSpecies_; ++k) {
-      Vec8f input,output;
 
 #pragma omp parallel for
       for(size_t i=0; i<maxInfecsPitch_; i+=VECSIZE) {
+	Vec8f input, output;
 	input.load(&animals_(i,k));
 	output = pow(input, psi_[k]);
 	output.store(&animalsInfPow_(i,k));
       }
+
     }
   }
     
@@ -464,13 +482,12 @@ namespace EpiRisk
   CpuLikelihood::CalcInfectivity()
   {
 
-    Vec8f input,output;
     // Now calculate infectivity
 #pragma omp parallel for
     for(size_t i = 0; i<maxInfecsPitch_; i+=VECSIZE) {
-
       Vec8f output = 0.0f;
       for(size_t k = 0; k<numSpecies_; ++k) {
+	Vec8f input;
 	input.load(&animalsInfPow_(i,k));
 	output += input * xi_[k];
       }
@@ -487,11 +504,11 @@ namespace EpiRisk
   {
     for(size_t k=0; k<numSpecies_; ++k)
       {
-	Vec8f input, output;
 
 #pragma omp parallel for
 	for(int i=0; i<popSizePitch_; i+=VECSIZE)
 	  {
+	    Vec8f input, output;
 	    input.load(&animals_(i,k));
 	    output = pow(input, phi_[k]);
 	    output.store(&animalsSuscPow_(i,k));
@@ -536,18 +553,28 @@ namespace EpiRisk
   void
   CpuLikelihood::CalcBgIntegral()
   {
+    //std::vector<float> res(popSize_);
+    // for(int i=0; i<popSize_; ++i)
+    //   {
+    // 	float I = eventTimes_(i,0);
+    // 	res[i] = *epsilon1_ * max((min(I, movtBan_) - I1Time_), 0.0f);
+    // 	res[i] += *epsilon1_ * *epsilon2_ * max(I - max(movtBan_, I1Time_), 0.0f);
+    //   }
+    // likComponents_.bgIntegral = std::accumulate(res.begin(), res.end(), 0.0f);
+
     float res = 0.0f;
+
 #pragma omp parallel for reduction(+:res)
     for(int i=0; i<popSizePitch_; i+= VECSIZE)
       {
-	Vec8f I;
-	I.load(&eventTimes_(i,0));
-	Vec8f partial = *epsilon1_ * max((min(I, movtBan_) - I1Time_),0.0f);
+    	Vec8f I;
+    	I.load(&eventTimes_(i,0));
+    	Vec8f partial = *epsilon1_ * max((min(I, movtBan_) - I1Time_),0.0f);
         partial += *epsilon1_ * *epsilon2_ * max(I - max(movtBan_, I1Time_),0.0f);
-	res += horizontal_add(partial);
+    	res += horizontal_add(partial);
       }
-    likComponents_.bgIntegral = res;
 
+    likComponents_.bgIntegral = res;
   }
 
 
@@ -556,7 +583,7 @@ namespace EpiRisk
   CpuLikelihood::ReduceProductVector()
   {
 
-    float logprod = 0.0f;
+    double logprod = 0.0;
     productCache_(infecIdx_(I1Idx_).ptr) = 1.0f;
 
 #pragma omp parallel for reduction(+:logprod)
@@ -565,18 +592,28 @@ namespace EpiRisk
 	Vec8f prod, input;
 	input.load(&productCache_(i));
 	prod = log(input);
-	
 	logprod += horizontal_add(prod);
       }
-
+    
     likComponents_.logProduct = logprod;
+
   }
 
   inline
   void
   CpuLikelihood::CalcProduct()
   {
-#pragma omp parallel for
+
+    float* workA;
+    float* workB;
+    float* workC;
+
+#pragma omp parallel private(workA, workB, workC)
+    {
+      workA = new float[popSize_];
+      workB = new float[popSize_];
+      workC = new float[popSize_];
+#pragma omp for 
     for(int jj=0; jj<infecIdx_.size(); ++jj)
       {
 	int j = infecIdx_(jj).ptr;
@@ -584,16 +621,13 @@ namespace EpiRisk
 	int end = D_.index1_data()[j+1];
 
 	float Ij = eventTimes_(j,0);
-	float sumPressure = 0.0f;
+
 
 	/////////// VECTORIZATION ATTEMPT ////////////
 	
 	// Load data
 	size_t dataSize = end-begin;
 	size_t arrSize = (dataSize + VECSIZE - 1) & (-VECSIZE);
-	float* workA = new float[arrSize*3];
-	float* workB = new float[arrSize];
-	float* workC = new float[arrSize];
 
 	size_t shortDataSize = 0;
 	for(size_t ii = 0; ii < dataSize; ii++)
@@ -601,11 +635,11 @@ namespace EpiRisk
 	    size_t i = D_.index2_data()[ii+begin];
 	    if(eventTimes_(i,0) < eventTimes_(i,1))
 	      {
-		workA[ii]           = eventTimes_(i,0);
-		workA[ii+arrSize]   = eventTimes_(i,1);
-		workA[ii+arrSize*2] = eventTimes_(i,2);
-		workB[ii]           = infectivity_(i);
-		workC[ii]           = D_.value_data()[ii+begin];
+		workA[shortDataSize]           = eventTimes_(i,0);
+		workA[shortDataSize+arrSize]   = eventTimes_(i,1);
+		workA[shortDataSize+arrSize*2] = eventTimes_(i,2);
+		workB[shortDataSize]           = infectivity_(i);
+		workC[shortDataSize]           = D_.value_data()[ii+begin];
 		shortDataSize++;
 	      }
 	  }
@@ -619,6 +653,7 @@ namespace EpiRisk
 	    workC[ii]           = 0.0f;
 	  }
 
+	float sumPressure = 0.0f;
 	for(int i=0; i<shortArrSize; i+=VECSIZE) {
 	  Vec8f Ii; Ii.load(workA+i);
 	  Vec8f Ni; Ni.load(workA+i+arrSize);
@@ -633,13 +668,14 @@ namespace EpiRisk
 	  idxOnj *= state;
 	  sumPressure += horizontal_add(idxOnj);
 	}
-
 	///////////////////////////////////////////////
+
 	float epsilon = *epsilon1_;
 	epsilon *= Ij < movtBan_ ? 1.0f : *epsilon2_;
 	productCache_[j] = sumPressure * *gamma1_ * susceptibility_(j) + epsilon;
-	delete[] workA; delete[] workB; delete[] workC;
       }
+    delete[] workA; delete[] workB; delete[] workC;
+    }
 
     ReduceProductVector();
   }
@@ -649,27 +685,34 @@ namespace EpiRisk
   CpuLikelihood::CalcIntegral()
   {
     float res = 0.0f;
-#pragma omp parallel for reduction(+:res)
-    for(int ii=0; ii<infecIdx_.size(); ++ii)
-      {
-	int i = infecIdx_(ii).ptr;
+    
+    float* workA;
+    float* workB;
+    float* workC;
+
+#pragma omp parallel private(workA, workB, workC)
+    {
+      workA = new float[popSize_];
+      workB = new float[popSize_];
+      workC = new float[popSize_];
+
+#pragma omp for ordered schedule(static) reduction(+:res)
+    for(size_t ii=0; ii<infecIdx_.size(); ++ii)
+	{
+	size_t i = infecIdx_(ii).ptr;
 	size_t begin = D_.index1_data()[i];
 	size_t end = D_.index1_data()[i+1];
 	float Ii = eventTimes_(i,0);
 	float Ni = eventTimes_(i,1);
 	float Ri = eventTimes_(i,2);
-	float pressureFromI = 0.0f;
 	
 	//////// VECTORIZATION ATTEMPT ////////
 	
 	// Load data
 	size_t dataSize = end-begin;
 	size_t arrSize = (dataSize + VECSIZE - 1) & (-VECSIZE);
-	float* workA = new float[arrSize];
-	float* workB = new float[arrSize];
-	float* workC = new float[arrSize];
 
-	for(int jj = 0; jj < dataSize; jj++) 
+	for(size_t jj = 0; jj < dataSize; ++jj) 
 	  {
 	    size_t j = D_.index2_data()[jj+begin];
 	    workA[jj] = susceptibility_[j];
@@ -683,8 +726,9 @@ namespace EpiRisk
 	    workC[jj] = POSINF;
 	  }
 	
-	// Vector processing 
-	for(int j = 0; j < dataSize; j+=VECSIZE)
+	// Vector processing
+	float pressureFromI = 0.0f;
+	for(size_t j = 0; j < dataSize; j+=VECSIZE)
 	  {
 	    // Load into vector types
 	    Vec8f Ij, suscep, d;
@@ -697,12 +741,15 @@ namespace EpiRisk
 	    betaij += *gamma2_ * (HVec8f(min(Ri, Ij) - Ii, *nu_,*alpha_) - HVec8f(min(Ni, Ij) - Ii, *nu_, *alpha_));
 	    betaij *= KVec8f(d, *delta_, *omega_);
 	    betaij *= suscep;
-	     
+	    betaij.store(workA+j);
 	    pressureFromI += horizontal_add(betaij);
 	  }
-	delete[] workA; delete[] workB; delete[] workC;
+	
 	res += pressureFromI * infectivity_[i];
       }
+    
+    delete[] workA; delete[] workB; delete[] workC;
+    }
 
     likComponents_.integral = res * *gamma1_;
   }
@@ -722,7 +769,7 @@ namespace EpiRisk
     CalcBgIntegral();
 
     logLikelihood_ = likComponents_.logProduct
-        - (likComponents_.integral* *gamma1_ + likComponents_.bgIntegral);
+        - (likComponents_.integral + likComponents_.bgIntegral);
 
 
 #ifdef GPUTIMING
@@ -755,7 +802,7 @@ namespace EpiRisk
     likComponents_.integral;
 
     logLikelihood_ = likComponents_.logProduct
-        - (likComponents_.integral* *gamma1_ + likComponents_.bgIntegral);
+        - (likComponents_.integral + likComponents_.bgIntegral);
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);

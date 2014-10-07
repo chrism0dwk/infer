@@ -307,7 +307,7 @@ namespace EpiRisk
     float movtBan_;
     float I1Time_;
     unsigned int I1Idx_;
-    ublas::vector<fp_t> productCache_;
+    ublas::vector<float> productCache_;
     LikelihoodComponents likComponents_;
 
     // GPU data structures

@@ -41,8 +41,8 @@ namespace EpiRisk
 
   typedef float fp_t;
 
-  const double POSINF( std::numeric_limits<double>::infinity() );
-  const double NEGINF(-std::numeric_limits<double>::infinity() );
+  const fp_t POSINF( std::numeric_limits<double>::infinity() );
+  const fp_t NEGINF(-std::numeric_limits<double>::infinity() );
 
   typedef struct {
     size_t idx;
