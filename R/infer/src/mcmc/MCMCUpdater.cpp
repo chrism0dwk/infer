@@ -912,6 +912,11 @@ namespace EpiRisk
               *doCompareProductVector_ = false;
             }
         }
+
+      // Recalculate full likelihood to
+      //   correct for arithmetic rounding errors
+      likelihood_->Propose();
+      likelihood_->Accept();
       ucalls_++;
     }
 

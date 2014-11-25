@@ -200,7 +200,10 @@ esac
 
 # Check headers
 AC_CHECK_HEADERS([math.h])
+CPPFLAGSOLD=${CPPFLAGS}
+CPPFLAGS=-I${HDF5_HOME}/include
 AC_CHECK_HEADERS([H5Cpp.h],,[AC_MSG_ERROR([HDF5 library headers not found])])
+CPPFLAGS=${CPPFLAGSOLD}
 
 # Assemble library requirements
 RCPP_PKG_LIBS=`${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()"`

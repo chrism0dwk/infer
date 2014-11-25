@@ -1310,6 +1310,13 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     checkCudaError(cudaGetDevice(&deviceId));
     cudaDeviceProp deviceProp;
     checkCudaError(cudaGetDeviceProperties(&deviceProp, deviceId));
+    int runtimeVersion;
+    checkCudaError(cudaRuntimeGetVersion(&runtimeVersion));
+
+    // Print device properties
+    std::cerr << "Initialised CUDA environment. CUDA runtime version " << runtimeVersion << "\n";
+    std::cerr << "Using GPU: " << deviceProp.name << ", id " << deviceId << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
+    std::cerr << "Free memory: " << deviceProp.totalGlobalMem << "\n";
 
 #ifndef NDEBUG
     std::cout << "Using GPGPU: " << deviceProp.name << ", id " << deviceId

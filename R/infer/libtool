@@ -2,7 +2,7 @@
 
 # libtool - Provide generalized library-building support services.
 # Generated automatically by config.status (description) VERSION
-# Libtool was configured on host it060123:
+# Libtool was configured on host build-sn-gpu-p:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 #
 #   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005,
@@ -86,7 +86,7 @@ NM="/usr/bin/nm -B"
 LN_S="ln -s"
 
 # What is the maximum length of a command?
-max_cmd_len=1966080
+max_cmd_len=3458764513820540925
 
 # Object file suffix (normally "o").
 objext=o
@@ -237,7 +237,7 @@ hardcode_into_libs=yes
 sys_lib_search_path_spec="/usr/local/packages/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2 /usr/local/packages/gcc-4.8.2/lib64 /lib64 /usr/lib64"
 
 # Run-time system search path for libraries.
-sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib64/R/lib /usr/lib64/atlas /usr/lib64/ctapi /usr/lib64/llvm /usr/local/lib /usr/local/lib64 /usr/lib64/openmpi/lib /usr/lib64/mysql /usr/lib/nvidia /usr/lib64/nvidia /usr/lib64/nx /usr/lib64/nx/X11 /usr/lib64/qt-3.3/lib /usr/lib64/xulrunner "
+sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib64/R/lib /opt/mellanox/fca/lib /opt/ibutils/lib64 /opt/mellanox/mxm/lib /usr/lib64/mysql /usr/lib64/qt-3.3/lib /gpfs1m/apps/apps/lib/lib /usr/local/lib /usr/lib64/xulrunner-2 "
 
 # Whether dlopen is supported.
 dlopen_support=unknown
@@ -275,7 +275,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -8930,7 +8930,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
