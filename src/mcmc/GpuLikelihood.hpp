@@ -150,15 +150,49 @@ namespace EpiRisk
     };
 
 
+  struct LikelihoodComponents
+  {
+    float sumI;
+    float bgIntegral;
+    float logProduct;
+    float integral;
+  };
+  
+  struct LikelihoodCache
+  {
+    LikelihoodComponents components;
+    float* workspace;
+    float* scratch;
+    float* product;
+    float* infectivity;
+    float* susceptibility;
+  };
+
+  struct Data
+  {
+    float* eventTimes;
+    float* popSize;
+    int eventTimesPitch;
+    float movtBan;
+    CsrMatrix D;
+  };
+
   class GpuLikelihood
   {
   public:
-    struct LikelihoodComponents
+
+    struct ParmVals
     {
-      float sumI;
-      float bgIntegral;
-      float logProduct;
-      float integral;
+      float epsilon1;
+      float epsilon2;
+      float gamma1;
+      float gamma2;
+      float delta;
+      float omega;
+      float nu;
+      float alpha;
+      float a;
+      float b;
     };
 
     explicit
@@ -361,7 +395,6 @@ namespace EpiRisk
     unsigned int I1Idx_;
 
     LikelihoodComponents* hostComponents_;
-    LikelihoodComponents* devComponents_;
 
     // GPU data structures
 
@@ -379,11 +412,10 @@ namespace EpiRisk
     size_t animalsInfPowPitch_, animalsSuscPowPitch_;
     float* devAnimalsInfPow_;
     float* devAnimalsSuscPow_;
-    float* devEventTimes_;
 
-    size_t eventTimesPitch_;
-    float* devSusceptibility_;
-    float* devInfectivity_;
+    Data devData_;
+
+    Cache devCache_;
     thrust::device_vector<float>* devProduct_;
     thrust::device_vector<float>* devWorkspace_;
     int integralBuffSize_;
@@ -407,6 +439,7 @@ namespace EpiRisk
     float* alpha_;
     float* a_;
     float* b_;
+    ParmVals pvals_;
 
     PointerVector<float> xi_;
     PointerVector<float> psi_;

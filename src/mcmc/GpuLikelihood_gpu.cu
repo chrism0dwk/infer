@@ -1244,7 +1244,7 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
   _reducePVectorStage1(float* input, const int size, const int I1Idx,
       float* output)
   {
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int tid = threadIdx.x + blockIdx.x * blockDim.x*4;
     extern
     __shared__ float buff[];
     buff[threadIdx.x] = 0.0f;
@@ -1253,9 +1253,8 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
       {
         if (tid == I1Idx)
           input[tid] = 1.0f; // Better put *after* our global memory fetch, I think!
-        buff[threadIdx.x] = logf(input[tid]);
-
-        //output[tid] = logf(input[tid]);
+	for(int i=0; i<4; ++i)
+	  if(tid+blockDim.x*i < size) buff[threadIdx.x] += logf(input[tid+blockDim.x*i]);
       }
     _shmemReduce(buff);
     if (threadIdx.x == 0)
@@ -1267,18 +1266,18 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
   {
     // Reduces the device-side product vector into the device-side components struct
 
-    cudaDeviceSynchronize();
-    int blocksPerGrid = (devProduct_->size() + THREADSPERBLOCK - 1)
-        / THREADSPERBLOCK;
+    const int threadsperblock = 128;
+    int blocksPerGrid = (devProduct_->size() + threadsperblock - 1)
+        / threadsperblock;
 
-_reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(float)>>>
+    // Sequentially adds 4 logs, and parallel reduction
+    _reducePVectorStage1<<<(blocksPerGrid+3)/4, threadsperblock, threadsperblock * sizeof(float)>>>
   (thrust::raw_pointer_cast(&(*devProduct_)[0]),
        devProduct_->size(),
        I1Idx_,
    thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
   	    	    checkCudaError(cudaGetLastError());
 
-    cudaDeviceSynchronize();
     CUDPPResult res = cudppReduce(addReduce_,
         (float*) ((char*) devComponents_
 		  + offsetof(LikelihoodComponents,logProduct)), thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
@@ -1286,12 +1285,8 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
       throw std::runtime_error(
           "cudppReduce failed in GpuLikelihood::ReduceProductVector()");
 
-    cudaDeviceSynchronize();
-
-//  float partial = thrust::reduce(devWorkspace_.begin(), devWorkspace_.begin() + devProduct_.size());
-//  checkCudaError(cudaMemcpy((float*)((char*)devComponents_ + offsetof(LikelihoodComponents,logProduct)), &partial, sizeof(float), cudaMemcpyHostToDevice));
-
   }
+
 
   GpuLikelihood::GpuLikelihood(PopDataImporter& population,
       EpiDataImporter& epidemic, const size_t nSpecies, const float obsTime,
@@ -1314,36 +1309,33 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     checkCudaError(cudaSetDeviceFlags(cudaDeviceMapHost));
 
-    // Allocate infec indicies
-    hostInfecIdx_ = new thrust::host_vector<InfecIdx_t>;
-    devInfecIdx_ = new thrust::device_vector<InfecIdx_t>;
-    hostSuscOccults_ = new thrust::host_vector<InfecIdx_t>;
 
-    // Load data into host memory
+    // Allocate data
     LoadPopulation(population);
     LoadEpidemic(epidemic);
     SortPopulation();
     CalcDistanceMatrix(dLimit);
-
-    // Set up on GPU
     SetSpecies();
     SetEvents();
+
+    hostInfecIdx_ = new thrust::host_vector<InfecIdx_t>;
+    devInfecIdx_ = new thrust::device_vector<InfecIdx_t>;
+    hostSuscOccults_ = new thrust::host_vector<InfecIdx_t>;
 
     // Set up reference counter to covariate data
     covariateCopies_ = new size_t;
     *covariateCopies_ = 1;
 
-    // Allocate product cache
-    devProduct_ = new thrust::device_vector<float>;
-    devProduct_->resize(maxInfecs_);
-    thrust::fill(devProduct_->begin(), devProduct_->end(), 1.0f);
+    // Allocate cache
+    checkCudaError(cudaMalloc(&devCache_.product, maxInfecs_*sizeof(float)));
+    thrust::device_ptr<float> prodPtr(devCache_.product);
+    thrust::fill(prodPtr, prodPtr + maxInfecs_, 1.0f);
 
     // Allocate integral array
     int numRequiredThreads = maxInfecs_ * 32; // One warp per infection
     integralBuffSize_ = (numRequiredThreads + THREADSPERBLOCK - 1)
         / THREADSPERBLOCK;
-    devWorkspace_ = new thrust::device_vector<float>;
-    devWorkspace_->resize(maxInfecs_);
+    checkCudaError(cudaMalloc(&devCache_.workspace, maxInfecs_*sizeof(float)));
 
     // Components
     checkCudaError(
@@ -1429,18 +1421,32 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
 // Copy constructor
   GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
-      popSize_(other.popSize_), numKnownInfecs_(other.numKnownInfecs_), maxInfecs_(
-          other.maxInfecs_), numSpecies_(other.numSpecies_), hostPopulation_(
-          other.hostPopulation_), obsTime_(other.obsTime_), I1Time_(
-          other.I1Time_), I1Idx_(other.I1Idx_), covariateCopies_(
-          other.covariateCopies_), devAnimals_(other.devAnimals_), animalsPitch_(
-          other.animalsPitch_), devD_(other.devD_), hostDRowPtr_(
-          other.hostDRowPtr_), dnnz_(other.dnnz_), integralBuffSize_(
-          other.integralBuffSize_), epsilon1_(other.epsilon1_), epsilon2_(other.epsilon2_),
-          gamma1_(
-		  other.gamma1_), gamma2_(other.gamma2_), delta_(other.delta_), omega_(other.omega_), nu_(
-          other.nu_), alpha_(other.alpha_), movtBan_(other.movtBan_), a_(other.a_), b_(other.b_), cuRand_(
-          other.cuRand_)
+    popSize_(other.popSize_), 
+    numKnownInfecs_(other.numKnownInfecs_), 
+    maxInfecs_(other.maxInfecs_), 
+    numSpecies_(other.numSpecies_), 
+    hostPopulation_(other.hostPopulation_), 
+    obsTime_(other.obsTime_), 
+    I1Time_(other.I1Time_), 
+    I1Idx_(other.I1Idx_), 
+    covariateCopies_(other.covariateCopies_),
+    devAnimals_(other.devAnimals_),
+    animalsPitch_(other.animalsPitch_),
+    devD_(other.devD_),
+    hostDRowPtr_(other.hostDRowPtr_),
+    dnnz_(other.dnnz_),
+    integralBuffSize_(other.integralBuffSize_), 
+    epsilon1_(other.epsilon1_), 
+    epsilon2_(other.epsilon2_),
+    gamma1_(other.gamma1_), 
+    gamma2_(other.gamma2_), 
+    delta_(other.delta_), 
+    omega_(other.omega_), 
+    nu_(other.nu_),
+    alpha_(other.alpha_),
+    movtBan_(other.movtBan_),
+    a_(other.a_), b_(other.b_),
+    cuRand_(other.cuRand_)
   {
     timeval start, end;
     gettimeofday(&start, NULL);
@@ -1459,10 +1465,10 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     // Allocate and copy event times - popSize_ * NUMEVENTS matrix
     checkCudaError(
-        cudaMallocPitch(&devEventTimes_, &eventTimesPitch_, popSize_ * sizeof(float), NUMEVENTS));
+        cudaMallocPitch(&devData_.eventTimes, &devData_.eventTimesPitch, popSize_ * sizeof(float), NUMEVENTS));
     eventTimesPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMemcpy2D(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+        cudaMemcpy2D(devData_.eventTimes,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
 
     // Allocate and copy intermediate infectivity and susceptibility
     checkCudaError(cudaMalloc(&devSusceptibility_, popSize_ * sizeof(float)));
@@ -1531,8 +1537,6 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
   const GpuLikelihood&
   GpuLikelihood::operator=(const GpuLikelihood& other)
   {
-//  timeval start, end;
-//  gettimeofday(&start, NULL);
     // Copy animal powers
     checkCudaError(
         cudaMemcpy2DAsync(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
@@ -1541,20 +1545,20 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     // copy event times
     checkCudaError(
-        cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+        cudaMemcpy2DAsync(devData_.eventTimes,devData_.eventTimesPitch_*sizeof(float),other.devData_.eventTimes,other.devData_.eventTimesPitch*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
 
     // copy intermediate infectivity and susceptibility
     checkCudaError(
-        cudaMemcpyAsync(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
+        cudaMemcpyAsync(devData.susceptibility, other.devData.susceptibility, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
     checkCudaError(
-        cudaMemcpyAsync(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
+        cudaMemcpyAsync(devData.infectivity, other.devData.infectivity, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
     // Infection index
     *devInfecIdx_ = *(other.devInfecIdx_);
     *hostInfecIdx_ = *(other.hostInfecIdx_);
 
     // Internals
-    I1Idx_ = other.I1Idx_;
+    devCache_.I1Idx = other.devCache_.I1Idx;
     I1Time_ = other.I1Time_;
     *hostSuscOccults_ = *other.hostSuscOccults_;
 
@@ -1583,10 +1587,6 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     *hostComponents_ = *other.hostComponents_;
     logLikelihood_ = other.logLikelihood_;
-
-//  gettimeofday(&end, NULL);
-//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-//      << timeinseconds(start, end) << std::endl;
 
     cudaDeviceSynchronize();
     return *this;
@@ -1840,6 +1840,18 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
         cudaMemcpy(devPhi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
 
     delete[] tmp;
+
+    pvals_.epsilon1 = *epsilon1_;
+    pvals_.epsilon2 = *epsilon2_;
+    pvals_.gamma1   = *gamma1_;
+    pvals_.gamma2   = *gamma2_;
+    pvals_.delta    = *delta_;
+    pvals_.omega    = *omega_;
+    pvals_.nu       = *nu_;
+    pvals_.alpha    = *alpha_;
+    pvals_.a        = *a_;
+    pvals_.b        = *b_;
+
   }
 
   inline
