@@ -275,6 +275,10 @@ namespace EpiRisk
     float
     InfectionPart();
     float
+    GetSumI() const;
+    float
+    GetSumLogI() const;
+    float
     GetIN(const size_t index);
     float
     GetLogLikelihood() const;
@@ -300,9 +304,10 @@ namespace EpiRisk
     GetSumSusceptibilityPow(float* result) const;
     void
     LazyAddInfecTime(const int idx, const float inTime);
+    void
+    RescaleNCInfecTimes(const float scaleFactor);
     float
-    NonCentreInfecTimes(const float oldGamma, const float newGamma,
-        const float prob);
+    CalcNCInfecTimes(const float prob);
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
 

@@ -180,6 +180,10 @@ setMethod("[","HD5InfecProxy",
 		}
 )
 
+# Occult probs
+setGeneric("poccult", function(x, from, to) standardGeneric("poccult"))
+setMethod("poccult", "Posterior", function(x, from, to) .Call("getOccultProb", x@filename, from=1, to=length(x))) 
+
 # Coercion
 setGeneric("as.data.frame")
 setMethod("as.data.frame","HD5ParamProxy", function(x) x[])

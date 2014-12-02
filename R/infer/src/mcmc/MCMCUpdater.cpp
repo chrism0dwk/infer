@@ -786,14 +786,17 @@ namespace EpiRisk
       float oldValue = param_;
 
       // Calculate current posterior
-      float logPiCur = likelihood_->GetCurrentValue() + log(param_.prior());
+      float llCur = likelihood_->GetCurrentValue();
+      float infecPartCur = likelihood_->GetNCInfecTimes(ncProp_);
+      float priorCur = log(param_.prior());
+      float logPiCur = llCur + infecPartCur + priorCur;
 
       // Adapt adaptscalar
       if (windowUpdates_ % WINDOWSIZE == 0)
         {
           float accept = (float) windowAcceptance_ / (float) windowUpdates_;
           float deltan = min(0.5, 1.0 / sqrtf(numUpdates_ / WINDOWSIZE));
-          if (accept < 0.15)
+          if (accept < 0.234)
             tuning_ *= exp(-deltan);
           else
             tuning_ *= exp(deltan);
@@ -805,18 +808,19 @@ namespace EpiRisk
       param_ *= exp(random_->gaussian(0, tuning_));
 
       // Perform the non-centering
-      float infecPartDiff = likelihood_->NonCentreInfecTimes(oldValue, param_,
-          ncProp_);
+      float infecPartCan = likelihood_->ProposeNCInfecTimes(oldValue, param_, ncProp_);
+      float llCan = likelihood_->Propose();
+      float priorCan = log(param_.prior());
 
       // Calculate candidate posterior
-      float logPiCan = likelihood_->Propose() + log(param_.prior());
+      float logPiCan = llCan + infecPartCan + priorCan;
 
       // q-ratio
       float qratio = logf(param_ / oldValue);
 
       // Accept or reject
       if (log(random_->uniform())
-          < logPiCan - logPiCur + infecPartDiff + qratio)
+          < logPiCan - logPiCur + qratio)
         {
           acceptance_++;
           windowAcceptance_++;
