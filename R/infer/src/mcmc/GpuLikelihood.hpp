@@ -326,7 +326,9 @@ namespace EpiRisk
     // Helper methods
     void
     ReduceProductVector();
-
+    void
+    wrapDataParms(Data* data, ParmVals* p);
+    
     // Data import
     enum DiseaseStatus
     {
