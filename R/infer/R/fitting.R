@@ -40,7 +40,7 @@ setMethod("berp.fit", "SpatPointSINR", function(model, control, init)
 
               if(is.null(control$powers)) control$powers <- TRUE
               else control$powers <- as.logical(control$powers)
-              if(is.null(control$doomega)) control$omega <- FALSE
+              if(is.null(control$doomega)) control$doomega <- FALSE
               else control$doomega <- as.logical(control$doomega)
               if(is.null(control$seed)) control$seed <- as.integer(round((2^31-1) * runif(1)))
               else control$seed <- as.integer(control$seed)

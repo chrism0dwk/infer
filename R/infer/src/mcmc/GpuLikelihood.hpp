@@ -56,7 +56,7 @@
 
 // CUDA defines
 #define THREADSPERBLOCK 128
-
+#define SCRATCHSIZE 5
 // Model defines
 #define NUMEVENTS 3
 //#define NUMSPECIES 3
@@ -159,6 +159,28 @@ namespace EpiRisk
       float bgIntegral;
       float logProduct;
       float integral;
+    };
+
+    struct Data
+    {
+      float* eventTimes;
+      int     eventTimesPitch;
+      float* infectivity;
+      float* susceptibility;
+      float  movtBan;
+      CsrMatrix  D;
+    };
+
+    struct ParmVals
+    {
+      float epsilon1;
+      float epsilon2;
+      float gamma1;
+      float gamma2;
+      float delta;
+      float omega;
+      float nu;
+      float alpha;
     };
 
     explicit
@@ -389,6 +411,7 @@ namespace EpiRisk
     float* devInfectivity_;
     thrust::device_vector<float>* devProduct_;
     thrust::device_vector<float>* devWorkspace_;
+    FP_t* devScratch_;
     int integralBuffSize_;
 
     // CUDAPP bits and pieces
