@@ -56,7 +56,7 @@
 
 // CUDA defines
 #define THREADSPERBLOCK 128
-
+#define SCRATCHSIZE 5
 // Model defines
 #define NUMEVENTS 3
 //#define NUMSPECIES 3
@@ -150,36 +150,26 @@ namespace EpiRisk
     };
 
 
-  struct LikelihoodComponents
-  {
-    float sumI;
-    float bgIntegral;
-    float logProduct;
-    float integral;
-  };
-  
-  struct LikelihoodCache
-  {
-    LikelihoodComponents components;
-    float* workspace;
-    float* scratch;
-    float* product;
-    float* infectivity;
-    float* susceptibility;
-  };
-
-  struct Data
-  {
-    float* eventTimes;
-    float* popSize;
-    int eventTimesPitch;
-    float movtBan;
-    CsrMatrix D;
-  };
-
   class GpuLikelihood
   {
   public:
+    struct LikelihoodComponents
+    {
+      float sumI;
+      float bgIntegral;
+      float logProduct;
+      float integral;
+    };
+
+    struct Data
+    {
+      float* eventTimes;
+      int     eventTimesPitch;
+      float* infectivity;
+      float* susceptibility;
+      float  movtBan;
+      CsrMatrix  D;
+    };
 
     struct ParmVals
     {
@@ -191,8 +181,6 @@ namespace EpiRisk
       float omega;
       float nu;
       float alpha;
-      float a;
-      float b;
     };
 
     explicit
@@ -329,13 +317,18 @@ namespace EpiRisk
     PrintEventTimes() const;
     void
     PrintDistMatrix() const;
-
+    void
+    DumpSpecies() const;
+    void
+    DumpInfSusc() const;
   private:
 
     // Helper methods
     void
     ReduceProductVector();
-
+    void
+    wrapDataParms(Data* data, ParmVals* p);
+    
     // Data import
     enum DiseaseStatus
     {
@@ -395,6 +388,7 @@ namespace EpiRisk
     unsigned int I1Idx_;
 
     LikelihoodComponents* hostComponents_;
+    LikelihoodComponents* devComponents_;
 
     // GPU data structures
 
@@ -412,12 +406,14 @@ namespace EpiRisk
     size_t animalsInfPowPitch_, animalsSuscPowPitch_;
     float* devAnimalsInfPow_;
     float* devAnimalsSuscPow_;
+    float* devEventTimes_;
 
-    Data devData_;
-
-    Cache devCache_;
+    size_t eventTimesPitch_;
+    float* devSusceptibility_;
+    float* devInfectivity_;
     thrust::device_vector<float>* devProduct_;
     thrust::device_vector<float>* devWorkspace_;
+    FP_t* devScratch_;
     int integralBuffSize_;
 
     // CUDAPP bits and pieces
@@ -439,7 +435,6 @@ namespace EpiRisk
     float* alpha_;
     float* a_;
     float* b_;
-    ParmVals pvals_;
 
     PointerVector<float> xi_;
     PointerVector<float> psi_;
