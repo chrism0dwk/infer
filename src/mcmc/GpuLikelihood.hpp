@@ -47,7 +47,7 @@
 #include "types.hpp"
 #include "Data.hpp"
 #include "PosteriorWriter.hpp"
-
+#include "GpuUtils.hpp"
 
 
 #ifndef __CUDACC__
@@ -65,11 +65,6 @@
 
 namespace EpiRisk
 {
-
-void
-__checkCudaError(const cudaError_t err, const char* file, const int line);
-#define checkCudaError(err) __checkCudaError(err, __FILE__, __LINE__)
-
 
 // Data structures
 

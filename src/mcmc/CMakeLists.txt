@@ -7,17 +7,22 @@ link_directories(${CMAKE_ARCHIVE_DIR}/src/Framework ${CMAKE_LIBRARY_PATH})
 include(FindCUDA)
 
 set(CUDA_64_BIT_DEVICE_CODE ON)
-set(gpulikelihood_SOURCES GpuLikelihood.cpp GpuLikelihood_gpu.cu)
-set(CUDA_NVCC_FLAGS -arch=sm_20;${CUDA_NVCC_FLAGS})
 
+set(gpuutils_SOURCES GpuUtils.cpp)
+
+set(gpulikelihood_SOURCES GpuLikelihood.cpp GpuLikelihood_gpu.cu)
+
+set(CUDA_NVCC_FLAGS -arch=sm_20;${CUDA_NVCC_FLAGS})
 if(CMAKE_BUILD_TYPE STREQUAL Release)
   set(CUDA_NVCC_FLAGS -use_fast_math;-O3;${CUDA_NVCC_FLAGS})
 else()
   set(CUDA_NVCC_FLAGS -g;-G;${CUDA_NVCC_FLAGS})
 endif()
 
+cuda_add_library(gpuutils STATIC ${gpuutils_SOURCES})
+
 cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES})
-target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
+target_link_libraries(gpulikelihood gpuutils data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
 
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})

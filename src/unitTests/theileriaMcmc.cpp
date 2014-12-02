@@ -459,13 +459,14 @@ main(int argc, char* argv[])
   Parameter beta1(0.00025, GammaPrior(3.981,15923.57), "beta1");
   Parameter beta2(0.1, GammaPrior(1.643,164.3), "beta2");
   //Parameter nu(140.4647, UniformPrior(50, 150), "nu");
-  Parameter nu(0, GaussianPrior(0, 30), "nu");
-  Parameter alpha1(0.1f, BetaPrior(1, 50), "alpha1");
-  Parameter alpha2(0.1f, BetaPrior(1, 50), "alpha2");
-  Parameter alpha3(1.0f, GammaPrior(1, 8), "alpha3");
-  Parameter zeta(2.0f, GammaPrior(5,2), "zeta");
+  Parameter nu(110, GaussianPrior(110, 5), "nu");
+  Parameter alpha1(.1f, BetaPrior(1, 50), "alpha1");
+  Parameter alpha2(.1f, BetaPrior(1, 50), "alpha2");
+  Parameter alpha3(4.0f, GammaPrior(32, 8), "alpha3");
+  Parameter zeta(1.0f, GammaPrior(5,2), "zeta");
   Parameter a(4.0, GammaPrior(1, 1), "a");
   Parameter b(0.05, GammaPrior(2.5, 50), "b");
+  //Parameter b(0.05, GammaPrior(2.5, 8.6), "b");
 
   // Iterate over tick data and set up the phi parameters
   Parameters phi(maxTLAId+1);
@@ -496,14 +497,14 @@ main(int argc, char* argv[])
   Mcmc::McmcRoot mcmc(likelihood, seed);
 
   UpdateBlock txDelta;
-  //txDelta.add(epsilon1);
+  txDelta.add(epsilon1);
   //txDelta.add(gamma1);
   txDelta.add(beta1);
   txDelta.add(beta2);
   txDelta.add(delta);
   txDelta.add(alpha1);
   txDelta.add(alpha2);
-  //txDelta.add(alpha3);
+  txDelta.add(alpha3);
   txDelta.add(zeta);
   Mcmc::AdaptiveMultiLogMRW* updateDistance =
       (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
@@ -514,8 +515,8 @@ main(int argc, char* argv[])
 
   UpdateBlock updateNuBlk;
   updateNuBlk.add(nu);
-  Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
-  updateNu->SetParameters(updateNuBlk);
+  //Mcmc::AdaptiveSingleMRW* updateNu = (Mcmc::AdaptiveSingleMRW*) mcmc.Create("AdaptiveSingleMRW", "updateNu");
+  //updateNu->SetParameters(updateNuBlk);
 
   UpdateBlock updatePhiBlk;
   for(list<TickSurv>::const_iterator it = tickdata.begin();
@@ -553,16 +554,16 @@ main(int argc, char* argv[])
   updateInfecTime->SetOccults(true);
 
    UpdateBlock bUpdate; bUpdate.add(b);
-   Mcmc::InfectionTimeGammaCentred* updateBC =
-      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-   updateBC->SetParameters(bUpdate);
-   updateBC->SetTuning(0.014);
+   //Mcmc::InfectionTimeGammaCentred* updateBC =
+   //   (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+   //updateBC->SetParameters(bUpdate);
+   //updateBC->SetTuning(0.014);
 
-   Mcmc::InfectionTimeGammaNC* updateBNC =
-      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-   updateBNC->SetParameters(bUpdate);
-   updateBNC->SetTuning(0.0007);
-   updateBNC->SetNCRatio(1.0);
+   //Mcmc::InfectionTimeGammaNC* updateBNC =
+   //   (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+   //updateBNC->SetParameters(bUpdate);
+   //updateBNC->SetTuning(0.0007);
+   //updateBNC->SetNCRatio(1.0);
 
     //// Output ////
 

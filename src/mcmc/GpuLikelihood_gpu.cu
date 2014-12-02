@@ -30,7 +30,8 @@
 //#define ALPHA 0.3
 
 #include "GpuLikelihood.hpp"
-
+//#include "CubicSpline1.hpp"
+#include "SquareWave.hpp"
 namespace EpiRisk
 {
   // Constants
@@ -60,45 +61,7 @@ namespace EpiRisk
     return result.tv_sec + result.tv_usec / 1000000.0;
   }
 
-  class GpuRuntimeError : public std::exception
-  {
-  public:
-    GpuRuntimeError(const std::string usrMsg, cudaError_t cudaErr)
-    {
-      msg_ = "GPU Runtime Error: ";
-      msg_ += usrMsg;
-      msg_ += " (";
-      msg_ += cudaErr;
-      msg_ += ",";
-      msg_ += cudaGetErrorString(cudaErr);
-      msg_ += ")";
-    }
-    ~GpuRuntimeError() throw ()
-    {
-    }
-    ;
-    const char*
-    what() const throw ()
-    {
-      return msg_.c_str();
-    }
 
-  private:
-    std::string msg_;
-  };
-
-
-
-  void
-  __checkCudaError(const cudaError_t err, const char* file, const int line)
-  {
-    if (err != cudaSuccess)
-      {
-        std::stringstream s;
-        s << file << "(" << line << ") : Cuda Runtime error ";
-        throw GpuRuntimeError(s.str(), err);
-      }
-  }
 
   // CUDA kernels
 
@@ -151,124 +114,15 @@ namespace EpiRisk
  __device__ float
  _h(const float t, const float I, float nu, float ys, float yw, float ysp)
 {
-  // Periodic piece-wise cubic spline
-  float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-  float Y[] = {1.0f, 1.0f, 1.0f, 1.0f,1.0f};
-  float delta = 0.25;
-  
-  assert(t-I >= 0);
-  
-  // Re-scale time to unit period
-  float tAdj = (t+nu)/365.0f;
-  tAdj = tAdj - floorf(tAdj);
 
-  // Set up parameters
-  Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
-  
-  // Calculate spline value
-  int epoch = (int)(tAdj*4.0f);
-
-  float a = -6.0f*(Y[epoch+1]-Y[epoch])/(delta*delta);
-  float b = -a;
-  
-  float h = a/(6.0f*delta) * powf(tAdj - T[epoch], 3);
-  h      += (Y[epoch+1]/delta - (a*delta)/6.0f) *  (tAdj - T[epoch]);
-  h      += b/(6.0f*delta) * powf(T[epoch+1] - tAdj, 3);
-  h      += (Y[epoch]/delta - (b*delta)/6.0f) * (T[epoch+1] - tAdj);
-  
-  return h;
+  return _s(t, I, nu, ys, yw, ysp);
 }
-  
-  __device__ float
-  _HIntegrand(float t, const float* T, const float* Y) {
-    // Calculates cubic spline integral between t1 and t2
-    float delta = 0.25f;
-    float a = -6.0f * (Y[1] - Y[0])/(delta * delta);
-    float b = -a;
-    
-    float h;
-    h =  a/(24.0f*delta) * powf(t - T[0], 4);
-    h += (Y[1]/(2.0f*delta) - (a*delta)/12.0f) * powf(t - T[0],2);
-    h -= b/(24.0f*delta) * powf(T[1] - t, 4);
-    h -= (Y[0]/(2.0f*delta) - (b*delta)/12.0f) * powf(T[1] - t,2);
-      
-    return h;
-  }
 
-__global__ void
-_HIntegConst(const float ys, const float yw, const float ysp, float* cache)
-{
-  // Calculates cached integral -- requires only 4 threads
-  float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-  float Y[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
-  
-  __shared__ float buff[4];
-  
-  int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  
-  Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
-
-  
-  if(tid < 4) {
-    buff[tid] = _HIntegrand(T[tid+1], T+tid, Y+tid)
-    - _HIntegrand(T[tid], T+tid, Y+tid);
     
-    __syncthreads();
-    
-    // Reduce cummulative sum here -- needs parallelising
-    if(tid == 0) {
-      buff[1] += buff[0];
-      buff[2] += buff[1];
-      buff[3] += buff[2];
-    }
-    __syncthreads();
-    
-    cache[tid+1] = buff[tid];  // Cache[0] is set to 0
-  }
-}
-  
-  void
-  CalcHFuncIntegCache(const float ys, const float yw, const float ysp, float* cache, const bool setZero=false)
-  {
-    // Calculates the CUDA H function integral cache
-    
-    if(setZero)
-      checkCudaError(cudaMemset(cache, 0, sizeof(float)));
-    
-    _HIntegConst<<<1, 4>>>(ys, yw, ysp, cache);
-
-    cudaDeviceSynchronize();
-  }
-  
 __device__ float
 _H(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float alpha3, const float* hCache)
 {
-  // Returns the integral of the 'h' function over [a,b]
-  float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-  float Y[] = {1.0f, 1.0f,  1.0f, 1.0f,  1.0f};
-  float delta = 0.25f;
-  
-  Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3; Y[4] = alpha1;
-
-  
-  if(b <= a) return 0.0f;
-  
-  float t1 = (a+nu)/365.0f;
-  float t2 = (b+nu)/365.0f;
-  
-  // Set relative to the beginning of t1's period
-  t2 = t2 - floorf(t1);
-  t1 = t1 - floorf(t1);
-  
-  int epoch1 = t1*4;
-  int period2 = t2;
-  int epoch2 = (t2-floorf(t2))*4;
-
-  float integrand1 = hCache[epoch1] + _HIntegrand(t1, T+epoch1, Y+epoch1) - _HIntegrand(epoch1*0.25f, T+epoch1, Y+epoch1);
-  float integrand2 = hCache[4]*period2 + hCache[epoch2] + _HIntegrand(t2-period2, T+epoch2, Y+epoch2) - _HIntegrand(epoch2*0.25f, T+epoch2, Y+epoch2);
-
-  return 365.0f*(integrand2 - integrand1);
-  
+  return _S(b, a, nu, alpha1, alpha2, alpha3, hCache);
 }
 
   struct DistanceKernel {
@@ -2944,7 +2798,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 		   cudaMemcpy(devPhi_, tmp, phi_.size()*sizeof(float), cudaMemcpyHostToDevice)
 		   );
     
-    CalcHFuncIntegCache(*alpha1_, *alpha2_, *alpha3_, devHIntegCache_,true);
+    CalcSIntegCache(*alpha1_, *alpha2_, *alpha3_, devHIntegCache_,true);
   }
 
   void
