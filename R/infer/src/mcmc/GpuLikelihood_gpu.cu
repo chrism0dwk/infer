@@ -1344,13 +1344,12 @@ namespace EpiRisk
     devD_ = makeSparseDistance(coords, popSize_, dLimit);
     dnnz_ = devD_->nnz;
 
-    cerr << "About to allocate hostDRowPtr" << endl;
     hostDRowPtr_ = new int[popSize_ + 1];
-    cerr << "Allocated hostDRowPtr_ " << endl;
     checkCudaError(
 		   cudaMemcpy(hostDRowPtr_, devD_->rowPtr, (popSize_+1)*sizeof(int), cudaMemcpyDeviceToHost));
 
     delete[] coords;
+    cerr << "Distance matrix allocated with " << dnnz_ << " valid elements." << endl;
   }
 
   void

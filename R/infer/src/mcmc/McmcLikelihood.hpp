@@ -84,9 +84,7 @@ namespace EpiRisk
     float
     GetValue() const;
     float
-    ProposeNCInfecTimes(const float oldGamma, const float newGamma, const float power);
-    float
-    GetNCInfecTimes(const float power) const;
+    NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
     const GpuLikelihood::LikelihoodComponents*
     GetProposal() const { return proposal_->GetLikelihoodComponents(); }
     const GpuLikelihood::LikelihoodComponents*
