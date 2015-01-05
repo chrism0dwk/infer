@@ -873,7 +873,7 @@ namespace EpiRisk
         IdxOnj *= susceptibility_(j);
         IdxOnj *= infectivity_(i);
 
-        buff += (IdxOnj + jOnIdx) * _K(D_.value_data()[jj], *delta_, *omega_);
+        buff += (IdxOnj + jOnIdx) * K(D_.value_data()[jj], *delta_, *omega_);
       }
 
     likComponents_.integral += buff * *gamma1_;
@@ -911,7 +911,7 @@ namespace EpiRisk
               idxOnj += h(Ij - newTime, *nu_, *alpha_);
 
             idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
-                * _K(D_.value_data()[jj], *delta_, *omega_);
+                * K(D_.value_data()[jj], *delta_, *omega_);
             productCache_[j] += idxOnj;
 
             // Recalculate instantaneous pressure on idx
@@ -922,7 +922,7 @@ namespace EpiRisk
               jOnIdx = *gamma2_ * h(newTime - Ij, *nu_, *alpha_);
 
             jOnIdx *= susceptibility_[i] * infectivity_[j]
-                * _K(D_.value_data()[jj], *delta_, *omega_);
+                * K(D_.value_data()[jj], *delta_, *omega_);
             productCache_[i] = jOnIdx * *gamma1_;
           }
       }
