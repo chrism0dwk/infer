@@ -227,6 +227,12 @@ namespace EpiRisk
     FullCalculate();
     void
     Calculate();
+    void
+    UpdateInfectionTime(const unsigned int idx, const float inTime);
+    void
+    AddInfectionTime(const unsigned int idx, const float inTime);
+    void
+    DeleteInfectionTime(const unsigned int idx);
     fp_t
     GetLogLikelihood() const;
     LikelihoodComponents
@@ -249,6 +255,10 @@ namespace EpiRisk
     // Helper methods
     void
     ReduceProductVector();
+    void
+    UpdateInfectionTimeInteg(const unsigned int i, const fp_t newTime);
+    void
+    UpdateInfectionTimeProd(const unsigned int i, const fp_t newTime);
 
     // Data import
     enum DiseaseStatus
