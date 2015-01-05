@@ -850,26 +850,26 @@ namespace EpiRisk
         fp_t jOnIdx = 0.0;
         if (Ij < Nj)
           {
-            jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), *nu_, *alpha_)
-                + *gamma2_ * (_H(fminf(Rj, newTime) - Ij, *nu_, *alpha_)); // New pressure
-            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), *nu_, *alpha_)
+            jOnIdx = H(fminf(Nj, newTime) - fminf(Ij, newTime), *nu_, *alpha_)
+                + *gamma2_ * (H(fminf(Rj, newTime) - Ij, *nu_, *alpha_)); // New pressure
+            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ii, Ij), *nu_, *alpha_)
                 + *gamma2_
-                    * (_H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
-                        - _H(fminf(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
+                    * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
+                        - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
                 // Apply infec and suscep
             jOnIdx *= susceptibility_(i);
             jOnIdx *= infectivity_(j);
           }
 
         // Recalculate pressure from idx on j
-        float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), *nu_, *alpha_);
-        IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
+        float IdxOnj = H(fminf(Ni, Ij) - fminf(newTime, Ij), *nu_, *alpha_);
+        IdxOnj -= H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
         IdxOnj += *gamma2_
-            * (_H(fminf(Ri, Ij) - newTime, *nu_, *alpha_)
-                - _H(fminf(Ni, Ij) - newTime, *nu_, *alpha_));
+            * (H(fminf(Ri, Ij) - newTime, *nu_, *alpha_)
+                - H(fminf(Ni, Ij) - newTime, *nu_, *alpha_));
         IdxOnj -= *gamma2_
-            * (_H(fminf(Ri, Ij) - Ii, *nu_, *alpha_)
-                - _H(fminf(Ni, Ij) - Ii, *nu_, *alpha_));
+            * (H(fminf(Ri, Ij) - Ii, *nu_, *alpha_)
+                - H(fminf(Ni, Ij) - Ii, *nu_, *alpha_));
         IdxOnj *= susceptibility_(j);
         IdxOnj *= infectivity_(i);
 
@@ -901,14 +901,14 @@ namespace EpiRisk
             // Adjust product cache from idx on others
             fp_t idxOnj = 0.0f;
             if (Ii < Ij and Ij <= Ni)
-              idxOnj -= _h(Ij - Ii, *nu_, *alpha_);
+              idxOnj -= h(Ij - Ii, *nu_, *alpha_);
             else if (Ni < Ij and Ij <= Ri)
               {
-                idxOnj -= *gamma2_ * _h(Ij - Ii, *nu_, *alpha_);
-                idxOnj += *gamma2_ * _h(Ij - newTime, *nu_, *alpha_);
+                idxOnj -= *gamma2_ * h(Ij - Ii, *nu_, *alpha_);
+                idxOnj += *gamma2_ * h(Ij - newTime, *nu_, *alpha_);
               }
             if (newTime < Ij and Ij <= Ni)
-              idxOnj += _h(Ij - newTime, *nu_, *alpha_);
+              idxOnj += h(Ij - newTime, *nu_, *alpha_);
 
             idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
                 * _K(D_.value_data()[jj], *delta_, *omega_);
@@ -917,9 +917,9 @@ namespace EpiRisk
             // Recalculate instantaneous pressure on idx
             float jOnIdx = 0.0f;
             if (Ij < newTime and newTime <= Nj)
-              jOnIdx = _h(newTime - Ij, *nu_, *alpha_);
+              jOnIdx = h(newTime - Ij, *nu_, *alpha_);
             else if (Nj < newTime and newTime <= Rj)
-              jOnIdx = *gamma2_ * _h(newTime - Ij, *nu_, *alpha_);
+              jOnIdx = *gamma2_ * h(newTime - Ij, *nu_, *alpha_);
 
             jOnIdx *= susceptibility_[i] * infectivity_[j]
                 * _K(D_.value_data()[jj], *delta_, *omega_);
