@@ -850,26 +850,26 @@ namespace EpiRisk
         fp_t jOnIdx = 0.0;
         if (Ij < Nj)
           {
-            jOnIdx = H(fminf(Nj, newTime) - fminf(Ij, newTime), *nu_, *alpha_)
-                + *gamma2_ * (H(fminf(Rj, newTime) - Ij, *nu_, *alpha_)); // New pressure
-            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ii, Ij), *nu_, *alpha_)
-                + *gamma2_
-                    * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
-                        - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
+            jOnIdx = H(min(Nj, newTime) - min(Ij, newTime), *nu_, *alpha_)
+	      + *gamma2_ * (H(min(Rj, newTime) - Ij, *nu_, *alpha_)
+			    - H(min(Nj, newTime) - Ij, *nu_, *alpha_)); // New pressure
+            jOnIdx -= H(min(Nj, Ii) - min(Ii, Ij), *nu_, *alpha_)
+	      + *gamma2_ * (H(min(Rj, Ii) - Ij, *nu_, *alpha_)
+			    - H(min(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
                 // Apply infec and suscep
             jOnIdx *= susceptibility_(i);
             jOnIdx *= infectivity_(j);
           }
 
         // Recalculate pressure from idx on j
-        float IdxOnj = H(fminf(Ni, Ij) - fminf(newTime, Ij), *nu_, *alpha_);
-        IdxOnj -= H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
+        float IdxOnj = H(min(Ni, Ij) - min(newTime, Ij), *nu_, *alpha_);
+        IdxOnj -= H(min(Ni, Ij) - min(Ii, Ij), *nu_, *alpha_);
         IdxOnj += *gamma2_
-            * (H(fminf(Ri, Ij) - newTime, *nu_, *alpha_)
-                - H(fminf(Ni, Ij) - newTime, *nu_, *alpha_));
+            * (H(min(Ri, Ij) - newTime, *nu_, *alpha_)
+                - H(min(Ni, Ij) - newTime, *nu_, *alpha_));
         IdxOnj -= *gamma2_
-            * (H(fminf(Ri, Ij) - Ii, *nu_, *alpha_)
-                - H(fminf(Ni, Ij) - Ii, *nu_, *alpha_));
+            * (H(min(Ri, Ij) - Ii, *nu_, *alpha_)
+                - H(min(Ni, Ij) - Ii, *nu_, *alpha_));
         IdxOnj *= susceptibility_(j);
         IdxOnj *= infectivity_(i);
 
@@ -923,7 +923,7 @@ namespace EpiRisk
 
             jOnIdx *= susceptibility_[i] * infectivity_[j]
                 * K(D_.value_data()[jj], *delta_, *omega_);
-            productCache_[i] = jOnIdx * *gamma1_;
+            productCache_[i] += jOnIdx * *gamma1_;
           }
       }
     productCache_[i] += newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
@@ -939,12 +939,15 @@ namespace EpiRisk
 
     fp_t savedIntegral = likComponents_.integral;
     unsigned int i = infecIdx_[idx].ptr;
-    float newTime = population_[i].N - inTime;
+    float newTime = eventTimes_(i,1) - inTime;
     float oldTime = eventTimes_(i, 0);
+
+    cout << "Move individual " << i << " from " << oldTime << " to " << newTime << endl;
 
     bool haveNewI1 = false;
     if (newTime < I1Time_ or i == I1Idx_)
       {
+	cout << "Have New I1" << endl;
         haveNewI1 = true;
         productCache_[I1Idx_] =
             newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
@@ -953,7 +956,6 @@ namespace EpiRisk
 
     UpdateInfectionTimeInteg(i, newTime);
     UpdateInfectionTimeProd(i, newTime);
-    ReduceProductVector();
 
     eventTimes_(i,0) = newTime;
 
@@ -970,6 +972,8 @@ namespace EpiRisk
             * (max(movtBan_, newTime) - max(movtBan_, oldTime));
       }
 
+    ReduceProductVector();
+    
     logLikelihood_ = likComponents_.logProduct
         - (likComponents_.integral + likComponents_.bgIntegral);
 
@@ -984,6 +988,7 @@ namespace EpiRisk
   void
   CpuLikelihood::PrintLikelihoodComponents() const
   {
+    cout.precision(15);
     cout << "Background: " << likComponents_.bgIntegral << "\n";
     cout << "Integral: " << likComponents_.integral << "\n";
     cout << "Product: " << likComponents_.logProduct << "\n";
@@ -1014,6 +1019,12 @@ namespace EpiRisk
       {
         cout << population_[i].id << ": " << productCache_(i) << "\n";
       }
+  }
+
+  const ublas::vector<fp_t>&
+  CpuLikelihood::GetProdCache() const
+  {
+    return productCache_;
   }
 
 } // namespace EpiRisk
