@@ -1076,8 +1076,7 @@ namespace EpiRisk
         IdxOnj *= susceptibility_[j];
         IdxOnj *= infectivity_[i];
 
-        buff += (IdxOnj + jOnIdx)
-            * K(D_.value_data()[jj], *delta_, *omega_);
+        buff += (IdxOnj + jOnIdx) * K(D_.value_data()[jj], *delta_, *omega_);
       }
 
     likComponents_.integral += buff * *gamma1_;
@@ -1088,8 +1087,6 @@ namespace EpiRisk
   {
     if (idx >= suscOccults_.size())
       throw std::range_error("Invalid idx in CpuLikelihood::AddInfectionTime");
-
-    fp_t savedIntegral = likComponents_.integral;
 
     unsigned int i = suscOccults_[idx].ptr;
     fp_t Ni = eventTimes_(i, 1);
@@ -1138,19 +1135,129 @@ namespace EpiRisk
   void
   CpuLikelihood::DelInfectionTimeProd(const unsigned int i)
   {
+    unsigned int begin = D_.index1_data()[i];
+    unsigned int end = D_.index1_data()[i + 1];
 
+    for (unsigned int jj = begin; jj < end; ++jj)
+      {
+        unsigned int j = D_.index2_data()[jj];
+
+        fp_t Ij = eventTimes_(j, 0);
+        fp_t Nj = eventTimes_(j, 1);
+
+        if (Ij < Nj)
+          {
+            fp_t Ii = eventTimes_(i, 0);
+            fp_t Ni = eventTimes_(i, 1);
+            fp_t Ri = eventTimes_(i, 2);
+
+            // Adjust product cache from idx on others
+            fp_t idxOnj = 0.0;
+            if (Ii < Ij and Ij <= Ni)
+              idxOnj -= h(Ij - Ii, *nu_, *alpha_);
+            else if (Ni < Ij and Ij <= Ri)
+              idxOnj -= *gamma2_ * h(Ij - Ii, *nu_, *alpha_);
+
+            idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
+                * K(D_.value_data()[jj], *delta_, *omega_);
+            productCache_[j] += idxOnj;
+          }
+      }
   }
 
   void
   CpuLikelihood::DelInfectionTimeInteg(const unsigned int i)
   {
+    unsigned int begin = D_.index1_data()[i];
+    unsigned int end = D_.index1_data()[i + 1];
 
+    fp_t buff = 0.0;
+    for (unsigned int jj = begin; jj < end; ++jj)
+      {
+        unsigned int j = D_.index2_data()[jj];
+
+        fp_t Ii = eventTimes_(i, 0);
+        fp_t Ni = eventTimes_(i, 1);
+        fp_t Ri = eventTimes_(i, 2);
+
+        fp_t Ij = eventTimes_(j, 0);
+        fp_t Nj = eventTimes_(j, 1);
+        fp_t Rj = eventTimes_(j, 2);
+
+        fp_t jOnIdx = 0.0;
+        if (Ij < Nj)
+          {
+            // Recalculate pressure from j on idx
+            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ii, Ij), *nu_, *alpha_)
+                + *gamma2_
+                    * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
+                        - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
+            jOnIdx += H(fminf(Nj, Ni) - fminf(Ij, Ni), *nu_, *alpha_)
+                + *gamma2_
+                    * (H(fminf(Rj, Ni) - Ij, *nu_, *alpha_)
+                        - H(fminf(Nj, Ni) - Ij, *nu_, *alpha_)); // New pressure
+                // Apply infec and suscep
+            jOnIdx *= susceptibility_[i];
+            jOnIdx *= infectivity_[j];
+          }
+
+        // Subtract pressure from idx on j
+        fp_t IdxOnj = 0.0f;
+        IdxOnj -= H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
+        IdxOnj -= *gamma2_
+            * (H(fminf(Ri, Ij) - Ii, *nu_, *alpha_)
+                - H(fminf(Ni, Ij) - Ii, *nu_, *alpha_));
+        IdxOnj *= susceptibility_[j];
+        IdxOnj *= infectivity_[i];
+
+        buff += (IdxOnj + jOnIdx)
+            * K(D_.value_data()[jj], *delta_, *omega_);
+      }
+
+    likComponents_.integral += buff * *gamma1_;
   }
 
   void
   CpuLikelihood::DeleteInfectionTime(const unsigned int idx)
   {
+    if (idx >= infecIdx_.size() - numKnownInfecs_)
+      throw std::range_error(
+          "Invalid idx in CpuLikelihood::DeleteInfectionTime");
 
+    unsigned int ii = idx + numKnownInfecs_;
+    unsigned int i = infecIdx_[ii].ptr;
+
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t oldI = eventTimes_(i, 0);
+
+    DelInfectionTimeInteg(i);
+    DelInfectionTimeProd(i);
+
+    // Make the change to the population
+    bool haveNewI1 = false;
+    infecIdx_.erase(infecIdx_.begin() + ii);
+    suscOccults_.push_back(i);
+    eventTimes_(i, 0) = eventTimes_(i, 1);
+    productCache_(i) = 1.0;
+
+    if (i == I1Idx_)
+      {
+        UpdateI1();
+        CalcBgIntegral();
+        haveNewI1 = true;
+      }
+    else
+      {
+        likComponents_.bgIntegral += *epsilon1_
+            * (min(movtBan_, Ni) - min(movtBan_, oldI));
+        likComponents_.bgIntegral += *epsilon1_ * *epsilon2_
+            * (max(movtBan_, Ni) - max(movtBan_, oldI));
+      }
+
+    ReduceProductVector();
+
+    logLikelihood_ = likComponents_.logProduct
+        - (likComponents_.integral + likComponents_.bgIntegral);
   }
 
   float
