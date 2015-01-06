@@ -249,6 +249,8 @@ namespace EpiRisk
     PrintEventTimes() const;
     void
     PrintProdCache() const;
+    const ublas::vector<fp_t>&
+    GetProdCache() const;
 
   private:
 
