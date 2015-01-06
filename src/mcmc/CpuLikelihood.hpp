@@ -261,6 +261,14 @@ namespace EpiRisk
     UpdateInfectionTimeInteg(const unsigned int i, const fp_t newTime);
     void
     UpdateInfectionTimeProd(const unsigned int i, const fp_t newTime);
+    void
+    AddInfectionTimeProd(const unsigned int i, const fp_t newTime);
+    void
+    AddInfectionTimeInteg(const unsigned int i, const fp_t newTime);
+    void
+    DelInfectionTimeProd(const unsigned int i);
+    void
+    DelInfectionTimeInteg(const unsigned int i);
 
     // Data import
     enum DiseaseStatus
@@ -311,8 +319,8 @@ namespace EpiRisk
     size_t maxInfecs_,maxInfecsPitch_;
     size_t occultsOnlyDC_;
 
-    ublas::vector<InfecIdx_t> infecIdx_;
-    ublas::vector<InfecIdx_t> suscOccults_;
+    std::vector<InfecIdx_t> infecIdx_;
+    std::vector<InfecIdx_t> suscOccults_;
     const size_t numSpecies_;
     float logLikelihood_;
     const float obsTime_;

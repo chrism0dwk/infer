@@ -135,7 +135,7 @@ namespace EpiRisk
       const float dLimit, const bool occultsOnlyDC) :
       popSize_(0), numSpecies_(nSpecies), obsTime_(obsTime), I1Time_(0.0), I1Idx_(
           0), occultsOnlyDC_(occultsOnlyDC), movtBan_(obsTime), workspaceA_(
-          NULL), workspaceB_(NULL), workspaceC_(NULL)
+      NULL), workspaceB_(NULL), workspaceC_(NULL)
   {
 
     // Load data into host memory
@@ -545,8 +545,8 @@ namespace EpiRisk
   {
     I1Idx_ = 0;
     for (int i = 0; i < infecIdx_.size(); ++i)
-      if (eventTimes_(infecIdx_(i).ptr, 0)
-          < eventTimes_(infecIdx_(I1Idx_).ptr, 0))
+      if (eventTimes_(infecIdx_[i].ptr, 0)
+          < eventTimes_(infecIdx_[I1Idx_].ptr, 0))
         I1Idx_ = i;
     I1Time_ = eventTimes_(I1Idx_, 0);
 
@@ -588,7 +588,7 @@ namespace EpiRisk
   {
 
     double logprod = 0.0;
-    productCache_(infecIdx_(I1Idx_).ptr) = 1.0f;
+    productCache_(infecIdx_[I1Idx_].ptr) = 1.0f;
 
 #pragma omp parallel for reduction(+:logprod)
     for (int i = 0; i < productCache_.size(); i += VECSIZE)
@@ -620,7 +620,7 @@ namespace EpiRisk
 #pragma omp for 
         for (int jj = 0; jj < infecIdx_.size(); ++jj)
           {
-            int j = infecIdx_(jj).ptr;
+            int j = infecIdx_[jj].ptr;
             int begin = D_.index1_data()[j];
             int end = D_.index1_data()[j + 1];
 
@@ -712,7 +712,7 @@ namespace EpiRisk
 #pragma omp for ordered schedule(static) reduction(+:res)
         for (size_t ii = 0; ii < infecIdx_.size(); ++ii)
           {
-            size_t i = infecIdx_(ii).ptr;
+            size_t i = infecIdx_[ii].ptr;
             size_t begin = D_.index1_data()[i];
             size_t end = D_.index1_data()[i + 1];
             float Ii = eventTimes_(i, 0);
@@ -851,11 +851,13 @@ namespace EpiRisk
         if (Ij < Nj)
           {
             jOnIdx = H(min(Nj, newTime) - min(Ij, newTime), *nu_, *alpha_)
-	      + *gamma2_ * (H(min(Rj, newTime) - Ij, *nu_, *alpha_)
-			    - H(min(Nj, newTime) - Ij, *nu_, *alpha_)); // New pressure
+                + *gamma2_
+                    * (H(min(Rj, newTime) - Ij, *nu_, *alpha_)
+                        - H(min(Nj, newTime) - Ij, *nu_, *alpha_)); // New pressure
             jOnIdx -= H(min(Nj, Ii) - min(Ii, Ij), *nu_, *alpha_)
-	      + *gamma2_ * (H(min(Rj, Ii) - Ij, *nu_, *alpha_)
-			    - H(min(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
+                + *gamma2_
+                    * (H(min(Rj, Ii) - Ij, *nu_, *alpha_)
+                        - H(min(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
                 // Apply infec and suscep
             jOnIdx *= susceptibility_(i);
             jOnIdx *= infectivity_(j);
@@ -926,7 +928,8 @@ namespace EpiRisk
             productCache_[i] += jOnIdx * *gamma1_;
           }
       }
-    productCache_[i] += newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
+    productCache_[i] +=
+        newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
   }
 
   void
@@ -939,15 +942,16 @@ namespace EpiRisk
 
     fp_t savedIntegral = likComponents_.integral;
     unsigned int i = infecIdx_[idx].ptr;
-    float newTime = eventTimes_(i,1) - inTime;
+    float newTime = eventTimes_(i, 1) - inTime;
     float oldTime = eventTimes_(i, 0);
 
-    cout << "Move individual " << i << " from " << oldTime << " to " << newTime << endl;
+    cout << "Move individual " << i << " from " << oldTime << " to " << newTime
+        << endl;
 
     bool haveNewI1 = false;
     if (newTime < I1Time_ or i == I1Idx_)
       {
-	cout << "Have New I1" << endl;
+        cout << "Have New I1" << endl;
         haveNewI1 = true;
         productCache_[I1Idx_] =
             newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
@@ -957,9 +961,9 @@ namespace EpiRisk
     UpdateInfectionTimeInteg(i, newTime);
     UpdateInfectionTimeProd(i, newTime);
 
-    eventTimes_(i,0) = newTime;
+    eventTimes_(i, 0) = newTime;
 
-    if(haveNewI1)
+    if (haveNewI1)
       {
         UpdateI1();
         CalcBgIntegral();
@@ -973,9 +977,179 @@ namespace EpiRisk
       }
 
     ReduceProductVector();
-    
+
     logLikelihood_ = likComponents_.logProduct
         - (likComponents_.integral + likComponents_.bgIntegral);
+
+  }
+
+  void
+  CpuLikelihood::AddInfectionTimeProd(const unsigned int i, const fp_t newTime)
+  {
+    unsigned int begin = D_.index1_data()[i];
+    unsigned int end = D_.index1_data()[i + 1];
+
+    for (unsigned int jj = begin; jj < end; ++jj)
+      {
+        unsigned int j = D_.index2_data()[jj];
+
+        fp_t Ij = eventTimes_(j, 0);
+        fp_t Nj = eventTimes_(j, 1);
+
+        if (Ij < Nj) // Only look at infected individuals
+          {
+            fp_t Ni = eventTimes_(i, 1);
+            fp_t Ri = eventTimes_(i, 2);
+            fp_t Rj = eventTimes_(j, 2);
+
+            // Adjust product cache from idx on others
+            float idxOnj = 0.0;
+            if (newTime < Ij and Ij <= Ni)
+              idxOnj += h(Ij - newTime, *nu_, *alpha_);
+            else if (Ni < Ij and Ij <= Ri)
+              idxOnj += *gamma2_ * h(Ij - newTime, *nu_, *alpha_);
+
+            idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
+                * K(D_.value_data()[jj], *delta_, *omega_);
+            productCache_[j] += idxOnj;
+
+            // Calculate instantaneous pressure on idx
+            float jOnIdx = 0.0f;
+            if (Ij < newTime and newTime <= Nj)
+              jOnIdx = h(newTime - Ij, *nu_, *alpha_);
+            else if (Nj < newTime and newTime <= Rj)
+              jOnIdx = *gamma2_ * h(newTime - Ij, *nu_, *alpha_);
+
+            jOnIdx *= *gamma1_ * infectivity_[j] * susceptibility_[i]
+                * K(D_.value_data()[jj], *delta_, *omega_);
+
+            productCache_[i] += jOnIdx;
+          }
+
+      }
+
+    float epsilon = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
+    productCache_[i] += epsilon;
+  }
+
+  void
+  CpuLikelihood::AddInfectionTimeInteg(const unsigned int i, const fp_t newTime)
+  {
+    unsigned int begin = D_.index1_data()[i];
+    unsigned int end = D_.index1_data()[i + 1];
+
+    fp_t buff = 0.0;
+    for (unsigned int jj = begin; jj < end; ++jj)
+      {
+        unsigned int j = D_.index2_data()[jj];
+
+        fp_t Ii = eventTimes_(i, 0);
+        fp_t Ni = eventTimes_(i, 1);
+        fp_t Ri = eventTimes_(i, 2);
+
+        fp_t Ij = eventTimes_(j, 0);
+        fp_t Nj = eventTimes_(j, 1);
+        fp_t Rj = eventTimes_(j, 2);
+
+        fp_t jOnIdx = 0.0;
+        if (Ij < Nj)  // Pressure from j on i
+          {
+            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ij, Ii), *nu_, *alpha_);
+            jOnIdx -= *gamma2_
+                * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
+                    - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_));
+            jOnIdx += H(fminf(Nj, newTime) - fminf(Ij, newTime), *nu_, *alpha_);
+            jOnIdx += *gamma2_
+                * (H(fminf(Rj, newTime) - Ij, *nu_, *alpha_)
+                    - H(fminf(Nj, newTime) - Ij, *nu_, *alpha_));
+
+            // Apply infec and suscep
+            jOnIdx *= susceptibility_[i];
+            jOnIdx *= infectivity_[j];
+          }
+
+        // Add pressure from i on j
+        float IdxOnj = H(fminf(Ni, Ij) - fminf(newTime, Ij), *nu_, *alpha_);
+        IdxOnj += *gamma2_
+            * (H(fminf(Ri, Ij) - newTime, *nu_, *alpha_)
+                - H(fminf(Ni, Ij) - newTime, *nu_, *alpha_));
+        IdxOnj *= susceptibility_[j];
+        IdxOnj *= infectivity_[i];
+
+        buff += (IdxOnj + jOnIdx)
+            * K(D_.value_data()[jj], *delta_, *omega_);
+      }
+
+    likComponents_.integral += buff * *gamma1_;
+  }
+
+  void
+  CpuLikelihood::AddInfectionTime(const unsigned int idx, const fp_t inTime)
+  {
+    if (idx >= suscOccults_.size())
+      throw std::range_error("Invalid idx in CpuLikelihood::AddInfectionTime");
+
+    fp_t savedIntegral = likComponents_.integral;
+
+    unsigned int i = suscOccults_[idx].ptr;
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t newTime = Ni - inTime;
+
+    // Update indices
+    infecIdx_.push_back(i);
+    suscOccults_.erase(suscOccults_.begin() + idx);
+
+    productCache_[i] = 0.0;
+    bool haveNewI1 = false;
+    if (newTime < I1Time_)
+      {
+        productCache_[I1Idx_] =
+            newTime < movtBan_ ? *epsilon1_ : *epsilon1_ * *epsilon2_;
+        haveNewI1 = true;
+      }
+
+    unsigned int addIdx = infecIdx_.size() - 1;
+
+    AddInfectionTimeInteg(i, newTime);
+    AddInfectionTimeProd(i, newTime);
+
+    // Update population
+    eventTimes_(i, 0) = newTime;
+    if (haveNewI1)
+      {
+        UpdateI1();
+        CalcBgIntegral();
+      }
+    else
+      {
+        likComponents_.bgIntegral += *epsilon1_
+            * (min(movtBan_, newTime) - min(movtBan_, Ni));
+        likComponents_.bgIntegral += *epsilon1_ * *epsilon2_
+            * (max(movtBan_, newTime) - max(movtBan_, Ni));
+      }
+
+    ReduceProductVector();
+
+    logLikelihood_ = likComponents_.logProduct
+        - (likComponents_.integral + likComponents_.bgIntegral);
+
+  }
+
+  void
+  CpuLikelihood::DelInfectionTimeProd(const unsigned int i)
+  {
+
+  }
+
+  void
+  CpuLikelihood::DelInfectionTimeInteg(const unsigned int i)
+  {
+
+  }
+
+  void
+  CpuLikelihood::DeleteInfectionTime(const unsigned int idx)
+  {
 
   }
 

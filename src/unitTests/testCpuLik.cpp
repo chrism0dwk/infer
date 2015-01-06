@@ -215,6 +215,12 @@ main(int argc, char* argv[])
   cout << "Likelihood took: " << timing[0]/(double)numreps << " seconds" << endl;
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
+
+  likelihood.UpdateInfectionTime()
+
+
+
+
   return EXIT_SUCCESS;
 
 }
