@@ -36,112 +36,15 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/matrix_sparse.hpp>
 
-#include "types.hpp"
-#include "Data.hpp"
-#include "PosteriorWriter.hpp"
+#include "Likelihood.hpp"
 
-
-
-#include "Parameter.hpp"
-
-
-
-// Model defines
-#define NUMEVENTS 3
-//#define NUMSPECIES 3
 
 namespace EpiRisk
 {
 
   using namespace boost::numeric;
 
-// Data structures
-
-  struct CsrMatrix
-  {
-    int* rowPtr;
-    int* colInd;
-    float* val;
-    int nnz;
-    int n;
-    int m;
-  };
-
-  struct InfecIdx_t
-  {
-    unsigned int ptr;
-    int dc;
-    InfecIdx_t(const unsigned int Ptr, const int DC=-1)
-    {
-      ptr = Ptr;
-      dc = DC;
-    }
-    InfecIdx_t() : ptr(NULL), dc(-1)
-    {
-    }
-  };
-
-
-// Helper classes
-  template<typename T>
-    class PointerVector
-    {
-    public:
-      PointerVector()
-      {
-      }
-      ;
-
-      PointerVector(const size_t size)
-      {
-        content_.resize(size);
-      }
-
-      PointerVector(PointerVector& other)
-      {
-        content_ = other.content_;
-      }
-
-      const PointerVector&
-      operator=(const PointerVector& other)
-      {
-        content_ = other.content_;
-        return *this;
-      }
-
-      void
-      push_back(T* x)
-      {
-        content_.push_back(x);
-      }
-
-      T
-      operator[](const size_t index) const
-      {
-        return *(content_[index]);
-      }
-      ;
-
-      size_t
-      size() const
-      {
-        return content_.size();
-      }
-      ;
-
-      void
-      clear()
-      {
-        content_.clear();
-      }
-      ;
-
-    private:
-      std::vector<T*> content_;
-    };
-
-
-  class CpuLikelihood
+  class CpuLikelihood : public Likelihood
   {
   public:
     struct LikelihoodComponents

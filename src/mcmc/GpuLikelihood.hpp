@@ -44,113 +44,13 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
-#include "types.hpp"
-#include "Data.hpp"
-#include "PosteriorWriter.hpp"
-
-
-
-#ifndef __CUDACC__
-#include "Parameter.hpp"
-#endif
-
 // CUDA defines
 #define THREADSPERBLOCK 128
-
-// Model defines
-#define NUMEVENTS 3
-//#define NUMSPECIES 3
 
 namespace EpiRisk
 {
 
-// Data structures
-
-  struct CsrMatrix
-  {
-    int* rowPtr;
-    int* colInd;
-    float* val;
-    int nnz;
-    int n;
-    int m;
-  };
-
-  struct InfecIdx_t
-  {
-    unsigned int ptr;
-    int dc;
-    InfecIdx_t(const unsigned int Ptr, const int DC=-1)
-    {
-      ptr = Ptr;
-      dc = DC;
-    }
-    InfecIdx_t() : ptr(NULL), dc(-1)
-    {
-    }
-  };
-
-
-// Helper classes
-  template<typename T>
-    class PointerVector
-    {
-    public:
-      PointerVector()
-      {
-      }
-      ;
-
-      PointerVector(const size_t size)
-      {
-        content_.resize(size);
-      }
-
-      PointerVector(PointerVector& other)
-      {
-        content_ = other.content_;
-      }
-
-      const PointerVector&
-      operator=(const PointerVector& other)
-      {
-        content_ = other.content_;
-        return *this;
-      }
-
-      void
-      push_back(T* x)
-      {
-        content_.push_back(x);
-      }
-
-      T
-      operator[](const size_t index) const
-      {
-        return *(content_[index]);
-      }
-      ;
-
-      size_t
-      size() const
-      {
-        return content_.size();
-      }
-      ;
-
-      void
-      clear()
-      {
-        content_.clear();
-      }
-      ;
-
-    private:
-      std::vector<T*> content_;
-    };
-
-
-  class GpuLikelihood
+  class GpuLikelihood : public Likelihood
   {
   public:
     struct LikelihoodComponents
@@ -181,14 +81,7 @@ namespace EpiRisk
     SortPopulation();
     void
     LoadDistanceMatrix(DistMatrixImporter& filename);
-    void
-    CalcDistanceMatrix(const float dLimit);
-    void
-    SetEvents();
-    void
-    SetSpecies();
-    void
-    SetDistance(const float* data, const int* rowptr, const int* colind);
+
     void
     SetParameters(Parameter& epsilon1, 
 		  Parameter& epsilon2, 
@@ -301,6 +194,14 @@ namespace EpiRisk
     // Helper methods
     void
     ReduceProductVector();
+    void
+    SetEvents();
+    void
+    SetSpecies();
+    void
+    CalcDistanceMatrix(const float dLimit);
+    void
+    SetDistance(const float* data, const int* rowptr, const int* colind);
 
     // Data import
     enum DiseaseStatus

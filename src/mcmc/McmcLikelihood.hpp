@@ -27,7 +27,7 @@
 #ifndef MCMCLIKELIHOOD_HPP_
 #define MCMCLIKELIHOOD_HPP_
 
-#include "GpuLikelihood.hpp"
+#include "Likelihood.hpp"
 
 
 
@@ -42,7 +42,7 @@ namespace EpiRisk
   {
   public:
     explicit
-    LikelihoodHandler(GpuLikelihood& likelihood);
+    LikelihoodHandler(Likelihood& likelihood);
     virtual
     ~LikelihoodHandler();
     float
