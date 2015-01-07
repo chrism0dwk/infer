@@ -235,6 +235,10 @@ namespace EpiRisk
     GetLogLikelihood() = 0;
 
     virtual
+    const LikelihoodComponents*
+    GetLikelihoodComponents();
+
+    virtual
     float
     GetMeanI2N() const = 0;
 

@@ -85,15 +85,15 @@ namespace EpiRisk
     GetValue() const;
     float
     NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
-    const GpuLikelihood::LikelihoodComponents*
+    const Likelihood::LikelihoodComponents*
     GetProposal() const { return proposal_->GetLikelihoodComponents(); }
-    const GpuLikelihood::LikelihoodComponents*
+    const Likelihood::LikelihoodComponents*
     GetCurrent() const { return likelihood_->GetLikelihoodComponents(); }
     void
     CompareProdVectors() const;
   private:
-    GpuLikelihood* likelihood_;
-    GpuLikelihood* proposal_;
+    Likelihood* likelihood_;
+    Likelihood* proposal_;
     enum move_t
     {
       PARAMETER=0,
