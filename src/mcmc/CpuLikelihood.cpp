@@ -1269,6 +1269,12 @@ namespace EpiRisk
   size_t
   CpuLikelihood::GetNumOccults() const
   {
+    return infecIdx_.size() - numKnownInfecs_;
+  }
+
+  size_t
+  CpuLikelihood::GetNumPossibleOccults() const
+  {
     return suscOccults_.size();
   }
 
