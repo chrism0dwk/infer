@@ -39,7 +39,7 @@
 namespace po = boost::program_options;
 
 #include "config.h"
-
+#include "Random.hpp"
 #include "Data.hpp"
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
@@ -207,6 +207,34 @@ main(int argc, char* argv[])
   cout << "Likelihood took: " << timeinseconds(start,end) << " seconds" << endl;
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
+
+  Random rng(0);
+
+  gettimeofday(&start,NULL);  
+  for(int i=0; i<900; ++i) 
+    likelihood.AddInfectionTime(rng.integer(likelihood.GetNumPossibleOccults()), rng.gamma(4,0.5));
+  gettimeofday(&end,NULL);
+  cout << "\n\nAdd: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  likelihood.FullCalculate();
+  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
+
+  cout << "\n\nDeleting...\n" << endl;
+  
+  gettimeofday(&start,NULL);  
+  for(int i=0; i<900; ++i) 
+    likelihood.DeleteInfectionTime(rng.integer(likelihood.GetNumOccults()));
+  gettimeofday(&end,NULL);
+  cout << "\n\nDelete: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  likelihood.FullCalculate();
+  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
+
+
   return EXIT_SUCCESS;
 
 }

@@ -35,8 +35,11 @@
 #include <unistd.h>
 
 #include <gsl/gsl_randist.h>
+
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
+
+#include "Random.hpp"
 
 #include "config.h"
 
@@ -216,9 +219,31 @@ main(int argc, char* argv[])
   cout << "Value: " << likelihood.GetLogLikelihood() << endl;
   likelihood.PrintLikelihoodComponents();
 
-  likelihood.UpdateInfectionTime()
+  Random rng(0);
 
+  gettimeofday(&start,NULL);  
+  for(int i=0; i<900; ++i) 
+    likelihood.AddInfectionTime(rng.integer(likelihood.GetNumPossibleOccults()), rng.gamma(4,0.5));
+  gettimeofday(&end,NULL);
+  cout << "\n\nAdd: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  likelihood.FullCalculate();
+  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
 
+  cout << "\n\nDeleting...\n" << endl;
+  
+  gettimeofday(&start,NULL);  
+  for(int i=0; i<900; ++i) 
+    likelihood.DeleteInfectionTime(rng.integer(likelihood.GetNumOccults()));
+  gettimeofday(&end,NULL);
+  cout << "\n\nDelete: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  likelihood.FullCalculate();
+  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
+  likelihood.PrintLikelihoodComponents();
+  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
 
 
   return EXIT_SUCCESS;
