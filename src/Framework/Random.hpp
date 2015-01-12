@@ -60,6 +60,7 @@ namespace EpiRisk
   class Random
   {
     gsl_rng* rng_;
+    size_t called_;
   public:
 
     typedef matrix<double> CovMatrix;

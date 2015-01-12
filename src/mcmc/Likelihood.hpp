@@ -31,6 +31,7 @@
 #include <ostream>
 #include <vector>
 #include <string>
+#include <sys/time.h>
 
 #include "types.hpp"
 #include "Data.hpp"
@@ -45,6 +46,12 @@
 namespace EpiRisk
 {
 
+  using namespace boost::numeric;
+
+// Constants
+  const float UNITY = 1.0;
+  const float ZERO = 0.0;
+
 // Data structures
 
   struct CsrMatrix
@@ -56,6 +63,16 @@ namespace EpiRisk
     int n;
     int m;
   };
+  
+  float
+  GetDistElement(const CsrMatrix* d, const int row, const int col);
+
+  bool
+  getDistMatrixElement(const int row, const int col, const CsrMatrix* csrMatrix,
+		       float* val);
+
+  float
+  timeinseconds(const timeval a, const timeval b);
 
   struct InfecIdx_t
   {
@@ -87,7 +104,7 @@ namespace EpiRisk
         content_.resize(size);
       }
 
-      PointerVector(PointerVector& other)
+      PointerVector(const PointerVector& other)
       {
         content_ = other.content_;
       }
@@ -142,61 +159,51 @@ namespace EpiRisk
     };
 
     virtual
-    void
-    LoadPopulation(PopDataImporter& filename) = 0;
+    ~Likelihood() {};
 
-    virtual
     void
-    LoadEpidemic(EpiDataImporter& importer) = 0;
+    SetMovtBan(const float movtBanTime);
 
-    virtual
+    float
+    GetMovtBan() const;
+
     void
     SetParameters(Parameter& epsilon1, Parameter& epsilon2, Parameter& gamma1,
-        Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
-        Parameters& phi, Parameter& delta, Parameter& omega, Parameter& nu,
-        Parameter& alpha, Parameter& a, Parameter& b) = 0;
+		  Parameter& gamma2, Parameters& xi, Parameters& psi, Parameters& zeta,
+		  Parameters& phi, Parameter& delta, Parameter& omega, Parameter& nu,
+		  Parameter& alpha, Parameter& a, Parameter& b);
+      
+    virtual
+    Likelihood*
+    clone() const = 0;
+
+    const Likelihood&
+    operator=(const Likelihood& other);
 
     virtual
     void
-    SetMovtBan(const float movtBanTime) = 0;
+    InfecCopy(const Likelihood& other) = 0;
 
-    virtual
-    float
-    GetMovtBan() const = 0;
-
-    virtual const Likelihood&
-    clone() = 0;
-
-    virtual
-    ~Likelihood();
-
-    virtual
-    void
-    InfecCopy(const GpuLikelihood& other) = 0;
-
-    virtual
     size_t
-    GetNumKnownInfecs() const = 0;
+    GetNumKnownInfecs() const;
 
     virtual
     size_t
     GetNumInfecs() const = 0;
 
-    virtual
     size_t
-    GetMaxInfecs() const = 0;
+    GetMaxInfecs() const;
 
     virtual
     size_t
     GetNumPossibleOccults() const = 0;
 
-    virtual
     size_t
-    GetPopulationSize() const = 0;
+    GetPopulationSize() const;
 
     virtual
     void
-    GetIds(std::vector<std::string>& ids) const = 0;
+    GetIds(std::vector<std::string>& ids) const;
 
     virtual
     size_t
@@ -223,7 +230,12 @@ namespace EpiRisk
     Calculate() = 0;
 
     virtual
-    float
+    fp_t
+    NonCentreInfecTimes(const fp_t oldGamma, const fp_t newGamma, 
+			const fp_t prob) = 0;
+
+    virtual
+    fp_t
     InfectionPart() = 0;
 
     virtual
@@ -232,11 +244,11 @@ namespace EpiRisk
 
     virtual
     float
-    GetLogLikelihood() = 0;
+    GetLogLikelihood() const = 0;
 
     virtual
-    const LikelihoodComponents*
-    GetLikelihoodComponents();
+    LikelihoodComponents
+    GetLikelihoodComponents() const = 0;
 
     virtual
     float
@@ -250,12 +262,105 @@ namespace EpiRisk
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods) = 0;
 
-    virtual friend std::ostream&
-    operator<<(std::ostream& out, const Likelihood& likelihood);
+    virtual
+    void
+    GetSumInfectivityPow(fp_t* result) const = 0;
+
+    virtual
+    void
+    GetSumSusceptibilityPow(fp_t* result) const = 0;
+
+    virtual
+    void
+    PrintLikelihoodComponents() const = 0;
+
+  protected:
+    Likelihood(PopDataImporter& population, EpiDataImporter& epidemic, 
+	       const size_t nSpecies, const fp_t obsTime, 
+	       const bool occultsOnlyDC = false);
+    Likelihood(const Likelihood& rhs);
+
+    virtual
+    const Likelihood&
+    assign(const Likelihood& rhs) = 0;
+
+    // Data import
+    enum DiseaseStatus
+    {
+      IP = 0, DC = 1, SUSC = 2
+    };
+
+    struct Covars
+    {
+      string id;
+      float x,y;
+      DiseaseStatus status;
+      float I;
+      float N;
+      float R;
+      float cattle;
+      float pigs;
+      float sheep;
+    };
+
+    struct CompareByStatus
+    {
+      bool
+      operator()(const Covars& lhs, const Covars& rhs) const
+      {
+        return (int) lhs.status < (int) rhs.status;
+      }
+    };
+
+    struct CompareByI
+    {
+      bool
+      operator()(const Covars& lhs, const Covars& rhs) const
+      {
+        return lhs.I < rhs.I;
+      }
+    };
+
+    // Data members
+    map<string, size_t> idMap_;
+    typedef std::vector<Covars> Population;
+    Population population_;
+
+    const size_t popSize_;
+    const size_t numSpecies_;
+    const size_t numKnownInfecs_;
+    const fp_t obsTime_;
+    const fp_t movtBan_;
+    const size_t maxInfecs_;
+    const size_t occultsOnlyDC_;
+
+    // Parameters
+    float* epsilon1_;
+    float* epsilon2_;
+    float* gamma1_;
+    float* gamma2_;
+    float* delta_;
+    float* omega_;
+    float* nu_;
+    float* alpha_;
+    float* a_;
+    float* b_;
+
+    PointerVector<float> xi_;
+    PointerVector<float> psi_;
+    PointerVector<float> zeta_;
+    PointerVector<float> phi_;
 
   private:
-    const Likelihood&
-    operator=(const Likelihood& other) { return this->clone(); };
+    void
+    LoadPopulation(PopDataImporter& importer);
+    void
+    LoadEpidemic(EpiDataImporter& importer);
+    //fp_t
+    //LoadDistanceMatrix(DistMatrixImporter& importer);
+    void
+    SortPopulation();
+
 
   };
 

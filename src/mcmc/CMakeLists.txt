@@ -16,13 +16,18 @@ else()
   set(CUDA_NVCC_FLAGS -g;-G;${CUDA_NVCC_FLAGS})
 endif()
 
-cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES})
+cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES} Likelihood.cpp)
 target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
 
-set(cpulikelihood_SOURCES CpuLikelihood.cpp)
+set(cpulikelihood_SOURCES CpuLikelihood.cpp Likelihood.cpp)
 cuda_add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
 set_target_properties(cpulikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpulikelihood data stlstrtok)
+
+set(cpuveclikelihood_SOURCES CpuVecLikelihood.cpp Likelihood.cpp)
+cuda_add_library(cpuveclikelihood STATIC ${cpuveclikelihood_SOURCES})
+set_target_properties(cpuveclikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
+target_link_libraries(cpuveclikelihood data stlstrtok)
 
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})

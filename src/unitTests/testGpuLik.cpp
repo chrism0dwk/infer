@@ -43,6 +43,9 @@ namespace po = boost::program_options;
 #include "Data.hpp"
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
+#include "Mcmc.hpp"
+#include "McmcFactory.hpp"
+#include "MCMCUpdater.hpp"
 
 using namespace std;
 using namespace boost::numeric;
@@ -50,15 +53,6 @@ using namespace EpiRisk;
 
 #define NSPECIES 3
 #define NEVENTS 3
-
-inline
-double
-timeinseconds(const timeval a, const timeval b)
-{
-  timeval result;
-  timersub(&b, &a, &result);
-  return result.tv_sec + result.tv_usec / 1000000.0;
-}
 
 class GammaPrior : public Prior
 {
@@ -158,7 +152,7 @@ main(int argc, char* argv[])
   timeval start, end;
   cout << "Timing constructor..." << flush;
   gettimeofday(&start, NULL);
-  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
+  GpuLikelihood gpu(*popDataImporter, *epiDataImporter,
       (size_t) 3, obsTime, 25.0f);
   gettimeofday(&end, NULL);
   cout << "Done.\nConstructor took " << timeinseconds(start,end) << " seconds" << endl;
@@ -195,45 +189,58 @@ main(int argc, char* argv[])
   Parameter b(0.5, GammaPrior(4.0, 8), "b");
   Parameter omega(1.5, GammaPrior(1,1), "omega");
 
-  likelihood.SetMovtBan(22.0f);
-  likelihood.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
+  gpu.SetMovtBan(22.0f);
+  gpu.SetParameters(epsilon1, epsilon2, gamma1, gamma2, xi, psi, zeta, phi, delta, omega,
       nu, alpha, a, b);
   
   cout << "Timing likelihood..." << flush;
   gettimeofday(&start, NULL);
-  likelihood.FullCalculate();
+  gpu.FullCalculate();
   gettimeofday(&end, NULL);
 
   cout << "Likelihood took: " << timeinseconds(start,end) << " seconds" << endl;
-  cout << "Value: " << likelihood.GetLogLikelihood() << endl;
-  likelihood.PrintLikelihoodComponents();
+  cout << "Value: " << gpu.GetLogLikelihood() << endl;
+  gpu.PrintLikelihoodComponents();
+
+  Mcmc::Initialize();
+
+  Mcmc::McmcRoot mcmc(gpu,0);
+
+  UpdateBlock gam;
+  gam.add(gamma1);
+  gam.add(epsilon1);
+
+  Mcmc::AdaptiveMultiLogMRW* updateGam = 
+    (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW","gam");
+  updateGam->SetParameters(gam);
+
+  UpdateBlock infecPeriod;
+  infecPeriod.add(a);
+  infecPeriod.add(b);
+  Mcmc::InfectionTimeUpdate* updateInfecTime =
+    (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate","infecTimes");
+  updateInfecTime->SetParameters(infecPeriod);
+  updateInfecTime->SetUpdateTuning(2.5);
+  updateInfecTime->SetReps(100);
 
   Random rng(0);
 
-  gettimeofday(&start,NULL);  
-  for(int i=0; i<900; ++i) 
-    likelihood.AddInfectionTime(rng.integer(likelihood.GetNumPossibleOccults()), rng.gamma(4,0.5));
-  gettimeofday(&end,NULL);
-  cout << "\n\nAdd: " << likelihood.GetLogLikelihood() << endl;
-  likelihood.PrintLikelihoodComponents();
-  likelihood.FullCalculate();
-  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
-  likelihood.PrintLikelihoodComponents();
-  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
+  gettimeofday(&start,NULL);
 
-  cout << "\n\nDeleting...\n" << endl;
-  
-  gettimeofday(&start,NULL);  
-  for(int i=0; i<900; ++i) 
-    likelihood.DeleteInfectionTime(rng.integer(likelihood.GetNumOccults()));
-  gettimeofday(&end,NULL);
-  cout << "\n\nDelete: " << likelihood.GetLogLikelihood() << endl;
-  likelihood.PrintLikelihoodComponents();
-  likelihood.FullCalculate();
-  cout << "\n\nFull calc: " << likelihood.GetLogLikelihood() << endl;
-  likelihood.PrintLikelihoodComponents();
-  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
+  for(int j=0; j<50; ++j) {
 
+    mcmc.Update();
+
+  }
+  gettimeofday(&end,NULL);
+  cout << "Likelihood:\n" << endl;
+  cout << "\n\nMove: " << gpu.GetLogLikelihood() << endl;
+  gpu.PrintLikelihoodComponents();
+  gpu.FullCalculate();
+  cout << "\n\nFull calc: " << gpu.GetLogLikelihood() << endl;
+  gpu.PrintLikelihoodComponents();
+
+  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
 
   return EXIT_SUCCESS;
 

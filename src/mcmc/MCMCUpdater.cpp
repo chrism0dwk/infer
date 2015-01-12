@@ -894,17 +894,17 @@ namespace EpiRisk
 
                   likelihood_->CompareProdVectors();
 
-                  const GpuLikelihood::LikelihoodComponents* pLik =
+                  const Likelihood::LikelihoodComponents pLik =
                       likelihood_->GetProposal();
-                  const GpuLikelihood::LikelihoodComponents* cLik =
+                  const Likelihood::LikelihoodComponents cLik =
                       likelihood_->GetCurrent();
                   cerr << setprecision(6);
-                  cerr << "bgIntegral: " << pLik->bgIntegral << "\t"
-                      << cLik->bgIntegral << endl;
-                  cerr << "integral: " << pLik->integral << "\t"
-                      << cLik->integral << endl;
-                  cerr << "product: " << pLik->logProduct << "\t"
-                      << cLik->logProduct << endl;
+                  cerr << "bgIntegral: " << pLik.bgIntegral << "\t"
+                      << cLik.bgIntegral << endl;
+                  cerr << "integral: " << pLik.integral << "\t"
+                      << cLik.integral << endl;
+                  cerr << "product: " << pLik.logProduct << "\t"
+                      << cLik.logProduct << endl;
                   cerr << "Likelihood: " << proposal << "\t" << likelihood_->GetCurrentValue();
                   likelihood_->Reject();
                   //throw logic_error(s.str().c_str());
@@ -919,9 +919,9 @@ namespace EpiRisk
     InfectionTimeUpdate::UpdateI()
     {
 
-#ifndef NDEBUG
-      std::cerr << "UPDATE" << std::endl;
-#endif
+      #ifndef NDEBUG
+      std::cout << "UPDATE" << std::endl;
+      #endif
 
       Parameter& a_((*params_)[0].getParameter());
       Parameter& b_((*params_)[1].getParameter());

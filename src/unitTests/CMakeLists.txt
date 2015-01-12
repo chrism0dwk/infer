@@ -7,7 +7,8 @@ link_directories(${CMAKE_SOURCE_DIR}/src/Framework ${GSL_LINK_DIRECTORIES} ${Boo
 
 set(fmdMcmc_SOURCES fmdMcmc.cpp)
 add_executable(fmdMcmc ${fmdMcmc_SOURCES})
-target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood posteriorwriter)
+set_target_properties(fmdMcmc PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood cpulikelihood posteriorwriter)
 
 set(fmdSim_SOURCES fmdSim.cpp fmdModel.cpp)
 add_executable(fmdSim ${fmdSim_SOURCES})
@@ -16,8 +17,18 @@ target_link_libraries(fmdSim data stlstrtok random gsl gslcblas boost_program_op
 set(testCpuLik_SOURCES testCpuLik.cpp)
 add_executable(testCpuLik ${testCpuLik_SOURCES})
 set_target_properties(testCpuLik PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
-target_link_libraries(testCpuLik data parameter random cpulikelihood)
+target_link_libraries(testCpuLik data parameter mcmc random cpulikelihood)
+
+set(testCpuLik_SOURCES testCpuVecLik.cpp)
+add_executable(testCpuVecLik ${testCpuLik_SOURCES})
+set_target_properties(testCpuVecLik PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(testCpuVecLik data parameter mcmc random cpuveclikelihood)
 
 set(testGpuLik_SOURCES testGpuLik.cpp)
 add_executable(testGpuLik ${testGpuLik_SOURCES})
-target_link_libraries(testGpuLik data parameter random gpulikelihood)
+target_link_libraries(testGpuLik data parameter mcmc random gpulikelihood)
+
+set(testBoth_SOURCES testBoth.cpp)
+add_executable(testBoth ${testBoth_SOURCES})
+set_target_properties(testBoth PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(testBoth data parameter random gpulikelihood cpulikelihood)

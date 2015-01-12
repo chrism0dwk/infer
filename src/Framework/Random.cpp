@@ -42,7 +42,7 @@
  *  Created on: Oct 27, 2010
  *      Author: stsiab
  */
-
+#include <iostream>
 #include <stdexcept>
 #include <sstream>
 #include <boost/numeric/ublas/io.hpp>
@@ -56,7 +56,7 @@
 namespace EpiRisk
 {
 
-  Random::Random(const unsigned long int seed)
+  Random::Random(const unsigned long int seed) : called_(0)
   {
     rng_ = gsl_rng_alloc(gsl_rng_mt19937);
     gsl_rng_set(rng_,seed);
@@ -65,37 +65,43 @@ namespace EpiRisk
 
   Random::~Random()
   {
+    std::cout << "RNG called " << called_ << " times" << std::endl;
     gsl_rng_free(rng_);
   }
   double
   Random::gaussian(const double mean, const double var)
   {
+    called_++;
     return mean + gsl_ran_gaussian(rng_, sqrt(var));
   }
   double
   Random::gamma(const double shape, const double rate)
   {
+    called_++;
     return gsl_ran_gamma(rng_, shape, 1 / rate);
   }
   double
   Random::beta(const double a, const double b)
   {
+    called_++;
     return gsl_ran_beta(rng_, a, b);
   }
   double
   Random::uniform(const double a, const double b)
   {
+    called_++;
     return gsl_ran_flat(rng_, a, b);
   }
   size_t
   Random::integer(const size_t n)
   {
+    called_++;
     return gsl_rng_uniform_int(rng_, n);
   }
   Random::Variates
   Random::mvgauss(const CovMatrix& covariance)
   {
-
+    called_++;
     // Cholesky decomposition to get SD matrix
     if(covariance.size1() != covariance.size2())
         throw std::invalid_argument(
@@ -147,22 +153,26 @@ namespace EpiRisk
   Random::Variates
   Random::mvgauss(const Variates& mu, const CovMatrix& covariance)
   {
+    called_++;
     // Generates MVN(0,Sigma) variates
     return mu + mvgauss(covariance);
   }
   double
   Random::extreme(const double a, const double b)
   {
+    called_++;
     return 1.0/b * log(1-log(1-uniform())/a);
   }
   double
   Random::gaussianTail(const double mean, const double var)
   {
+    called_++;
     return mean + gsl_ran_gaussian_tail(rng_,-mean,sqrt(var));
   }
   Random::Variates
   Random::dirichlet(const Variates& alpha)
   {
+    called_++;
     size_t k = alpha.size();
     double* calpha = new double[k]; for(size_t i=0; i<k; i++) calpha[i] = alpha(i);
     double* crv = new double[k];

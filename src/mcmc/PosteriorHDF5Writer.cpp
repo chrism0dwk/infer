@@ -14,7 +14,7 @@
 namespace EpiRisk {
 
 PosteriorHDF5Writer::PosteriorHDF5Writer(std::string filename,
-		GpuLikelihood& likelihood) :
+		Likelihood& likelihood) :
   PosteriorWriter(likelihood), isFirstWrite_(true), file_(NULL) {
 	// Open HDF5 file here
 	file_ = new H5::H5File(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);

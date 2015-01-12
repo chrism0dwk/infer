@@ -49,6 +49,7 @@ namespace po = boost::program_options;
 #include "McmcWriter.hpp"
 #include "Parameter.hpp"
 #include "GpuLikelihood.hpp"
+#include "CpuLikelihood.hpp"
 #include "PosteriorHDF5Writer.hpp"
 
 using namespace std;
@@ -69,14 +70,14 @@ sig_handler(int signo)
   }
 }
 
-inline
-double
-timeinseconds(const timeval a, const timeval b)
-{
-  timeval result;
-  timersub(&b, &a, &result);
-  return result.tv_sec + result.tv_usec / 1000000.0;
-}
+// inline
+// double
+// timeinseconds(const timeval a, const timeval b)
+// {
+//   timeval result;
+//   timersub(&b, &a, &result);
+//   return result.tv_sec + result.tv_usec / 1000000.0;
+// }
 
 class GammaPrior : public Prior
 {
@@ -350,8 +351,8 @@ main(int argc, char* argv[])
   size_t seed = atoi(argv[6]);
   int gpuId = atoi(argv[8]);
 
-  GpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
-      (size_t) 3, obsTime, true, gpuId);
+  CpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
+			   (size_t) 3, obsTime, 25.0f, false);
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -431,17 +432,17 @@ main(int argc, char* argv[])
   txInfec.add(xi[1]);
   txInfec.add(xi[2]);
 
-  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
-      "InfectivityMRW", "txInfec");
-  updateInfec->SetParameters(txInfec);
+  //Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
+  //    "InfectivityMRW", "txInfec");
+  //updateInfec->SetParameters(txInfec);
 
   UpdateBlock txSuscep;
   txSuscep.add(gamma1);
   txSuscep.add(zeta[1]);
   txSuscep.add(zeta[2]);
-  Mcmc::SusceptibilityMRW* updateSuscep =
-      (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-  updateSuscep->SetParameters(txSuscep);
+  //Mcmc::SusceptibilityMRW* updateSuscep =
+  //    (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+  //updateSuscep->SetParameters(txSuscep);
 
   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
@@ -451,22 +452,23 @@ main(int argc, char* argv[])
   Mcmc::InfectionTimeUpdate* updateInfecTime =
       (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
           "infecTimes");
-  updateInfecTime->SetCompareProductVector(&doCompareProdVec);
+  //updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
   updateInfecTime->SetUpdateTuning(2.5);
   updateInfecTime->SetReps(30);
+  updateInfecTime->SetOccults(true);
 
-  UpdateBlock bUpdate; bUpdate.add(b);
-  Mcmc::InfectionTimeGammaCentred* updateBC =
-      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  updateBC->SetParameters(bUpdate);
-  updateBC->SetTuning(0.014);
+  // UpdateBlock bUpdate; bUpdate.add(b);
+  // Mcmc::InfectionTimeGammaCentred* updateBC =
+  //     (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+  // updateBC->SetParameters(bUpdate);
+  // updateBC->SetTuning(0.014);
 
-  Mcmc::InfectionTimeGammaNC* updateBNC =
-      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  updateBNC->SetParameters(bUpdate);
-  updateBNC->SetTuning(0.0007);
-  updateBNC->SetNCRatio(ncratio);
+  // Mcmc::InfectionTimeGammaNC* updateBNC =
+  //     (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+  // updateBNC->SetParameters(bUpdate);
+  // updateBNC->SetTuning(0.0007);
+  // updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -485,13 +487,13 @@ main(int argc, char* argv[])
     output.AddParameter(nu);      output.AddParameter(alpha);
     output.AddParameter(b);
 
-    boost::function< float () > getlikelihood = boost::bind(&GpuLikelihood::GetLogLikelihood, &likelihood);
+    boost::function< float () > getlikelihood = boost::bind(&Likelihood::GetLogLikelihood, &likelihood);
     output.AddSpecial("loglikelihood",getlikelihood);
-    boost::function< float () > getnuminfecs = boost::bind(&GpuLikelihood::GetNumInfecs, &likelihood);
+    boost::function< float () > getnuminfecs = boost::bind(&Likelihood::GetNumInfecs, &likelihood);
     output.AddSpecial("numInfecs",getnuminfecs);
-    boost::function< float () > getmeanI2N = boost::bind(&GpuLikelihood::GetMeanI2N, &likelihood);
+    boost::function< float () > getmeanI2N = boost::bind(&Likelihood::GetMeanI2N, &likelihood);
     output.AddSpecial("meanI2N", getmeanI2N);
-    boost::function< float () > getmeanOccI = boost::bind(&GpuLikelihood::GetMeanOccI, &likelihood);
+    boost::function< float () > getmeanOccI = boost::bind(&Likelihood::GetMeanOccI, &likelihood);
     output.AddSpecial("meanOccI", getmeanOccI);
 
     // Output the population id index
@@ -532,8 +534,8 @@ main(int argc, char* argv[])
     cout << updateDistance->GetCovariance() << "\n";
     cout << updatePsi->GetCovariance() << "\n";
     cout << updatePhi->GetCovariance() << "\n";
-    cout << updateInfec->GetCovariance() << "\n";
-    cout << updateSuscep->GetCovariance() << "\n";
+    //cout << updateInfec->GetCovariance() << "\n";
+    //cout << updateSuscep->GetCovariance() << "\n";
 
   return EXIT_SUCCESS;
 

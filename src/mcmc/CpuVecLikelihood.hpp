@@ -156,6 +156,11 @@ namespace EpiRisk
     CalcIntegral();
 
     // Host vars
+    size_t popSizePitch_;
+    size_t maxInfecsPitch_;
+
+    size_t numThreads_;
+
     std::vector<InfecIdx_t> infecIdx_;
     std::vector<InfecIdx_t> suscOccults_;
     fp_t logLikelihood_;
@@ -163,8 +168,6 @@ namespace EpiRisk
     unsigned int I1Idx_;
     ublas::vector<fp_t> productCache_;
     LikelihoodComponents likComponents_;
-
-    // GPU data structures
 
     // Covariate data is shared over a copy
     ublas::matrix<fp_t,ublas::column_major> animals_;

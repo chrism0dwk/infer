@@ -85,9 +85,9 @@ namespace EpiRisk
     GetValue() const;
     float
     NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
-    const Likelihood::LikelihoodComponents*
+    Likelihood::LikelihoodComponents
     GetProposal() const { return proposal_->GetLikelihoodComponents(); }
-    const Likelihood::LikelihoodComponents*
+    Likelihood::LikelihoodComponents
     GetCurrent() const { return likelihood_->GetLikelihoodComponents(); }
     void
     CompareProdVectors() const;

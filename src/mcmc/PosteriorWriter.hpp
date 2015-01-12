@@ -31,16 +31,17 @@
 
 #include "Parameter.hpp"
 
+
 namespace EpiRisk
 {
 
   // FWD decl
-  class GpuLikelihood;
+  class Likelihood;
 
   class PosteriorWriter
   {
   public:
-    PosteriorWriter(GpuLikelihood& likelihood);
+    PosteriorWriter(Likelihood& likelihood);
     virtual
     ~PosteriorWriter();
     void
@@ -56,7 +57,7 @@ namespace EpiRisk
     write() = 0;
 
   protected:
-    GpuLikelihood& likelihood_;
+    Likelihood& likelihood_;
     std::vector<Parameter*> paramVals_; std::vector<float> valueBuff_;
     std::vector<std::string> paramTags_; std::vector<float> infecBuff_;
     std::vector< boost::function<float ()> > special_;

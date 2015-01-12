@@ -44,6 +44,8 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
+#include "Likelihood.hpp"
+
 // CUDA defines
 #define THREADSPERBLOCK 128
 
@@ -53,92 +55,33 @@ namespace EpiRisk
   class GpuLikelihood : public Likelihood
   {
   public:
-    struct LikelihoodComponents
-    {
-      float sumI;
-      float bgIntegral;
-      float logProduct;
-      float integral;
-    };
-
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
 		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
-    GpuLikelihood(const GpuLikelihood& other);
+    GpuLikelihood(const GpuLikelihood& rhs);
     virtual
     ~GpuLikelihood();
-    const GpuLikelihood&
-    operator=(const GpuLikelihood& other);
     void
-    InfecCopy(const GpuLikelihood& other);
-    void
-    LoadPopulation(PopDataImporter& filename);
-    void
-    LoadEpidemic(EpiDataImporter& importer);
-    void
-    SortPopulation();
-    void
-    LoadDistanceMatrix(DistMatrixImporter& filename);
+    InfecCopy(const Likelihood& rhs);
+    GpuLikelihood*
+    clone() const;
 
-    void
-    SetParameters(Parameter& epsilon1, 
-		  Parameter& epsilon2, 
-		  Parameter& gamma1, 
-		  Parameter& gamma2,
-		  Parameters& xi, 
-		  Parameters& psi, 
-		  Parameters& zeta, 
-		  Parameters& phi,
-		  Parameter& delta, 
-		  Parameter& omega, 
-		  Parameter& nu, 
-		  Parameter& alpha, 
-		  Parameter& a, 
-		  Parameter& b);
-    void
-    RefreshParameters();
-    void
-    SetMovtBan(const float movtBanTime);
-    float
-    GetMovtBan() const;
-    size_t
-    GetNumKnownInfecs() const;
     size_t
     GetNumInfecs() const;
     size_t
-    GetMaxInfecs() const;
-    size_t
     GetNumPossibleOccults() const;
     size_t
-    GetPopulationSize() const;
-    void
-    GetIds(std::vector<std::string>& ids) const;
-    size_t
     GetNumOccults() const;
-    void
-    CalcSusceptibilityPow();
-    void
-    CalcSusceptibility();
-    void
-    CalcInfectivityPow();
-    void
-    CalcInfectivity();
-    void
-    UpdateI1();
-    void
-    CalcBgIntegral();
+
     void
     UpdateInfectionTime(const unsigned int idx, const float inTime);
     void
     AddInfectionTime(const unsigned int idx, const float inTime);
     void
     DeleteInfectionTime(const unsigned int idx);
-    void
-    CalcProduct();
-    void
-    CalcIntegral();
+
     void
     FullCalculate();
     void
@@ -149,10 +92,10 @@ namespace EpiRisk
     GetIN(const size_t index);
     float
     GetLogLikelihood() const;
-    const LikelihoodComponents*
+    LikelihoodComponents
     GetLikelihoodComponents() const
     {
-      return hostComponents_;
+      return *hostComponents_;
     }
     const thrust::device_vector<float>&
     GetProdVector() const
@@ -177,8 +120,8 @@ namespace EpiRisk
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
 
-    friend std::ostream&
-    operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+    // friend std::ostream&
+    // operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
     void
     PrintLikelihoodComponents() const;
@@ -202,62 +145,33 @@ namespace EpiRisk
     CalcDistanceMatrix(const float dLimit);
     void
     SetDistance(const float* data, const int* rowptr, const int* colind);
+    void
+    RefreshParameters();
+    const Likelihood&
+    assign(const Likelihood& rhs);
 
-    // Data import
-    enum DiseaseStatus
-    {
-      IP = 0, DC = 1, SUSC = 2
-    };
-
-    struct Covars
-    {
-      string id;
-      float x,y;
-      DiseaseStatus status;
-      float I;
-      float N;
-      float R;
-      float cattle;
-      float pigs;
-      float sheep;
-    };
-
-    map<string, size_t> idMap_;
-    typedef std::vector<Covars> Population;
-
-    struct CompareByStatus
-    {
-      bool
-      operator()(const Covars& lhs, const Covars& rhs) const
-      {
-        return (int) lhs.status < (int) rhs.status;
-      }
-    };
-
-    struct CompareByI
-    {
-      bool
-      operator()(const Covars& lhs, const Covars& rhs) const
-      {
-        return lhs.I < rhs.I;
-      }
-    };
-
-    Population hostPopulation_;
-
-    // Host vars
-    const size_t popSize_;
-    size_t numKnownInfecs_;
-    size_t maxInfecs_;
-    size_t occultsOnlyDC_;
+    // Private calculation methods
+    void
+    CalcProduct();
+    void
+    CalcIntegral();
+    void
+    CalcSusceptibilityPow();
+    void
+    CalcSusceptibility();
+    void
+    CalcInfectivityPow();
+    void
+    CalcInfectivity();
+    void
+    UpdateI1();
+    void
+    CalcBgIntegral();
 
     thrust::host_vector<InfecIdx_t>* hostInfecIdx_;
     thrust::device_vector<InfecIdx_t>* devInfecIdx_;
     thrust::host_vector<InfecIdx_t>* hostSuscOccults_;
-    const size_t numSpecies_;
     float logLikelihood_;
-    const float obsTime_;
-    float movtBan_;
     float I1Time_;
     unsigned int I1Idx_;
 
@@ -297,23 +211,7 @@ namespace EpiRisk
     CUDPPHandle minReduce_;
     CUDPPConfiguration minReduceCfg_;
 
-    // Parameters
-    float* epsilon1_;
-    float* epsilon2_;
-    float* gamma1_;
-    float* gamma2_;
-    float* delta_;
-    float* omega_;
-    float* nu_;
-    float* alpha_;
-    float* a_;
-    float* b_;
-
-    PointerVector<float> xi_;
-    PointerVector<float> psi_;
-    PointerVector<float> zeta_;
-    PointerVector<float> phi_;
-
+    // Device parameter vectors
     float* devXi_;
     float* devPsi_;
     float* devZeta_;
@@ -328,8 +226,8 @@ namespace EpiRisk
 
   };
 
-  std::ostream&
-  operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+  // std::ostream&
+  // operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
 } // namespace EpiRisk
 
