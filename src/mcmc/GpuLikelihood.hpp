@@ -22,6 +22,9 @@
  *
  *  Created on: Feb 13, 2012
  *      Author: stsiab
+ *
+ *  Modified on Jan 20, 2015
+ *    -- now inherits off EpiRisk::Likelihood
  */
 
 #ifndef GPULIKELIHOOD_HPP_
@@ -45,9 +48,19 @@
 #include <thrust/device_vector.h>
 
 #include "Likelihood.hpp"
+#include "types.hpp"
+#include "Data.hpp"
+#include "PosteriorWriter.hpp"
+
+
+
+#ifndef __CUDACC__
+#include "Parameter.hpp"
+#endif
 
 // CUDA defines
 #define THREADSPERBLOCK 128
+#define SCRATCHSIZE 5
 
 namespace EpiRisk
 {
@@ -55,16 +68,38 @@ namespace EpiRisk
   class GpuLikelihood : public Likelihood
   {
   public:
+    struct ParmVals
+    {
+      float epsilon1;
+      float epsilon2;
+      float gamma1;
+      float gamma2;
+      float delta;
+      float omega;
+      float nu;
+      float alpha;
+    };
+
+    struct Data
+    {
+      float* eventTimes;
+      int     eventTimesPitch;
+      float* infectivity;
+      float* susceptibility;
+      float  movtBan;
+      CsrMatrix  D;
+    };
+
     explicit
     GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic,
         const size_t nSpecies,
 		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
-    GpuLikelihood(const GpuLikelihood& rhs);
+    GpuLikelihood(const GpuLikelihood& other);
     virtual
     ~GpuLikelihood();
     void
-    InfecCopy(const Likelihood& rhs);
+    InfecCopy(const Likelihood& other);
     GpuLikelihood*
     clone() const;
 
@@ -74,7 +109,6 @@ namespace EpiRisk
     GetNumPossibleOccults() const;
     size_t
     GetNumOccults() const;
-
     void
     UpdateInfectionTime(const unsigned int idx, const float inTime);
     void
@@ -120,9 +154,6 @@ namespace EpiRisk
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
 
-    // friend std::ostream&
-    // operator<<(std::ostream& out, const GpuLikelihood& likelihood);
-
     void
     PrintLikelihoodComponents() const;
     void
@@ -131,12 +162,17 @@ namespace EpiRisk
     PrintEventTimes() const;
     void
     PrintDistMatrix() const;
-
+    // void
+    // DumpSpecies() const;
+    // void
+    // DumpInfSusc() const;
   private:
 
     // Helper methods
     void
     ReduceProductVector();
+    void
+    wrapDataParms(Data* data, ParmVals* p);
     void
     SetEvents();
     void
@@ -152,10 +188,6 @@ namespace EpiRisk
 
     // Private calculation methods
     void
-    CalcProduct();
-    void
-    CalcIntegral();
-    void
     CalcSusceptibilityPow();
     void
     CalcSusceptibility();
@@ -167,12 +199,16 @@ namespace EpiRisk
     UpdateI1();
     void
     CalcBgIntegral();
+    void
+    CalcProduct();
+    void
+    CalcIntegral();
 
     thrust::host_vector<InfecIdx_t>* hostInfecIdx_;
     thrust::device_vector<InfecIdx_t>* devInfecIdx_;
     thrust::host_vector<InfecIdx_t>* hostSuscOccults_;
-    float logLikelihood_;
-    float I1Time_;
+    fp_t logLikelihood_;
+    fp_t I1Time_;
     unsigned int I1Idx_;
 
     LikelihoodComponents* hostComponents_;
@@ -201,6 +237,7 @@ namespace EpiRisk
     float* devInfectivity_;
     thrust::device_vector<float>* devProduct_;
     thrust::device_vector<float>* devWorkspace_;
+    FP_t* devScratch_;
     int integralBuffSize_;
 
     // CUDAPP bits and pieces
@@ -211,7 +248,7 @@ namespace EpiRisk
     CUDPPHandle minReduce_;
     CUDPPConfiguration minReduceCfg_;
 
-    // Device parameter vectors
+    // Parameters
     float* devXi_;
     float* devPsi_;
     float* devZeta_;
@@ -226,8 +263,8 @@ namespace EpiRisk
 
   };
 
-  // std::ostream&
-  // operator<<(std::ostream& out, const GpuLikelihood& likelihood);
+  std::ostream&
+  operator<<(std::ostream& out, const GpuLikelihood& likelihood);
 
 } // namespace EpiRisk
 

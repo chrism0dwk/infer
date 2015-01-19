@@ -127,6 +127,8 @@ namespace EpiRisk
     void
     ReduceProductVector();
     void
+    PackData(const size_t begin, const size_t end, fp_t** data, size_t* pitch);
+    void
     UpdateInfectionTimeInteg(const unsigned int i, const fp_t newTime);
     void
     UpdateInfectionTimeProd(const unsigned int i, const fp_t newTime);

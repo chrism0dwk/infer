@@ -103,7 +103,6 @@ namespace EpiRisk
             {
               it->Update();
             }
-	  cout << "RNG: " << random_->uniform() << endl;
     }
 
     map<string, float>

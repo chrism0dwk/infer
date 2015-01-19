@@ -30,7 +30,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -60,6 +60,19 @@ using namespace EpiRisk;
 #define NEVENTS 3
 
 bool doCompareProdVec = false;
+
+fp_t timediff(timespec start, timespec end)
+{
+	timespec temp;
+	if ((end.tv_nsec-start.tv_nsec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+	}
+	return (temp.tv_sec*1000000000L + temp.tv_nsec)/1000000000.0;
+}
 
 void
 sig_handler(int signo)
@@ -432,17 +445,17 @@ main(int argc, char* argv[])
   txInfec.add(xi[1]);
   txInfec.add(xi[2]);
 
-  //Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
-  //    "InfectivityMRW", "txInfec");
-  //updateInfec->SetParameters(txInfec);
+  Mcmc::InfectivityMRW* updateInfec = (Mcmc::InfectivityMRW*) mcmc.Create(
+     "InfectivityMRW", "txInfec");
+  updateInfec->SetParameters(txInfec);
 
   UpdateBlock txSuscep;
   txSuscep.add(gamma1);
   txSuscep.add(zeta[1]);
   txSuscep.add(zeta[2]);
-  //Mcmc::SusceptibilityMRW* updateSuscep =
-  //    (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-  //updateSuscep->SetParameters(txSuscep);
+  Mcmc::SusceptibilityMRW* updateSuscep =
+     (Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+  updateSuscep->SetParameters(txSuscep);
 
   // AdaptiveMultiMRW* updateDistanceLin = mcmc.NewAdaptiveMultiMRW("txDistanceLin",txDelta, 300);
 
@@ -455,20 +468,20 @@ main(int argc, char* argv[])
   //updateInfecTime->SetCompareProductVector(&doCompareProdVec);
   updateInfecTime->SetParameters(infecPeriod);
   updateInfecTime->SetUpdateTuning(2.5);
-  updateInfecTime->SetReps(30);
+  updateInfecTime->SetReps(900);
   updateInfecTime->SetOccults(true);
 
-  // UpdateBlock bUpdate; bUpdate.add(b);
-  // Mcmc::InfectionTimeGammaCentred* updateBC =
-  //     (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-  // updateBC->SetParameters(bUpdate);
-  // updateBC->SetTuning(0.014);
+  UpdateBlock bUpdate; bUpdate.add(b);
+  Mcmc::InfectionTimeGammaCentred* updateBC =
+      (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+  updateBC->SetParameters(bUpdate);
+  updateBC->SetTuning(0.014);
 
-  // Mcmc::InfectionTimeGammaNC* updateBNC =
-  //     (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-  // updateBNC->SetParameters(bUpdate);
-  // updateBNC->SetTuning(0.0007);
-  // updateBNC->SetNCRatio(ncratio);
+  Mcmc::InfectionTimeGammaNC* updateBNC =
+      (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+  updateBNC->SetParameters(bUpdate);
+  updateBNC->SetTuning(0.0007);
+  updateBNC->SetNCRatio(ncratio);
 
     //// Output ////
 
@@ -509,17 +522,22 @@ main(int argc, char* argv[])
     idxfile.close();
 
     // Run the chain
+
+    timespec start, end;
     cout << "Running MCMC" << endl;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID,&start);
     for(size_t k=0; k<atoi(argv[5]); ++k)
       {
-        if(k % 100 == 0)
-          {
-            cout << "Iteration " << k << endl;
-            output.flush();
-          }
+        // if(k % 100 == 0)
+        //   {
+        //     cout << "Iteration " << k << endl;
+        //     output.flush();
+        //   }
+
         mcmc.Update();
         output.write();
       }
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID,&end);
 
     // Wrap up
     map<string, float> acceptance = mcmc.GetAcceptance();
@@ -530,12 +548,7 @@ main(int argc, char* argv[])
         cout << it->first << ": " << it->second << "\n";
       }
 
-    cout << "Covariances\n";
-    cout << updateDistance->GetCovariance() << "\n";
-    cout << updatePsi->GetCovariance() << "\n";
-    cout << updatePhi->GetCovariance() << "\n";
-    //cout << updateInfec->GetCovariance() << "\n";
-    //cout << updateSuscep->GetCovariance() << "\n";
+    cout << "\n\nTime taken: " << timediff(start,end) << endl;
 
   return EXIT_SUCCESS;
 

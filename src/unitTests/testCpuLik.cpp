@@ -30,7 +30,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -53,6 +53,21 @@ using namespace EpiRisk;
 
 #define NSPECIES 3
 #define NEVENTS 3
+
+#define THECLOCK CLOCK_THREAD_CPUTIME_ID
+
+fp_t timediff(timespec start, timespec end)
+{
+	timespec temp;
+	if ((end.tv_nsec-start.tv_nsec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+	}
+	return (temp.tv_sec*1000000000L + temp.tv_nsec)/1000000000.0;
+}
 
 class GammaPrior : public Prior
 {
@@ -149,13 +164,14 @@ main(int argc, char* argv[])
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
   float obsTime = atof(argv[3]);
 
-  timeval start, end;
+  timespec start;
+  timespec end;
   cout << "Timing constructor..." << flush;
-  gettimeofday(&start, NULL);
+  clock_gettime(THECLOCK, &start);
   CpuLikelihood cpu(*popDataImporter, *epiDataImporter,
       (size_t) 3, obsTime, 25.0f);
-  gettimeofday(&end, NULL);
-  cout << "Done.\nConstructor took " << timeinseconds(start,end) << " seconds" << endl;
+  clock_gettime(THECLOCK, &end);
+  cout << "Done.\nConstructor took " << timediff(start, end) << " seconds" << endl;
 
   delete popDataImporter;
   delete epiDataImporter;
@@ -194,49 +210,67 @@ main(int argc, char* argv[])
       nu, alpha, a, b);
   
   cout << "Timing likelihood..." << flush;
-  gettimeofday(&start, NULL);
+  clock_gettime(THECLOCK, &start);
   cpu.FullCalculate();
-  gettimeofday(&end, NULL);
+  clock_gettime(THECLOCK, &end);
 
-  cout << "Likelihood took: " << timeinseconds(start,end) << " seconds" << endl;
+  cout << "Likelihood took: " << timediff(start, end) << " nanoseconds" << endl;
   cout << "Value: " << cpu.GetLogLikelihood() << endl;
   cpu.PrintLikelihoodComponents();
 
-  fp_t tmp[3];
-  cpu.GetSumInfectivityPow(tmp);
-  cout << "Sum infectivity: " << tmp[0] << ", " << tmp[1] << ", " << tmp[2] << endl;
-  cpu.GetSumSusceptibilityPow(tmp);
-  cout << "Sum susceptibility: " <<  tmp[0] << ", " << tmp[1] << ", " << tmp[2] << endl;
-  Mcmc::Initialize();
 
-  Mcmc::McmcRoot mcmc(cpu,0);
-
-  UpdateBlock gam;
-  gam.add(gamma1);
-  gam.add(epsilon1);
-
-  Mcmc::AdaptiveMultiLogMRW* updateGam = 
-    (Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW","gam");
-  updateGam->SetParameters(gam);
-
-  UpdateBlock infecPeriod;
-  infecPeriod.add(a);
-  infecPeriod.add(b);
-  Mcmc::InfectionTimeUpdate* updateInfecTime =
-    (Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate","infecTimes");
-  updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetUpdateTuning(2.5);
-  updateInfecTime->SetReps(100);
-
+  // Timing
+  const size_t reps = 1000;
+  double avgtime = 0.0;
   Random rng(0);
-  
 
-  gettimeofday(&start,NULL);
+  // Full calculation first
+  for(size_t i=0; i<reps; ++i)
+    {
+      clock_gettime(THECLOCK, &start);
+      cpu.FullCalculate();
+      clock_gettime(THECLOCK, &end);
+      avgtime += (timediff(start, end) - avgtime)/(i+1);
+    }
+  cout << "CPU Vec FullCalculate: " << avgtime << " nanoseconds" << endl;
 
-  for(int j=0; j<50; ++j) {
-    mcmc.Update();
-  }
-  gettimeofday(&end,NULL);
+  // Moving
+  avgtime = 0.0;
+  for(size_t i=0; i<reps; ++i)
+    {
+
+      size_t idx = rng.integer(cpu.GetNumInfecs());
+      fp_t d = rng.gamma(4, 0.5);
+      clock_gettime(THECLOCK, &start);
+      cpu.UpdateInfectionTime(idx, d);
+      clock_gettime(THECLOCK, &end);
+      avgtime += (timediff(start,end) - avgtime)/(i+1);
+    }
+  cout << "CPU Vec Update: " << avgtime << " nanoseconds" << endl;
+  cpu.FullCalculate();
+  avgtime = 0.0;
+  for(size_t i=0; i<reps; ++i)
+    {
+      size_t idx = rng.integer(cpu.GetNumPossibleOccults());
+      fp_t d = rng.gamma(4, 0.5);
+      clock_gettime(THECLOCK, &start);
+      cpu.AddInfectionTime(idx, d);
+      clock_gettime(THECLOCK, &end);
+      avgtime += (timediff(start, end) - avgtime)/(i+1);
+    }
+  cout << "CPU Vec Add: " << avgtime << " nanoseconds" << endl;
+  cpu.FullCalculate();
+  avgtime = 0.0;
+  for(size_t i=0; i<reps; ++i)
+    {
+      size_t idx = rng.integer(cpu.GetNumOccults());
+      clock_gettime(THECLOCK, &start);
+      cpu.DeleteInfectionTime(idx);
+      clock_gettime(THECLOCK, &end);
+      avgtime += (timediff(start, end) - avgtime)/(i+1);
+    }
+  cout << "CPU Vec Del: " << avgtime << " nanoseconds" << endl;
+
   cout << "Likelihood:\n" << endl;
   cout << "\n\nMove: " << cpu.GetLogLikelihood() << endl;
   cpu.PrintLikelihoodComponents();
@@ -244,7 +278,6 @@ main(int argc, char* argv[])
   cout << "\n\nFull calc: " << cpu.GetLogLikelihood() << endl;
   cpu.PrintLikelihoodComponents();
 
-  cout << "\n\nTime taken: " << timeinseconds(start,end)/900 << endl;
 
   return EXIT_SUCCESS;
 

@@ -5,14 +5,14 @@ ${CMAKE_SOURCE_DIR}/src/data ${CMAKE_SOURCE_DIR}/src/mcmc ${CMAKE_SOURCE_DIR}/sr
 ${Boost_INCLUDE_DIRS} ${GSL_INCLUDE_DIR} ${CMAKE_INCLUDE_PATH})
 link_directories(${CMAKE_SOURCE_DIR}/src/Framework ${GSL_LINK_DIRECTORIES} ${Boost_LIBRARY_DIRS} ${CMAKE_LIBRARY_PATH})
 
-set(fmdMcmc_SOURCES fmdMcmc.cpp)
-add_executable(fmdMcmc ${fmdMcmc_SOURCES})
-set_target_properties(fmdMcmc PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
-target_link_libraries(fmdMcmc data parameter mcmc gpulikelihood cpulikelihood posteriorwriter)
+
 
 set(fmdSim_SOURCES fmdSim.cpp fmdModel.cpp)
 add_executable(fmdSim ${fmdSim_SOURCES})
 target_link_libraries(fmdSim data stlstrtok random gsl gslcblas boost_program_options)
+
+
+
 
 set(testCpuLik_SOURCES testCpuLik.cpp)
 add_executable(testCpuLik ${testCpuLik_SOURCES})
@@ -32,3 +32,20 @@ set(testBoth_SOURCES testBoth.cpp)
 add_executable(testBoth ${testBoth_SOURCES})
 set_target_properties(testBoth PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(testBoth data parameter random gpulikelihood cpulikelihood)
+
+
+set(fmdMcmc_SOURCES fmdMcmc.cpp)
+add_executable(fmdMcmc ${fmdMcmc_SOURCES})
+set_target_properties(fmdMcmc PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(fmdMcmc data parameter mcmc cpulikelihood posteriorwriter)
+
+set(fmdMcmcVec_SOURCES fmdMcmcVec.cpp)
+add_executable(fmdMcmcVec ${fmdMcmcVec_SOURCES})
+set_target_properties(fmdMcmcVec PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(fmdMcmcVec data parameter mcmc cpuveclikelihood posteriorwriter)
+
+set(fmdMcmcGpu_SOURCES fmdMcmcGpu.cpp)
+add_executable(fmdMcmcGpu ${fmdMcmcGpu_SOURCES})
+set_target_properties(fmdMcmcGpu PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(fmdMcmcGpu data parameter mcmc gpulikelihood posteriorwriter)
+

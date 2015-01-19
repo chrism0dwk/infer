@@ -29,9 +29,11 @@
 
 #include "GpuLikelihood.hpp"
 
+
+#define T2P(thrustvec) thrust::raw_pointer_cast(&(thrustvec)[0])
+
 namespace EpiRisk
 {
-
   class GpuRuntimeError : public std::exception
   {
   public:
@@ -72,53 +74,53 @@ namespace EpiRisk
       }
   }
 
-// CUDA kernels
+  // CUDA kernels
 
   __device__
   float cache[5];
 
   template<typename T>
-    struct Log
+  struct Log
+  {
+    __host__ __device__
+    T
+    operator()(const T& val) const
     {
-      __host__ __device__
-      T
-      operator()(const T& val) const
-      {
-        return logf(val);
-      }
-    };
+      return logf(val);
+    }
+  };
 
   template<typename T>
-    struct LessThanZero
+  struct LessThanZero
+  {
+    __host__ __device__
+    bool
+    operator()(const T& val) const
     {
-      __host__ __device__
-      bool
-      operator()(const T& val) const
-      {
-        return val < 0;
-      }
-    };
+      return val < 0;
+    }
+  };
 
 
   template<typename T>
-    struct IndirectMin
+  struct IndirectMin
+  {
+    __host__ __device__
+    IndirectMin(T* ptr) :
+      ptr_(ptr)
     {
-      __host__ __device__
-      IndirectMin(T* ptr) :
-          ptr_(ptr)
-      {
-      }
-      ;
+    }
+    ;
 
-      __host__ __device__
-      bool
-      operator()(const InfecIdx_t& lhs, const InfecIdx_t& rhs) const
-      {
-        return ptr_[lhs.ptr] < ptr_[rhs.ptr];
-      }
-    private:
-      T* ptr_;
-    };
+    __host__ __device__
+    bool
+    operator()(const InfecIdx_t& lhs, const InfecIdx_t& rhs) const
+    {
+      return ptr_[lhs.ptr] < ptr_[rhs.ptr];
+    }
+  private:
+    T* ptr_;
+  };
 
   __device__ float
   _h(const float t, float nu, float alpha)
@@ -160,44 +162,44 @@ namespace EpiRisk
       {
         assumed = old;
         old = atomicCAS(address_as_ui, assumed,
-            __float_as_int(val + __int_as_float(assumed)));
+			__float_as_int(val + __int_as_float(assumed)));
       }
     while (assumed != old);
     return __int_as_float(old);
   }
 
   template<typename T>
-    __device__
-    void
-    _shmemReduce(T* buff)
-    {
-      // Reduce buffer into output
-      __syncthreads();
+  __device__
+  void
+  _shmemReduce(T* buff)
+  {
+    // Reduce buffer into output
+    __syncthreads();
 
-      for (unsigned int size = blockDim.x / 2; size > 32; size >>= 1)
-        {
-          if (threadIdx.x < size)
-            buff[threadIdx.x] += buff[threadIdx.x + size];
-          __syncthreads();
-        }
-      if (threadIdx.x < 32)
-        {
-          volatile T* vbuff = buff;
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 32];
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 16];
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 8];
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 4];
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 2];
-          vbuff[threadIdx.x] += vbuff[threadIdx.x + 1];
-        }
+    for (unsigned int size = blockDim.x / 2; size > 32; size >>= 1)
+      {
+	if (threadIdx.x < size)
+	  buff[threadIdx.x] += buff[threadIdx.x + size];
+	__syncthreads();
+      }
+    if (threadIdx.x < 32)
+      {
+	volatile T* vbuff = buff;
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 32];
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 16];
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 8];
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 4];
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 2];
+	vbuff[threadIdx.x] += vbuff[threadIdx.x + 1];
+      }
 
-      __syncthreads();
-    }
+    __syncthreads();
+  }
 
   __global__
   void
   _computeDistance(const float2* coords, int* output, size_t outputPitch,
-      const float distance, const int n)
+		   const float distance, const int n)
   {
     // Launch this kernel with block dim [THREADSPERBLOCK,1]
 
@@ -206,9 +208,9 @@ namespace EpiRisk
     int row = threadIdx.x + blockIdx.y * blockDim.x;
     float dsq = distance * distance;
     __shared__
-    float2 ybuff[THREADSPERBLOCK];
+      float2 ybuff[THREADSPERBLOCK];
     __shared__
-    int nnzbuff[THREADSPERBLOCK];
+      int nnzbuff[THREADSPERBLOCK];
 
     nnzbuff[threadIdx.x] = 0.0f;
 
@@ -243,7 +245,7 @@ namespace EpiRisk
   __global__
   void
   _computeDrow(const float2* coords, float* devDrow, unsigned int* devIsValid,
-      const int n, const int row, const float distance)
+	       const int n, const int row, const float distance)
   {
     int col = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -283,9 +285,9 @@ namespace EpiRisk
     dim3 numBlocks(numBlocks_xy, numBlocks_xy);
 
     checkCudaError(
-        cudaMallocPitch(&devNNZ, &devNNZPitch, numBlocks_xy*sizeof(int), numBlocks_xy));
+		   cudaMallocPitch(&devNNZ, &devNNZPitch, numBlocks_xy*sizeof(int), numBlocks_xy));
     checkCudaError(
-        cudaMemset2DAsync(devNNZ, devNNZPitch, 0, numBlocks_xy*sizeof(int), numBlocks_xy));
+		   cudaMemset2DAsync(devNNZ, devNNZPitch, 0, numBlocks_xy*sizeof(int), numBlocks_xy));
 
     hostNNZ = new int[numBlocks_xy * numBlocks_xy];
 
@@ -296,7 +298,7 @@ namespace EpiRisk
 
     // Copy memory back to host
     checkCudaError(
-        cudaMemcpy2D(hostNNZ, numBlocks_xy*sizeof(int), devNNZ, devNNZPitch, numBlocks_xy*sizeof(int), numBlocks_xy, cudaMemcpyDeviceToHost));
+		   cudaMemcpy2D(hostNNZ, numBlocks_xy*sizeof(int), devNNZ, devNNZPitch, numBlocks_xy*sizeof(int), numBlocks_xy, cudaMemcpyDeviceToHost));
 
     // Reduction on the host
     int i;
@@ -322,7 +324,7 @@ namespace EpiRisk
     float2* devCoords;
     checkCudaError(cudaMalloc(&devCoords, n*sizeof(float2)));
     checkCudaError(
-        cudaMemcpy(devCoords, coords, n*sizeof(float2), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devCoords, coords, n*sizeof(float2), cudaMemcpyHostToDevice));
 
     // Get number of valid (ie 0 < d <= dLimit) entries
     size_t nnz = distanceNumValid(devCoords, n, dLimit);
@@ -334,8 +336,6 @@ namespace EpiRisk
     csrMatrix->nnz = nnz;
     csrMatrix->m = n;
     csrMatrix->n = n;
-    
-    cout << "D sparsity = " << csrMatrix->nnz << endl;
 
     float* devDrow = NULL;
     int* devColNums = NULL;
@@ -391,7 +391,7 @@ namespace EpiRisk
     compactIntConfig.options = CUDPP_OPTION_FORWARD;
     CUDPPHandle compactFloatPlan;
     result = cudppPlan(theCudpp, &compactFloatPlan, compactFloatConfig, n, 1,
-        0);
+		       0);
     if (result != CUDPP_SUCCESS)
       cerr << "Help!  Could not create float plan!" << endl;
     CUDPPHandle compactIntPlan;
@@ -400,7 +400,7 @@ namespace EpiRisk
       cerr << "Help! Could not create int plan!" << endl;
     size_t *numValid, *devNumValid;
     checkCudaError(
-        cudaHostAlloc(&numValid, sizeof(size_t), cudaHostAllocMapped));
+		   cudaHostAlloc(&numValid, sizeof(size_t), cudaHostAllocMapped));
     checkCudaError(cudaHostGetDevicePointer(&devNumValid, numValid, 0));
     int* hostRowptr = new int[n + 1];
     hostRowptr[0] = 0;
@@ -411,14 +411,14 @@ namespace EpiRisk
     for (int row = 0; row < n; ++row)
       {
         // Compute distances, record valid entries
-_computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, row, dLimit);
-        		        checkCudaError(cudaGetLastError());
+	_computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, row, dLimit);
+	checkCudaError(cudaGetLastError());
 
         // Compact into col
         cudppCompact(compactFloatPlan, csrMatrix->val + hostRowptr[row],
-            devNumValid, devDrow, devIsValid, n);
+		     devNumValid, devDrow, devIsValid, n);
         cudppCompact(compactIntPlan, csrMatrix->colInd + hostRowptr[row],
-            devNumValid, devColNums, devIsValid, n);
+		     devNumValid, devColNums, devIsValid, n);
         cudaDeviceSynchronize();
 
         // Update rowptr
@@ -426,7 +426,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
       }
 
     checkCudaError(
-        cudaMemcpy(csrMatrix->rowPtr, hostRowptr, (n+1)*sizeof(int), cudaMemcpyHostToDevice));
+		   cudaMemcpy(csrMatrix->rowPtr, hostRowptr, (n+1)*sizeof(int), cudaMemcpyHostToDevice));
 
     // Clean up
     cudaFree(devDrow);
@@ -455,13 +455,14 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     delete csrMatrix;
   }
 
+
   int
   checkDistMatrixSymmetry(const CsrMatrix* csrMatrix)
   {
 
     int row;
     int nonsymmetric = 0;
-  #pragma omp parallel for shared(csrMatrix) private(row) reduction(+:nonsymmetric)
+#pragma omp parallel for shared(csrMatrix) private(row) reduction(+:nonsymmetric)
     for(row=0; row<csrMatrix->n; ++row)
       {
         int rowptr = csrMatrix->rowPtr[row];
@@ -474,15 +475,15 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             float ctor;
             bool rv = getDistMatrixElement(colnum,row,csrMatrix,&ctor);
 
-              if(rtoc != ctor or !rv) {
-  #pragma omp critical
-            {
-              cerr << "Non-symmetry: (" << row << "," << colnum << ") = " << rtoc
-                   << " but (" << colnum << "," << row << ") = " << ctor;
-              cerr << endl;
-            }
-            nonsymmetric += 1;
-              }
+	    if(rtoc != ctor or !rv) {
+#pragma omp critical
+	      {
+		cerr << "Non-symmetry: (" << row << "," << colnum << ") = " << rtoc
+		     << " but (" << colnum << "," << row << ") = " << ctor;
+		cerr << endl;
+	      }
+	      nonsymmetric += 1;
+	    }
           }
       }
 
@@ -514,9 +515,9 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
   __global__ void
   _calcIntegral(const InfecIdx_t* infecIdx, const int infecSize,
-      const CsrMatrix distance, float* eventTimes, const int eventTimesPitch,
-      const float* susceptibility, const float* infectivity, const float gamma2,
-      const float delta, const float omega, const float nu, const float alpha, float* output)
+		const CsrMatrix distance, float* eventTimes, const int eventTimesPitch,
+		const float* susceptibility, const float* infectivity, const float gamma2,
+		const float delta, const float omega, const float nu, const float alpha, float* output)
   {
     // Each warp calculates a row i of the sparse matrix
 
@@ -525,7 +526,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     int lane = tid & (32 - 1); // Id within a warp
 
     __shared__
-    float buff[THREADSPERBLOCK];
+      float buff[THREADSPERBLOCK];
 
     buff[threadIdx.x] = 0.0f;
 
@@ -546,8 +547,8 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
             float Ij = eventTimes[distance.colInd[jj]];
             float betaij = _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
             betaij += gamma2
-                * (_H(fminf(Ri, Ij) - Ii, nu, alpha)
-                    - _H(fminf(Ni, Ij) - Ii, nu, alpha));
+	      * (_H(fminf(Ri, Ij) - Ii, nu, alpha)
+		 - _H(fminf(Ni, Ij) - Ii, nu, alpha));
 
             // Apply distance kernel and suscep
             betaij *= _K(distance.val[jj], delta, omega);
@@ -569,13 +570,13 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
 
   __global__ void
   _bgIntegral(float* output, const float* eventTimes, const int popSize,
-      const float epsilon1, const float epsilon2, const float movtBan,
-      const float I1Time)
+	      const float epsilon1, const float epsilon2, const float movtBan,
+	      const float I1Time)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     __shared__
-    float buff[THREADSPERBLOCK];
+      float buff[THREADSPERBLOCK];
     buff[threadIdx.x] = 0.0f;
 
     if (tid < popSize)
@@ -605,7 +606,7 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     int lane = tid & (32 - 1); // Id within a warp
 
     __shared__
-    float threadProdCache[THREADSPERBLOCK];
+      float threadProdCache[THREADSPERBLOCK];
     threadProdCache[threadIdx.x] = 0.0f;
     int row = gwid;
 
@@ -654,15 +655,15 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
           {
             float epsilon = Ij < movtBan ? epsilon1 : (epsilon1*epsilon2);
             prodCache[j] = threadProdCache[threadIdx.x] * susceptibility[j]
-                * gamma1 + epsilon;
+	      * gamma1 + epsilon;
           }
       }
   }
 
   __global__ void
   _calcSpecPow(const unsigned int size, const int nSpecies, float* specpow,
-      const int specpowPitch, const float* animals, const int animalsPitch,
-      const float* powers)
+	       const int specpowPitch, const float* animals, const int animalsPitch,
+	       const float* powers)
   {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -671,409 +672,23 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
         for (unsigned int col = 0; col < nSpecies; ++col)
           {
             specpow[col * specpowPitch + row] = powf(
-                animals[col * animalsPitch + row], powers[col]);
+						     animals[col * animalsPitch + row], powers[col]);
           }
       }
   }
 
-  __global__ void
-  _updateInfectionTimeIntegral(const unsigned int idx,
-      const InfecIdx_t* infecIdx, const float newTime, const CsrMatrix distance,
-      float* eventTimes, const int eventTimesPitch, const float* susceptibility,
-			       const float* infectivity, const float gamma2, const float delta, const float omega,
-      const float nu, const float alpha, float* output)
-  {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    extern __shared__
-    float buff[];
-    buff[threadIdx.x] = 0.0f;
 
-    int i = infecIdx[idx].ptr;
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin)
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ii = eventTimes[i];
-        float Ni = eventTimes[i + eventTimesPitch];
-        float Ri = eventTimes[i + eventTimesPitch * 2];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-        float Rj = eventTimes[j + eventTimesPitch * 2];
-
-        float jOnIdx = 0.0f;
-        if (Ij < Nj)
-          {
-            // Recalculate pressure from j on idx
-            jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), nu, alpha)
-                + gamma2
-                    * (_H(fminf(Rj, newTime) - Ij, nu, alpha)
-                        - _H(fminf(Nj, newTime) - Ij, nu, alpha)); // New pressure
-            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), nu, alpha)
-                + gamma2
-                    * (_H(fminf(Rj, Ii) - Ij, nu, alpha)
-                        - _H(fminf(Nj, Ii) - Ij, nu, alpha)); // Old pressure
-                // Apply infec and suscep
-            jOnIdx *= susceptibility[i];
-            jOnIdx *= infectivity[j];
-          }
-
-        // Recalculate pressure from idx on j
-        float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), nu, alpha);
-        IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
-        IdxOnj += gamma2
-            * (_H(fminf(Ri, Ij) - newTime, nu, alpha)
-                - _H(fminf(Ni, Ij) - newTime, nu, alpha));
-        IdxOnj -= gamma2
-            * (_H(fminf(Ri, Ij) - Ii, nu, alpha)
-                - _H(fminf(Ni, Ij) - Ii, nu, alpha));
-        IdxOnj *= susceptibility[j];
-        IdxOnj *= infectivity[i];
-
-        buff[threadIdx.x] = (IdxOnj + jOnIdx)
-	  * _K(distance.val[begin+tid], delta,omega);
-
-        // Reduce buffer into output
-        _shmemReduce(buff);
-
-      }
-
-    if (threadIdx.x == 0)
-      {
-        output[blockIdx.x] = buff[0];
-      }
-  }
-
-//! This kernel updates the product vector, **AND** alters the population
-//! To be called **AFTER** the integral function!!
-  __global__ void
-  _updateInfectionTimeProduct(const unsigned int idx,
-      const InfecIdx_t* infecIdx, const float newTime, const CsrMatrix distance,
-      float* eventTimes, const int eventTimesPitch, const float* susceptibility,
-      const float* infectivity, const float epsilon1, const float epsilon2, const float gamma1,
-			      const float gamma2, const float delta, const float omega, const float nu, const float alpha, const float movtBan,
-      const int I1Idx, float* prodCache)
-  {
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    extern __shared__
-    float buff[];
-    buff[threadIdx.x] = 0.0f;
-
-    int i = infecIdx[idx].ptr;
-
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin) // Massive amount of wasted time just here!
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-
-        if (Ij < Nj)
-          {
-            float Ii = eventTimes[i];
-            float Ni = eventTimes[i + eventTimesPitch];
-            float Ri = eventTimes[i + eventTimesPitch * 2];
-            float Rj = eventTimes[j + eventTimesPitch * 2];
-
-            // Adjust product cache from idx on others
-            float idxOnj = 0.0f;
-            if (Ii < Ij and Ij <= Ni)
-              idxOnj -= _h(Ij - Ii, nu, alpha);
-            else if (Ni < Ij and Ij <= Ri)
-              {
-                idxOnj -= gamma2 * _h(Ij - Ii, nu, alpha);
-                idxOnj += gamma2 * _h(Ij - newTime, nu, alpha);
-              }
-            if (newTime < Ij and Ij <= Ni)
-              idxOnj += _h(Ij - newTime, nu, alpha);
-
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta, omega);
-            prodCache[j] += idxOnj;
-
-            // Recalculate instantaneous pressure on idx
-            float jOnIdx = 0.0f;
-            if (Ij < newTime and newTime <= Nj)
-              jOnIdx = _h(newTime - Ij, nu, alpha);
-            else if (Nj < newTime and newTime <= Rj)
-              jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
-
-            jOnIdx *= susceptibility[i] * infectivity[j] * _K(distance.val[begin+tid],delta, omega);
-            buff[threadIdx.x] = jOnIdx * gamma1;
-
-          }
-
-        _shmemReduce(buff);
-
-        if (threadIdx.x == 0)
-          _atomicAdd(prodCache + i, buff[0]); // Maybe better to create an external reduction buffer here.
-        if (tid == 0) {
-          float epsilon = newTime < movtBan ? epsilon1 : (epsilon1 * epsilon2);
-          _atomicAdd(prodCache + i, epsilon);
-        }
-      }
-  }
-
-  __global__ void
-  _addInfectionTimeIntegral(const unsigned int idx, const InfecIdx_t* infecIdx,
-      const float newTime, const CsrMatrix distance, const float* eventTimes,
-      const int eventTimesPitch, const float* susceptibility,
-			    const float* infectivity, const float gamma2, const float delta, const float omega,
-      const float nu, const float alpha, float* output)
-  {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    extern __shared__
-    float buff[];
-    buff[threadIdx.x] = 0.0f;
-
-    int i = infecIdx[idx].ptr;
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin)
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ii = eventTimes[i];
-        float Ni = eventTimes[i + eventTimesPitch];
-        float Ri = eventTimes[i + eventTimesPitch * 2];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-        float Rj = eventTimes[j + eventTimesPitch * 2];
-
-        float jOnIdx = 0.0f;
-        if (Ij < Nj)
-          {
-            // Calculate pressure from j on idx
-            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii), nu, alpha);
-            jOnIdx -= gamma2
-                * (_H(fminf(Rj, Ii) - Ij, nu, alpha)
-                    - _H(fminf(Nj, Ii) - Ij, nu, alpha));
-            jOnIdx += _H(fminf(Nj, newTime) - fminf(Ij, newTime), nu, alpha);
-            jOnIdx += gamma2
-                * (_H(fminf(Rj, newTime) - Ij, nu, alpha)
-                    - _H(fminf(Nj, newTime) - Ij, nu, alpha));
-
-            // Apply infec and suscep
-            jOnIdx *= susceptibility[i];
-            jOnIdx *= infectivity[j];
-          }
-
-        // Add pressure from idx on j
-        float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), nu, alpha);
-        IdxOnj += gamma2
-            * (_H(fminf(Ri, Ij) - newTime, nu, alpha)
-                - _H(fminf(Ni, Ij) - newTime, nu, alpha));
-        IdxOnj *= susceptibility[j];
-        IdxOnj *= infectivity[i];
-
-        buff[threadIdx.x] = (IdxOnj + jOnIdx)
-	  * _K(distance.val[begin+tid], delta, omega);
-
-        // Reduce buffer into output
-        _shmemReduce(buff);
-      }
-
-    if (threadIdx.x == 0)
-      {
-        output[blockIdx.x] = buff[0];
-      }
-  }
-
-  __global__ void
-  _delInfectionTimeIntegral(const unsigned int idx, const InfecIdx_t* infecIdx,
-      const float newTime, const CsrMatrix distance, float* eventTimes,
-      const int eventTimesPitch, const float* susceptibility,
-			    const float* infectivity, const float gamma2, const float delta, const float omega,
-      const float nu, const float alpha, float* output)
-  {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    extern __shared__
-    float buff[];
-    buff[threadIdx.x] = 0.0f;
-
-    int i = infecIdx[idx].ptr;
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin)
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ii = eventTimes[i];
-        float Ni = eventTimes[i + eventTimesPitch];
-        float Ri = eventTimes[i + eventTimesPitch * 2];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-        float Rj = eventTimes[j + eventTimesPitch * 2];
-
-        float jOnIdx = 0.0f;
-        if (Ij < Nj)
-          {
-            // Recalculate pressure from j on idx
-            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), nu, alpha)
-                + gamma2
-                    * (_H(fminf(Rj, Ii) - Ij, nu, alpha)
-                        - _H(fminf(Nj, Ii) - Ij, nu, alpha)); // Old pressure
-            jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni), nu, alpha)
-                + gamma2
-                    * (_H(fminf(Rj, Ni) - Ij, nu, alpha)
-                        - _H(fminf(Nj, Ni) - Ij, nu, alpha)); // New pressure
-                // Apply infec and suscep
-            jOnIdx *= susceptibility[i];
-            jOnIdx *= infectivity[j];
-          }
-
-        // Subtract pressure from idx on j
-        float IdxOnj = 0.0f;
-        IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), nu, alpha);
-        IdxOnj -= gamma2
-            * (_H(fminf(Ri, Ij) - Ii, nu, alpha)
-                - _H(fminf(Ni, Ij) - Ii, nu, alpha));
-        IdxOnj *= susceptibility[j];
-        IdxOnj *= infectivity[i];
-
-        buff[threadIdx.x] = (IdxOnj + jOnIdx)
-	  * _K(distance.val[begin+tid], delta, omega);
-
-        // Reduce buffer into output
-        _shmemReduce(buff);
-
-      }
-
-    if (threadIdx.x == 0)
-      {
-        output[blockIdx.x] = buff[0];
-      }
-  }
-
-  __global__ void
-  _addInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
-      const float newTime, const CsrMatrix distance, float* eventTimes,
-      const int eventTimesPitch, const float* susceptibility,
-      const float* infectivity, const float epsilon1, const float epsilon2, const float gamma1,
-			   const float gamma2, const float delta, const float omega, const float nu, const float alpha, const float movtBan,
-      const int I1Idx, float* prodCache)
-  {
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    extern __shared__
-    float buff[];
-    buff[threadIdx.x] = 0.0f;
-
-    int i = infecIdx[idx].ptr;
-
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin) // Massive amount of wasted time just here!
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-
-        if (Ij < Nj)
-          { // Only look at infected individuals
-
-            float Ni = eventTimes[i + eventTimesPitch];
-            float Ri = eventTimes[i + eventTimesPitch * 2];
-            float Rj = eventTimes[j + eventTimesPitch * 2];
-
-            // Adjust product cache from idx on others
-            float idxOnj = 0.0f;
-            if (newTime < Ij and Ij <= Ni)
-              idxOnj += _h(Ij - newTime, nu, alpha);
-            else if (Ni < Ij and Ij <= Ri)
-              idxOnj += gamma2 * _h(Ij - newTime, nu, alpha);
-
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta, omega);
-            prodCache[j] += idxOnj;
-
-            // Calculate instantaneous pressure on idx
-            float jOnIdx = 0.0f;
-            if (Ij < newTime and newTime <= Nj)
-              jOnIdx = _h(newTime - Ij, nu, alpha);
-            else if (Nj < newTime and newTime <= Rj)
-              jOnIdx = gamma2 * _h(newTime - Ij, nu, alpha);
-
-            jOnIdx *= gamma1 * infectivity[j] * susceptibility[i] * _K(distance.val[begin+tid],delta,omega);
-
-            buff[threadIdx.x] = jOnIdx;
-
-          }
-
-        _shmemReduce(buff);
-
-        if (threadIdx.x == 0)
-          _atomicAdd(prodCache + i, buff[0]);
-        if (tid == 0) { // Add background pressure, or turn to 1.0f for I1
-          float epsilon = newTime < movtBan ? epsilon1 : (epsilon1*epsilon2);
-          _atomicAdd(prodCache + i, epsilon);
-        }
-      }
-  }
-
-  __global__ void
-  _delInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
-      const float newTime, const CsrMatrix distance, float* eventTimes,
-      const int eventTimesPitch, const float* susceptibility,
-      const float* infectivity, const float gamma1,
-			   const float gamma2, const float delta, const float omega, const float nu, const float alpha,
-      float* prodCache)
-  {
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-
-    int i = infecIdx[idx].ptr;
-
-    int begin = distance.rowPtr[i];
-    int end = distance.rowPtr[i + 1];
-
-    if (tid < end - begin) // Massive amount of wasted time just here!
-      {
-        int j = distance.colInd[begin + tid];
-
-        float Ij = eventTimes[j];
-        float Nj = eventTimes[j + eventTimesPitch];
-
-        if (Ij < Nj)
-          {
-
-            float Ii = eventTimes[i];
-            float Ni = eventTimes[i + eventTimesPitch];
-            float Ri = eventTimes[i + eventTimesPitch * 2];
-
-            // Adjust product cache from idx on others
-            float idxOnj = 0.0;
-            if (Ii < Ij and Ij <= Ni)
-              idxOnj -= _h(Ij - Ii, nu, alpha);
-            else if (Ni < Ij and Ij <= Ri)
-              idxOnj -= gamma2 * _h(Ij - Ii, nu, alpha);
-
-            idxOnj *= gamma1 * infectivity[i] * susceptibility[j] * _K(distance.val[begin+tid],delta,omega);
-            prodCache[j] += idxOnj;
-          }
-      }
-  }
 
   __global__
   void
   _knownInfectionsLikelihood(const InfecIdx_t* infecIdx,
-      const unsigned int knownInfecs, const float* eventTimes,
-      const int eventTimesPitch, const float a, const float b,
-      float* reductionBuff)
+			     const unsigned int knownInfecs, const float* eventTimes,
+			     const int eventTimesPitch, const float a, const float b,
+			     float* reductionBuff)
   {
     extern
-    __shared__ float buff[];
+      __shared__ float buff[];
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     buff[threadIdx.x] = 0.0f;
@@ -1096,25 +711,25 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
   __global__
   void
   _knownInfectionsLikelihoodPNC(const InfecIdx_t* infecIdx,
-      const unsigned int knownInfecs, const float* eventTimes,
-      const int eventTimesPitch, const float a, const float oldGamma,
-      const float newGamma, const float* rns, const float prob,
-      float* reductionBuff)
+				const unsigned int knownInfecs, const float* eventTimes,
+				const int eventTimesPitch, const float a, const float oldGamma,
+				const float newGamma, const float* rns, const float prob,
+				float* reductionBuff)
   {
     extern
-    __shared__ float buff[];
+      __shared__ float buff[];
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     buff[threadIdx.x] = 0.0f;
 
     if (tid < knownInfecs)
       {
-            int i = infecIdx[tid].ptr;
-            float Ii = eventTimes[i];
-            float Ni = eventTimes[eventTimesPitch + i];
-            float d = Ni - Ii;
+	int i = infecIdx[tid].ptr;
+	float Ii = eventTimes[i];
+	float Ni = eventTimes[eventTimesPitch + i];
+	float d = Ni - Ii;
         buff[threadIdx.x] = (powf(newGamma, prob) / powf(oldGamma, prob - 1.0f) - newGamma) * d
-                          + a * (1 - prob) * log( newGamma / oldGamma );
+	  + a * (1 - prob) * log( newGamma / oldGamma );
       }
 
     _shmemReduce(buff);
@@ -1126,24 +741,24 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
   __global__
   void
   _nonCentreInfecTimes(const InfecIdx_t* index, const int size,
-      float* eventTimes, int eventTimesPitch, const float factor,
-      const float* toCentre, const float prop)
+		       float* eventTimes, int eventTimesPitch, const float factor,
+		       const float* toCentre, const float prop)
   {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (tid < size)
       {
-            unsigned int i = index[tid].ptr;
-            float notification = eventTimes[i + eventTimesPitch];
-            float infection = eventTimes[i];
-            eventTimes[i] = notification - (notification - infection) * powf(factor,prop);
+	unsigned int i = index[tid].ptr;
+	float notification = eventTimes[i + eventTimesPitch];
+	float infection = eventTimes[i];
+	eventTimes[i] = notification - (notification - infection) * powf(factor,prop);
       }
   }
 
   __global__
   void
   _collectInfectiousPeriods(const InfecIdx_t* index, const int size,
-      const float* eventTimes, const int eventTimesPitch, float* output)
+			    const float* eventTimes, const int eventTimesPitch, float* output)
   {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -1168,12 +783,12 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
   __global__
   void
   _indirectedSum(const InfecIdx_t* index, const int size, const float* data,
-      float* output)
+		 float* output)
   {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     extern
-    __shared__ float buff[];
+      __shared__ float buff[];
     buff[threadIdx.x] = 0.0f;
 
     if (tid < size)
@@ -1191,30 +806,32 @@ _computeDrow<<<numBlocks, THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, 
     int numBlocks = (size + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
     thrust::device_vector<float> output(numBlocks);
 
-_indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(index, size, data, thrust::raw_pointer_cast(&output[0]));
-          	    	    checkCudaError(cudaGetLastError());
+    _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(index, size, data, thrust::raw_pointer_cast(&output[0]));
+    checkCudaError(cudaGetLastError());
     return thrust::reduce(output.begin(), output.end());
 
   }
 
+  template<int STRIDE>
   __global__
   void
   _reducePVectorStage1(float* input, const int size, const int I1Idx,
-      float* output)
+		       float* output)
   {
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int dataBlk = blockIdx.x*blockDim.x*STRIDE;
+    
     extern
-    __shared__ float buff[];
+      __shared__ float buff[];
     buff[threadIdx.x] = 0.0f;
 
-    if (tid < size)
-      {
-        if (tid == I1Idx)
-          input[tid] = 1.0f; // Better put *after* our global memory fetch, I think!
-        buff[threadIdx.x] = logf(input[tid]);
+    if(I1Idx / (blockDim.x*STRIDE) == blockIdx.x and threadIdx.x==0)
+	input[I1Idx] = 1.0f;
 
-        //output[tid] = logf(input[tid]);
-      }
+    for(int ii=0; ii<STRIDE; ++ii) {
+      int i = dataBlk+blockDim.x*ii+threadIdx.x;
+      if(i < size) buff[threadIdx.x] += logf(input[i]);
+    }
+
     _shmemReduce(buff);
     if (threadIdx.x == 0)
       output[blockIdx.x] = buff[0];
@@ -1225,35 +842,37 @@ _indirectedSum<<<numBlocks, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(in
   {
     // Reduces the device-side product vector into the device-side components struct
 
-    cudaDeviceSynchronize();
-    int blocksPerGrid = (devProduct_->size() + THREADSPERBLOCK - 1)
-        / THREADSPERBLOCK;
+    int blocksPerGrid = (devProduct_->size() + THREADSPERBLOCK * 4 - 1)
+      / (THREADSPERBLOCK*4);
 
-_reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(float)>>>
-  (thrust::raw_pointer_cast(&(*devProduct_)[0]),
+    _reducePVectorStage1<4><<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(float)>>>
+      (thrust::raw_pointer_cast(&(*devProduct_)[0]),
        devProduct_->size(),
        I1Idx_,
-   thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-  	    	    checkCudaError(cudaGetLastError());
+       thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    checkCudaError(cudaGetLastError());
 
-    cudaDeviceSynchronize();
-    CUDPPResult res = cudppReduce(addReduce_,
-        (float*) ((char*) devComponents_
-		  + offsetof(LikelihoodComponents,logProduct)), thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::ReduceProductVector()");
-
-    cudaDeviceSynchronize();
-
-//  float partial = thrust::reduce(devWorkspace_.begin(), devWorkspace_.begin() + devProduct_.size());
-//  checkCudaError(cudaMemcpy((float*)((char*)devComponents_ + offsetof(LikelihoodComponents,logProduct)), &partial, sizeof(float), cudaMemcpyHostToDevice));
+    if(blocksPerGrid > 1) {
+      CUDPPResult res = cudppReduce(addReduce_,
+				    (float*) ((char*) devComponents_
+					      + offsetof(LikelihoodComponents,logProduct)),
+				    T2P(*devWorkspace_), blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::ReduceProductVector()");
+    }
+    else
+      checkCudaError(cudaMemcpy(&(devComponents_->logProduct), 
+				T2P(*devWorkspace_), 
+				sizeof(float), cudaMemcpyDeviceToDevice));
 
   }
 
   GpuLikelihood::GpuLikelihood(PopDataImporter& population,
-			       EpiDataImporter& epidemic, const size_t nSpecies, const float obsTime,
-			       const float dLimit, const bool occultsOnlyDC, const int gpuId) :
+			       EpiDataImporter& epidemic, 
+			       const size_t nSpecies, const float obsTime,
+			       const float dLimit, const bool occultsOnlyDC,
+			       const int gpuId) :
     Likelihood(population, epidemic, nSpecies, obsTime, occultsOnlyDC),
     I1Time_(0.0), I1Idx_(0), covariateCopies_(0)
   {
@@ -1264,10 +883,17 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     checkCudaError(cudaGetDevice(&deviceId));
     cudaDeviceProp deviceProp;
     checkCudaError(cudaGetDeviceProperties(&deviceProp, deviceId));
+    int runtimeVersion;
+    checkCudaError(cudaRuntimeGetVersion(&runtimeVersion));
+
+    // Print device properties
+    std::cerr << "Initialised CUDA environment. CUDA runtime version " << runtimeVersion << "\n";
+    std::cerr << "Using GPU: " << deviceProp.name << ", id " << deviceId << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
+    std::cerr << "Free memory: " << deviceProp.totalGlobalMem << "\n";
 
 #ifndef NDEBUG
     std::cout << "Using GPGPU: " << deviceProp.name << ", id " << deviceId
-        << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
+	      << ", located at PCI bus ID " << deviceProp.pciBusID << "\n";
 #endif
 
     checkCudaError(cudaSetDeviceFlags(cudaDeviceMapHost));
@@ -1275,11 +901,11 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     // Calculate distance matrix
     CalcDistanceMatrix(dLimit);
 
-    // Set up indices
+    // Allocate infec indicies
     hostInfecIdx_ = new thrust::host_vector<InfecIdx_t>;
     devInfecIdx_ = new thrust::device_vector<InfecIdx_t>;
     hostSuscOccults_ = new thrust::host_vector<InfecIdx_t>;
-    for (size_t i = numKnownInfecs_; i < maxInfecs_; ++i)
+    for(size_t i = numKnownInfecs_; i < maxInfecs_; ++i)
       hostSuscOccults_->push_back(i);
 
     // Set up on GPU
@@ -1294,17 +920,18 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     devProduct_ = new thrust::device_vector<float>;
     devProduct_->resize(maxInfecs_);
     thrust::fill(devProduct_->begin(), devProduct_->end(), 1.0f);
-
+    
     // Allocate integral array
     int numRequiredThreads = maxInfecs_ * 32; // One warp per infection
     integralBuffSize_ = (numRequiredThreads + THREADSPERBLOCK - 1)
-        / THREADSPERBLOCK;
+      / THREADSPERBLOCK;
     devWorkspace_ = new thrust::device_vector<float>;
     devWorkspace_->resize(maxInfecs_);
+    checkCudaError(cudaMalloc(&devScratch_, SCRATCHSIZE*sizeof(FP_t)));
 
     // Components
     checkCudaError(
-        cudaHostAlloc((void**)&hostComponents_, sizeof(LikelihoodComponents), cudaHostAllocMapped));
+		   cudaHostAlloc((void**)&hostComponents_, sizeof(LikelihoodComponents), cudaHostAllocMapped));
 
     hostComponents_->bgIntegral = 0.0f;
     hostComponents_->integral = 0.0f;
@@ -1312,7 +939,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     hostComponents_->logProduct = 0.0f;
 
     checkCudaError(
-        cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
+		   cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
 
     // Parameters
     checkCudaError(cudaMalloc(&devXi_, numSpecies_ * sizeof(float)));
@@ -1337,7 +964,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     // RNG for non-centering
     curandStatus_t curandStatus = curandCreateGenerator(&cuRand_,
-        CURAND_RNG_PSEUDO_DEFAULT);
+							CURAND_RNG_PSEUDO_DEFAULT);
     if (curandStatus != CURAND_STATUS_SUCCESS)
       {
         throw std::runtime_error("CURAND init failed");
@@ -1356,7 +983,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     cudppCreate(&cudpp_);
     CUDPPResult res = cudppPlan(cudpp_, &addReduce_, addReduceCfg_, popSize_, 1,
-        0);
+				0);
     if (res != CUDPP_SUCCESS)
       {
         std::stringstream msg;
@@ -1370,57 +997,53 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     minReduceCfg_.datatype = CUDPP_FLOAT;
     minReduceCfg_.options = CUDPP_OPTION_FORWARD;
 
-//    res = cudppPlan(cudpp_, &minReduce_, minReduceCfg_, popSize_, 1, 0);
-//    if (res != CUDPP_SUCCESS)
-//      {
-//        std::stringstream msg;
-//        msg << "CUDPP initialization failed with error " << res;
-//        throw std::runtime_error(msg.str().c_str());
-//      }
-
 #ifndef NDEBUG
     cerr << "ObsTime: " << obsTime_ << endl;
 #endif
 
   }
 
-// Copy constructor
+  // Copy constructor
   GpuLikelihood::GpuLikelihood(const GpuLikelihood& other) :
-    Likelihood(other), I1Time_(other.I1Time_), I1Idx_(other.I1Idx_), 
-    covariateCopies_(other.covariateCopies_), devAnimals_(other.devAnimals_),
-    animalsPitch_(other.animalsPitch_), devD_(other.devD_), 
-    hostDRowPtr_(other.hostDRowPtr_), dnnz_(other.dnnz_), 
-    integralBuffSize_(other.integralBuffSize_), cuRand_(other.cuRand_)
+    Likelihood(other), I1Time_(other.I1Time_), I1Idx_(other.I1Idx_),
+    covariateCopies_(other.covariateCopies_), 
+    devAnimals_(other.devAnimals_), 
+    animalsPitch_(other.animalsPitch_), 
+    devD_(other.devD_), 
+    hostDRowPtr_(other.hostDRowPtr_), 
+    dnnz_(other.dnnz_), 
+    integralBuffSize_(other.integralBuffSize_), 
+    cuRand_(other.cuRand_)
   {
     timeval start, end;
     gettimeofday(&start, NULL);
     // Allocate Animals_
     checkCudaError(
-        cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_, maxInfecs_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_, maxInfecs_ * sizeof(float), numSpecies_));
     animalsInfPowPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMemcpy2D(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2D(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
 
     checkCudaError(
-        cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_, popSize_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_, popSize_ * sizeof(float), numSpecies_));
     animalsSuscPowPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMemcpy2D(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2D(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
 
     // Allocate and copy event times - popSize_ * NUMEVENTS matrix
     checkCudaError(
-        cudaMallocPitch(&devEventTimes_, &eventTimesPitch_, popSize_ * sizeof(float), NUMEVENTS));
+		   cudaMallocPitch(&devEventTimes_, &eventTimesPitch_, popSize_ * sizeof(float), NUMEVENTS));
     eventTimesPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMemcpy2D(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2D(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
 
     // Allocate and copy intermediate infectivity and susceptibility
     checkCudaError(cudaMalloc(&devSusceptibility_, popSize_ * sizeof(float)));
     checkCudaError(
-        cudaMemcpy(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
+		   cudaMemcpy(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
     checkCudaError(cudaMalloc(&devInfectivity_, maxInfecs_ * sizeof(float)));
     checkCudaError(
-        cudaMemcpy(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
+		   cudaMemcpy(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
     // Infection index
     devInfecIdx_ = new thrust::device_vector<InfecIdx_t>(*other.devInfecIdx_);
@@ -1432,15 +1055,16 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     devProduct_ = new thrust::device_vector<float>(*(other.devProduct_));
     devWorkspace_ = new thrust::device_vector<float>;
     devWorkspace_->resize(other.devWorkspace_->size());
+    checkCudaError(cudaMalloc(&devScratch_, SCRATCHSIZE*sizeof(FP_t)));
     logLikelihood_ = other.logLikelihood_;
 
     checkCudaError(
-        cudaHostAlloc(&hostComponents_, sizeof(LikelihoodComponents), cudaHostAllocMapped));
+		   cudaHostAlloc(&hostComponents_, sizeof(LikelihoodComponents), cudaHostAllocMapped));
 
     *hostComponents_ = *(other.hostComponents_);
 
     checkCudaError(
-        cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
+		   cudaHostGetDevicePointer(&devComponents_, hostComponents_, 0));
 
     // Parameters -- device side
     checkCudaError(cudaMalloc(&devXi_, numSpecies_ * sizeof(float)));
@@ -1460,7 +1084,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-        << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
 
     // CUDAPP bits
     // CUDPP for faster reductions than Thrust (hopefully!)
@@ -1469,6 +1093,9 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     addReduce_ = other.addReduce_;
 
     cudaDeviceSynchronize();
+    
+
+
   }
 
   GpuLikelihood*
@@ -1477,29 +1104,29 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     return new GpuLikelihood(*this);
   }
 
-// Assignment constructor
+  // Assignment constructor
   const Likelihood&
   GpuLikelihood::assign(const Likelihood& rhs)
   {
-//  timeval start, end;
-//  gettimeofday(&start, NULL);
+    //  timeval start, end;
+    //  gettimeofday(&start, NULL);
     const GpuLikelihood& other = static_cast<const GpuLikelihood&>(rhs);
 
     // Copy animal powers
     checkCudaError(
-        cudaMemcpy2DAsync(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2DAsync(devAnimalsInfPow_,animalsInfPowPitch_*sizeof(float),other.devAnimalsInfPow_,other.animalsInfPowPitch_*sizeof(float),maxInfecs_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
     checkCudaError(
-        cudaMemcpy2DAsync(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2DAsync(devAnimalsSuscPow_,animalsSuscPowPitch_*sizeof(float),other.devAnimalsSuscPow_,other.animalsSuscPowPitch_*sizeof(float),popSize_*sizeof(float),numSpecies_,cudaMemcpyDeviceToDevice));
 
     // copy event times
     checkCudaError(
-        cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),popSize_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
 
     // copy intermediate infectivity and susceptibility
     checkCudaError(
-        cudaMemcpyAsync(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
+		   cudaMemcpyAsync(devSusceptibility_, other.devSusceptibility_, popSize_ * sizeof(float),cudaMemcpyDeviceToDevice));
     checkCudaError(
-        cudaMemcpyAsync(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
+		   cudaMemcpyAsync(devInfectivity_, other.devInfectivity_, maxInfecs_ * sizeof(float), cudaMemcpyDeviceToDevice));
 
     // Infection index
     *devInfecIdx_ = *(other.devInfecIdx_);
@@ -1517,9 +1144,9 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     *hostComponents_ = *other.hostComponents_;
     logLikelihood_ = other.logLikelihood_;
 
-//  gettimeofday(&end, NULL);
-//  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-//      << timeinseconds(start, end) << std::endl;
+    //  gettimeofday(&end, NULL);
+    //  std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
+    //      << timeinseconds(start, end) << std::endl;
 
     RefreshParameters();
 
@@ -1534,7 +1161,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     // copy event times
     checkCudaError(
-        cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),maxInfecs_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
+		   cudaMemcpy2DAsync(devEventTimes_,eventTimesPitch_*sizeof(float),other.devEventTimes_,other.eventTimesPitch_*sizeof(float),maxInfecs_*sizeof(float), NUMEVENTS, cudaMemcpyDeviceToDevice));
 
     // Infection index
     *devInfecIdx_ = *other.devInfecIdx_;
@@ -1636,7 +1263,7 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
     hostDRowPtr_ = new int[popSize_ + 1];
     cerr << "Allocated hostDRowPtr_ " << endl;
     checkCudaError(
-        cudaMemcpy(hostDRowPtr_, devD_->rowPtr, (popSize_+1)*sizeof(int), cudaMemcpyDeviceToHost));
+		   cudaMemcpy(hostDRowPtr_, devD_->rowPtr, (popSize_+1)*sizeof(int), cudaMemcpyDeviceToHost));
 
     delete[] coords;
   }
@@ -1658,22 +1285,22 @@ _reducePVectorStage1<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK * sizeof(
 
     // Allocate Event times - popSize_ * NUMEVENTS matrix
     checkCudaError(
-        cudaMallocPitch(&devEventTimes_, &eventTimesPitch_, popSize_ * sizeof(float), NUMEVENTS));
+		   cudaMallocPitch(&devEventTimes_, &eventTimesPitch_, popSize_ * sizeof(float), NUMEVENTS));
     eventTimesPitch_ /= sizeof(float);
 
     // Get event times into GPU memory
     cudaError_t rv = cudaMemcpy2D(devEventTimes_,
-        eventTimesPitch_ * sizeof(float), eventsMatrix,
-        popSize_ * sizeof(float), popSize_ * sizeof(float), NUMEVENTS,
-        cudaMemcpyHostToDevice);
+				  eventTimesPitch_ * sizeof(float), eventsMatrix,
+				  popSize_ * sizeof(float), popSize_ * sizeof(float), NUMEVENTS,
+				  cudaMemcpyHostToDevice);
     if (rv != cudaSuccess)
 
       throw GpuRuntimeError("Copying event times to device failed", rv);
 
     // Set any event times greater than obsTime to obsTime
     int blocksPerGrid = (popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
-_sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTimesPitch_, obsTime_, popSize_);
-          	    	    checkCudaError(cudaGetLastError());
+    _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTimesPitch_, obsTime_, popSize_);
+    checkCudaError(cudaGetLastError());
 
     thrust::device_ptr<float> p(devEventTimes_);
     hostInfecIdx_->clear();
@@ -1705,13 +1332,13 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
 
     // Allocate Animals_
     checkCudaError(
-        cudaMallocPitch(&devAnimals_, &animalsPitch_, popSize_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimals_, &animalsPitch_, popSize_ * sizeof(float), numSpecies_));
     animalsPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_, popSize_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimalsSuscPow_, &animalsSuscPowPitch_, popSize_ * sizeof(float), numSpecies_));
     animalsSuscPowPitch_ /= sizeof(float);
     checkCudaError(
-        cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_, maxInfecs_ * sizeof(float), numSpecies_));
+		   cudaMallocPitch(&devAnimalsInfPow_, &animalsInfPowPitch_, maxInfecs_ * sizeof(float), numSpecies_));
     animalsInfPowPitch_ /= sizeof(float);
 
     // Allocate intermediate infectivity and susceptibility
@@ -1719,8 +1346,8 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     checkCudaError(cudaMalloc(&devInfectivity_, maxInfecs_ * sizeof(float)));
 
     cudaError_t rv = cudaMemcpy2D(devAnimals_, animalsPitch_ * sizeof(float),
-        speciesMatrix, popSize_ * sizeof(float), popSize_ * sizeof(float),
-        numSpecies_, cudaMemcpyHostToDevice);
+				  speciesMatrix, popSize_ * sizeof(float), popSize_ * sizeof(float),
+				  numSpecies_, cudaMemcpyHostToDevice);
     if (rv != cudaSuccess)
       throw GpuRuntimeError("Failed copying species data to device", rv);
 
@@ -1730,7 +1357,7 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
 
   void
   GpuLikelihood::SetDistance(const float* data, const int* rowptr,
-      const int* colind)
+			     const int* colind)
   {
 
     checkCudaError(cudaMalloc(&devD_->val, dnnz_ * sizeof(float)));
@@ -1740,13 +1367,13 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     hostDRowPtr_ = new int[maxInfecs_ + 1];
 
     checkCudaError(
-        cudaMemcpy(devD_->val, data, dnnz_ * sizeof(float), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devD_->val, data, dnnz_ * sizeof(float), cudaMemcpyHostToDevice));
     checkCudaError(
-        cudaMemcpy(devD_->rowPtr, rowptr, (maxInfecs_ + 1) * sizeof(int), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devD_->rowPtr, rowptr, (maxInfecs_ + 1) * sizeof(int), cudaMemcpyHostToDevice));
     checkCudaError(
-        cudaMemcpy(devD_->colInd, colind, dnnz_ * sizeof(int), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devD_->colInd, colind, dnnz_ * sizeof(int), cudaMemcpyHostToDevice));
     checkCudaError(
-        cudaMemcpy(hostDRowPtr_, rowptr, (maxInfecs_ + 1)*sizeof(int), cudaMemcpyHostToHost));
+		   cudaMemcpy(hostDRowPtr_, rowptr, (maxInfecs_ + 1)*sizeof(int), cudaMemcpyHostToHost));
   }
 
   void
@@ -1758,24 +1385,46 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
     for (size_t i = 0; i < numSpecies_; ++i)
       tmp[i] = xi_[i];
     checkCudaError(
-        cudaMemcpy(devXi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devXi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
 
     for (size_t i = 0; i < numSpecies_; ++i)
       tmp[i] = psi_[i];
     checkCudaError(
-        cudaMemcpy(devPsi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devPsi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
 
     for (size_t i = 0; i < numSpecies_; ++i)
       tmp[i] = zeta_[i];
     checkCudaError(
-        cudaMemcpy(devZeta_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devZeta_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
 
     for (size_t i = 0; i < numSpecies_; ++i)
       tmp[i] = phi_[i];
     checkCudaError(
-        cudaMemcpy(devPhi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
+		   cudaMemcpy(devPhi_, tmp, numSpecies_ * sizeof(float), cudaMemcpyHostToDevice));
 
     delete[] tmp;
+  }
+
+
+  inline
+  void
+  GpuLikelihood::wrapDataParms(Data* data, ParmVals* p)
+  {
+    data->eventTimes = devEventTimes_;
+    data->eventTimesPitch = eventTimesPitch_;
+    data->infectivity = devInfectivity_;
+    data->susceptibility = devSusceptibility_;
+    data->movtBan = movtBan_;
+    data->D = *devD_;
+    
+    p->epsilon1 = *epsilon1_;
+    p->epsilon2 = *epsilon2_;
+    p->gamma1 = *gamma1_;
+    p->gamma2 = *gamma2_;
+    p->delta = *delta_;
+    p->omega = *omega_;
+    p->nu = *nu_;
+    p->alpha = *alpha_;
   }
 
   inline
@@ -1784,8 +1433,8 @@ _sanitizeEventTimes<<<blocksPerGrid, THREADSPERBLOCK>>>(devEventTimes_, eventTim
   {
     int dimBlock(THREADSPERBLOCK);
     int dimGrid((maxInfecs_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
-_calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, animalsInfPowPitch_,devAnimals_,animalsPitch_,devPsi_);
-                        	    	    checkCudaError(cudaGetLastError());
+    _calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, animalsInfPowPitch_,devAnimals_,animalsPitch_,devPsi_);
+    checkCudaError(cudaGetLastError());
 				 
   }
 
@@ -1796,8 +1445,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, an
 
     // Now calculate infectivity
     blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, maxInfecs_, numSpecies_,
-        &UNITY, devAnimalsInfPow_, animalsInfPowPitch_, devXi_, 1, &ZERO,
-        devInfectivity_, 1);
+			    &UNITY, devAnimalsInfPow_, animalsInfPowPitch_, devXi_, 1, &ZERO,
+			    devInfectivity_, 1);
     if (blasStat_ != CUBLAS_STATUS_SUCCESS)
       {
         std::cerr << "Error in infectivity: " << blasStat_ << std::endl;
@@ -1811,8 +1460,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(maxInfecs_,numSpecies_,devAnimalsInfPow_, an
   {
     int dimBlock(THREADSPERBLOCK);
     int dimGrid((popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
-_calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,animalsSuscPowPitch_, devAnimals_,animalsPitch_,devPhi_);
-                        	    	    checkCudaError(cudaGetLastError());
+    _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,animalsSuscPowPitch_, devAnimals_,animalsPitch_,devPhi_);
+    checkCudaError(cudaGetLastError());
 
 					   
   }
@@ -1823,8 +1472,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   {
     // Calculates susceptibility powers and sums over suscept.
     blasStat_ = cublasSgemv(cudaBLAS_, CUBLAS_OP_N, popSize_, numSpecies_,
-        &UNITY, devAnimalsSuscPow_, animalsSuscPowPitch_, devZeta_, 1, &ZERO,
-        devSusceptibility_, 1);
+			    &UNITY, devAnimalsSuscPow_, animalsSuscPowPitch_, devZeta_, 1, &ZERO,
+			    devSusceptibility_, 1);
     if (blasStat_ != CUBLAS_STATUS_SUCCESS)
       {
         std::cerr << "Error in susceptibility: " << blasStat_ << std::endl;
@@ -1837,7 +1486,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   {
     thrust::device_vector<InfecIdx_t>::iterator myMin;
     myMin = thrust::min_element(devInfecIdx_->begin(), devInfecIdx_->end(),
-        IndirectMin<float>(devEventTimes_));
+				IndirectMin<float>(devEventTimes_));
     InfecIdx_t tmp = *myMin;
     I1Idx_ = tmp.ptr;
 
@@ -1852,10 +1501,13 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     int numBlocks = (popSize_ + THREADSPERBLOCK - 1) / THREADSPERBLOCK;
     _bgIntegral<<<numBlocks, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devWorkspace_)[0]), devEventTimes_, popSize_, *epsilon1_, *epsilon2_, movtBan_, I1Time_);
 
-    cudaDeviceSynchronize();
-    CUDPPResult res = cudppReduce(addReduce_, &devComponents_->bgIntegral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), numBlocks);
-    if(res != CUDPP_SUCCESS) throw logic_error("CUDPP failed");
+    if(numBlocks > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->bgIntegral,
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), numBlocks);
+      if(res != CUDPP_SUCCESS) throw logic_error("CUDPP failed");
+    }
+    else
+      checkCudaError(cudaMemcpy(&devComponents_->bgIntegral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 
 #ifndef NDEBUG
     cudaDeviceSynchronize();
@@ -1871,7 +1523,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 
     _calcProduct<<<integralBuffSize_,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),devInfecIdx_->size(),*devD_,
 							devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*epsilon1_, *epsilon2_, *gamma1_,*gamma2_,*delta_,*omega_,*nu_, *alpha_, movtBan_, thrust::raw_pointer_cast(&(*devProduct_)[0]));
-          	    	    checkCudaError(cudaGetLastError());
+    checkCudaError(cudaGetLastError());
 
     ReduceProductVector();
   }
@@ -1882,19 +1534,19 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   {
     int numRequiredThreads = devInfecIdx_->size() * 32; // One warp per infection
     int integralBuffSize = (numRequiredThreads + THREADSPERBLOCK - 1)
-        / THREADSPERBLOCK;
+      / THREADSPERBLOCK;
 
     _calcIntegral<<<integralBuffSize,THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),devInfecIdx_->size(),*devD_,
 							devEventTimes_,eventTimesPitch_,devSusceptibility_,devInfectivity_,*gamma2_,*delta_,*omega_,*nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-                	    	    checkCudaError(cudaGetLastError());
+    checkCudaError(cudaGetLastError());
 
     cudaDeviceSynchronize();
     if(integralBuffSize > 1) {
       CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), integralBuffSize);
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), integralBuffSize);
       if (res != CUDPP_SUCCESS)
         throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::CalcIntegral()");
+				 "cudppReduce failed in GpuLikelihood::CalcIntegral()");
     }
     else checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
   }
@@ -1922,15 +1574,15 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     cudaDeviceSynchronize();
     hostComponents_->integral *= *gamma1_;
     logLikelihood_ = hostComponents_->logProduct
-        - (hostComponents_->integral + hostComponents_->bgIntegral);
+      - (hostComponents_->integral + hostComponents_->bgIntegral);
 
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-    << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
     std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-    << std::endl;
+	      << std::endl;
 #endif
 
 #ifndef NDEBUG
@@ -1963,12 +1615,12 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     hostComponents_->integral *= *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
-        - (hostComponents_->integral + hostComponents_->bgIntegral);
+      - (hostComponents_->integral + hostComponents_->bgIntegral);
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-    << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
 #endif
 
 #ifndef NDEBUG
@@ -1984,11 +1636,11 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   GpuLikelihood::InfectionPart()
   {
     int blocksPerGrid = (GetNumKnownInfecs() + THREADSPERBLOCK - 1)
-        / THREADSPERBLOCK;
+      / THREADSPERBLOCK;
 
     _knownInfectionsLikelihood<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
 												  GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, *a_, *b_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-  	    	    checkCudaError(cudaGetLastError());
+    checkCudaError(cudaGetLastError());
 
     float loglikelihood = 0.0f;
 
@@ -2000,13 +1652,201 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
         checkCudaError(
 		       cudaMemcpy(&Ni, devEventTimes_+eventTimesPitch_+(*hostInfecIdx_)[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         loglikelihood += log(
-            gsl_cdf_gamma_Q(Ni - Ii, (float) *a_, 1.0 / (float) *b_));
+			     gsl_cdf_gamma_Q(Ni - Ii, (float) *a_, 1.0 / (float) *b_));
       }
 
     loglikelihood += thrust::reduce(devWorkspace_->begin(),
-        devWorkspace_->begin() + blocksPerGrid);
+				    devWorkspace_->begin() + blocksPerGrid);
 
     return loglikelihood;
+  }
+
+  /*************************
+   * Update Infection Time *
+   *************************/
+  __global__ void
+  _updateInfectionTimePrepare(const int i, 
+			      const float inTime,
+			      const int I1Idx,
+			      const GpuLikelihood::Data data,
+			      const GpuLikelihood::ParmVals p,
+			      float* devOldTime, 
+			      float* prodVector,
+			      GpuLikelihood::LikelihoodComponents* devComponents_)
+  {
+    // Calculate new time
+    float newTime = data.eventTimes[i+data.eventTimesPitch] - inTime;
+    float oldTime = data.eventTimes[i];
+    
+    // Work out if we're creating a new I1
+    if(i==I1Idx or newTime < data.eventTimes[I1Idx]) {
+      prodVector[I1Idx] = newTime < data.movtBan ? p.epsilon1 : (p.epsilon1 * p.epsilon2);
+    }
+    else { // Update background pressure IF NOT CHANGING I1.  Else we delegate
+      //  to the UpdateI1() function.
+      devComponents_->bgIntegral += p.epsilon1 * (min(data.movtBan,newTime) 
+						  - min(data.movtBan,oldTime));
+      devComponents_->bgIntegral += p.epsilon1 * p.epsilon2 * (max(data.movtBan,newTime) 
+							       - max(data.movtBan,oldTime));
+    }
+    
+    // Cache the old infection time -- used in subsequent calculations
+    *devOldTime = oldTime;  // Save old time
+    
+    // Insert new time
+    data.eventTimes[i] = data.eventTimes[i+data.eventTimesPitch] - inTime;
+    
+    // Zero product vector for movee
+    prodVector[i] = 0.0f;
+  }
+  
+  
+  __global__ void
+  _updateInfectionTimeIntegral(const unsigned int idx,
+			       const InfecIdx_t* infecIdx, 
+			       const GpuLikelihood::Data data,
+			       const GpuLikelihood::ParmVals p,
+			       const float* oldTime,
+			       float* output)
+  {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    extern __shared__
+      float buff[];
+    buff[threadIdx.x] = 0.0f;
+
+    int i = infecIdx[idx].ptr;
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+
+    if (tid < end - begin)
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ii = *oldTime;
+	float newTime = data.eventTimes[i];
+        float Ni = data.eventTimes[i + data.eventTimesPitch];
+        float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+        float Rj = data.eventTimes[j + data.eventTimesPitch * 2];
+
+        float jOnIdx = 0.0f;
+        if (Ij < Nj)
+          {
+            // Recalculate pressure from j on idx
+            jOnIdx = _H(fminf(Nj, newTime) - fminf(Ij, newTime), p.nu, p.alpha)
+	      + p.gamma2
+	      * (_H(fminf(Rj, newTime) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, newTime) - Ij, p.nu, p.alpha)); // New pressure
+            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), p.nu, p.alpha)
+	      + p.gamma2
+	      * (_H(fminf(Rj, Ii) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, Ii) - Ij, p.nu, p.alpha)); // Old pressure
+	    // Apply infec and suscep
+            jOnIdx *= data.susceptibility[i];
+            jOnIdx *= data.infectivity[j];
+          }
+
+        // Recalculate pressure from idx on j
+        float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), p.nu, p.alpha);
+        IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), p.nu, p.alpha);
+        IdxOnj += p.gamma2
+	  * (_H(fminf(Ri, Ij) - newTime, p.nu, p.alpha)
+	     - _H(fminf(Ni, Ij) - newTime, p.nu, p.alpha));
+        IdxOnj -= p.gamma2
+	  * (_H(fminf(Ri, Ij) - Ii, p.nu, p.alpha)
+	     - _H(fminf(Ni, Ij) - Ii, p.nu, p.alpha));
+        IdxOnj *= data.susceptibility[j];
+        IdxOnj *= data.infectivity[i];
+
+        buff[threadIdx.x] = (IdxOnj + jOnIdx)
+	  * _K(data.D.val[begin+tid], p.delta,p.omega);
+
+        // Reduce buffer into output
+        _shmemReduce(buff);
+
+      }
+
+    if (threadIdx.x == 0)
+      {
+        output[blockIdx.x] = buff[0];
+      }
+  }
+
+  __global__ void
+  _updateInfectionTimeProduct(const unsigned int idx,
+			      const InfecIdx_t* infecIdx,
+			      const GpuLikelihood::Data data,
+			      const GpuLikelihood::ParmVals p,
+			      const int I1Idx,
+			      const float* oldTime,
+			      float* prodCache)
+  {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    extern __shared__
+      float buff[];
+    buff[threadIdx.x] = 0.0f;
+
+    int i = infecIdx[idx].ptr;
+
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+    float newTime = data.eventTimes[i];
+
+    if (tid < end - begin) // Massive amount of wasted time just here!
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+
+        if (Ij < Nj)
+          {
+            float Ii = *oldTime;
+            float Ni = data.eventTimes[i + data.eventTimesPitch];
+            float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+            float Rj = data.eventTimes[j + data.eventTimesPitch * 2];
+
+            // Adjust product cache from idx on others
+            float idxOnj = 0.0f;
+            if (Ii < Ij and Ij <= Ni)
+              idxOnj -= _h(Ij - Ii, p.nu, p.alpha);
+            else if (Ni < Ij and Ij <= Ri)
+              {
+                idxOnj -= p.gamma2 * _h(Ij - Ii, p.nu, p.alpha);
+                idxOnj += p.gamma2 * _h(Ij - newTime, p.nu, p.alpha);
+              }
+            if (newTime < Ij and Ij <= Ni)
+              idxOnj += _h(Ij - newTime, p.nu, p.alpha);
+
+            idxOnj *= p.gamma1 * data.infectivity[i] * data.susceptibility[j]
+	      * _K(data.D.val[begin+tid], p.delta, p.omega);
+            prodCache[j] += idxOnj;
+
+            // Recalculate instantaneous pressure on idx
+            float jOnIdx = 0.0f;
+            if (Ij < newTime and newTime <= Nj)
+              jOnIdx = _h(newTime - Ij, p.nu, p.alpha);
+            else if (Nj < newTime and newTime <= Rj)
+              jOnIdx = p.gamma2 * _h(newTime - Ij, p.nu, p.alpha);
+
+            jOnIdx *= data.susceptibility[i] * data.infectivity[j]
+	      * _K(data.D.val[begin+tid],p.delta, p.omega);
+            buff[threadIdx.x] = jOnIdx * p.gamma1;
+
+          }
+
+        _shmemReduce(buff);
+
+        if (threadIdx.x == 0)
+          _atomicAdd(prodCache + i, buff[0]); // Maybe better to create an external reduction buffer here.
+        if (tid == 0) {
+          float epsilon = newTime < data.movtBan ? p.epsilon1 : (p.epsilon1 * p.epsilon2);
+          _atomicAdd(prodCache + i, epsilon);
+        }
+      }
   }
 
   void
@@ -2020,70 +1860,71 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     gettimeofday(&start, NULL);
 #endif
 
+#ifndef NDEBUG
+    float oldTime = eventTimesPtr[i];
+    cerr << "Moving idx " << idx << " from " <<  oldTime << " to " << newTime << endl;
+#endif
+
+    // Pack data and parameters (Delegate to constructor!)
+    Data data;
+    ParmVals p;
+    wrapDataParms(&data, &p);
+
     if (idx >= hostInfecIdx_->size())
       throw std::range_error(
-          "Invalid idx in GpuLikelihood::UpdateInfectionTime");
+			     "Invalid idx in GpuLikelihood::UpdateInfectionTime");
 
     // Save likelihood components
     float savedIntegral = hostComponents_->integral;
 
     int i = (*hostInfecIdx_)[idx].ptr;
 
-    thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
     float newTime = population_[i].N - inTime; // Relies on hostPopulation.N *NOT* being changed!
-    float oldTime = eventTimesPtr[i];
 
     bool haveNewI1 = false;
     if (newTime < I1Time_ or i == I1Idx_)
       {
         haveNewI1 = true;
-        (*devProduct_)[I1Idx_] = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
       }
 
-    (*devProduct_)[i] = 0.0f;
+    _updateInfectionTimePrepare<<<1,1>>>(i, inTime,I1Idx_, data, p,
+					 devScratch_,
+					 thrust::raw_pointer_cast(&(*devProduct_)[0]),
+					 devComponents_);
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
-        - 1) / THREADSPERBLOCK + 1;
+			 - 1) / THREADSPERBLOCK + 1;
 
-#ifndef NDEBUG
-    cerr << "Moving idx " << idx << " from " <<  oldTime << " to " << newTime << endl;
-#endif
+
 
     // Integrated infection pressure
-    _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime,
-      *devD_,
-      devEventTimes_, eventTimesPitch_, devSusceptibility_,
-												    devInfectivity_, *gamma2_, *delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-			    cudaDeviceSynchronize();
-      if(blocksPerGrid > 1) {
+    _updateInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (idx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), data, p, devScratch_,
+       thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
+    checkCudaError(cudaGetLastError());
+    if(blocksPerGrid > 1) {
       CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]),
+				    blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+    }
+    else 
+      {
+	checkCudaError(cudaMemcpy(&devComponents_->integral, 
+				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), 
+				  sizeof(float), cudaMemcpyDeviceToDevice));
       }
-      else {
-	checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
-#ifndef NDEBUG
-	cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
-#endif
-      }
-
-    _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(idx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime, *devD_,
-    devEventTimes_, eventTimesPitch_,
-    devSusceptibility_, devInfectivity_, *epsilon1_, *epsilon2_, *gamma1_, *gamma2_,
-												   *delta_, *omega_, *nu_, *alpha_, movtBan_, I1Idx_, thrust::raw_pointer_cast(&(*devProduct_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-
-    // Make the change to the population
-    eventTimesPtr[i] = newTime;
+    
+    _updateInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (idx, T2P(*devInfecIdx_),data, p, I1Idx_, devScratch_, T2P(*devProduct_));
+    checkCudaError(cudaGetLastError());
 
     if (haveNewI1)
       {
         UpdateI1();
         CalcBgIntegral();
-        haveNewI1 = true;
 #ifndef NDEBUG
         std::cerr << "New I1" << std::endl;
 #endif
@@ -2092,26 +1933,20 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     ReduceProductVector();
 
     // Collect results and update likelihood
-
-    //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost)); // CUDA_MEMCPY
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-        + hostComponents_->integral * *gamma1_;
-    if (!haveNewI1) {
-      hostComponents_->bgIntegral += *epsilon1_ * (min(movtBan_,newTime) - min(movtBan_,oldTime));
-      hostComponents_->bgIntegral += *epsilon1_ * *epsilon2_ * (max(movtBan_,newTime) - max(movtBan_,oldTime));
-    }
+      + hostComponents_->integral * *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
-        - (hostComponents_->integral + hostComponents_->bgIntegral);
+      - (hostComponents_->integral + hostComponents_->bgIntegral);
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-    << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
     std::cerr.precision(20);
     std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-    << std::endl;
+	      << std::endl;
     std::cerr << "I1: " << I1Idx_ << " at " << I1Time_ << std::endl;
 #endif
 
@@ -2124,6 +1959,186 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 #endif
   }
 
+
+  /**********************
+   * Add infection Time *
+   **********************/
+
+    __global__ void
+  _addInfectionTimePrepare(const int i, 
+			   const float inTime,
+			   const int I1Idx,
+			   const GpuLikelihood::Data data,
+			   const GpuLikelihood::ParmVals p,
+			   float* devOldTime, 
+			   float* prodVector,
+			   GpuLikelihood::LikelihoodComponents* devComponents_)
+  {
+    // Calculate new time
+    float newTime = data.eventTimes[i+data.eventTimesPitch] - inTime;
+    float oldTime = data.eventTimes[i];
+    
+    // Work out if we're creating a new I1
+    if(i==I1Idx or newTime < data.eventTimes[I1Idx]) {
+      prodVector[I1Idx] = newTime < data.movtBan ? p.epsilon1 : (p.epsilon1 * p.epsilon2);
+    }
+    else { // Update background pressure IF NOT CHANGING I1.  Else we delegate
+      //  to the UpdateI1() function.
+      devComponents_->bgIntegral += p.epsilon1 * (min(data.movtBan,newTime) 
+						  - min(data.movtBan,oldTime));
+      devComponents_->bgIntegral += p.epsilon1 * p.epsilon2 * (max(data.movtBan,newTime) 
+							       - max(data.movtBan,oldTime));
+    }
+    
+    // Cache the old infection time -- used in subsequent calculations
+    *devOldTime = oldTime;  // Save old time
+    
+    // Insert new time
+    data.eventTimes[i] = data.eventTimes[i+data.eventTimesPitch] - inTime;
+    
+    // Zero product vector for movee
+    prodVector[i] = 0.0f;
+  }
+
+
+  __global__ void
+  _addInfectionTimeIntegral(const unsigned int idx,
+			    const InfecIdx_t* infecIdx,
+			    const GpuLikelihood::Data data,
+			    const GpuLikelihood::ParmVals p,
+			    const float* oldTime,
+			    float* output)
+  {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    extern __shared__
+      float buff[];
+    buff[threadIdx.x] = 0.0f;
+
+    int i = infecIdx[idx].ptr;
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+
+    if (tid < end - begin)
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ii = *oldTime;
+	float newTime = data.eventTimes[i];
+        float Ni = data.eventTimes[i + data.eventTimesPitch];
+        float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+        float Rj = data.eventTimes[j + data.eventTimesPitch * 2];
+
+        float jOnIdx = 0.0f;
+        if (Ij < Nj)
+          {
+            // Calculate pressure from j on idx
+            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ij, Ii), p.nu, p.alpha);
+            jOnIdx -= p.gamma2
+	      * (_H(fminf(Rj, Ii) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, Ii) - Ij, p.nu, p.alpha));
+            jOnIdx += _H(fminf(Nj, newTime) - fminf(Ij, newTime), p.nu, p.alpha);
+            jOnIdx += p.gamma2
+	      * (_H(fminf(Rj, newTime) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, newTime) - Ij, p.nu, p.alpha));
+
+            // Apply infec and suscep
+            jOnIdx *= data.susceptibility[i];
+            jOnIdx *= data.infectivity[j];
+          }
+
+        // Add pressure from idx on j
+        float IdxOnj = _H(fminf(Ni, Ij) - fminf(newTime, Ij), p.nu, p.alpha);
+        IdxOnj += p.gamma2
+	  * (_H(fminf(Ri, Ij) - newTime, p.nu, p.alpha)
+	     - _H(fminf(Ni, Ij) - newTime, p.nu, p.alpha));
+        IdxOnj *= data.susceptibility[j];
+        IdxOnj *= data.infectivity[i];
+
+        buff[threadIdx.x] = (IdxOnj + jOnIdx)
+	  * _K(data.D.val[begin+tid], p.delta, p.omega);
+
+        // Reduce buffer into output
+        _shmemReduce(buff);
+      }
+
+    if (threadIdx.x == 0)
+      {
+        output[blockIdx.x] = buff[0];
+      }
+  }
+
+    __global__ void
+  _addInfectionTimeProduct(const unsigned int idx,
+			   const InfecIdx_t* infecIdx,
+			   const GpuLikelihood::Data data,
+			   const GpuLikelihood::ParmVals p,
+			   const int I1Idx,
+			   float* prodCache)
+  {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    extern __shared__
+      float buff[];
+    buff[threadIdx.x] = 0.0f;
+
+    int i = infecIdx[idx].ptr;
+    float newTime = data.eventTimes[i];
+    
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+
+    if (tid < end - begin) // Massive amount of wasted time just here!
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+
+        if (Ij < Nj)
+          { // Only look at infected individuals
+            float Ni = data.eventTimes[i + data.eventTimesPitch];
+            float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+            float Rj = data.eventTimes[j + data.eventTimesPitch * 2];
+
+            // Adjust product cache from idx on others
+            float idxOnj = 0.0f;
+            if (newTime < Ij and Ij <= Ni)
+              idxOnj += _h(Ij - newTime, p.nu, p.alpha);
+            else if (Ni < Ij and Ij <= Ri)
+              idxOnj += p.gamma2 * _h(Ij - newTime, p.nu, p.alpha);
+
+            idxOnj *= p.gamma1 * data.infectivity[i] * data.susceptibility[j]
+			  * _K(data.D.val[begin+tid], p.delta, p.omega);
+            prodCache[j] += idxOnj;
+
+            // Calculate instantaneous pressure on idx
+            float jOnIdx = 0.0f;
+            if (Ij < newTime and newTime <= Nj)
+              jOnIdx = _h(newTime - Ij, p.nu, p.alpha);
+            else if (Nj < newTime and newTime <= Rj)
+              jOnIdx = p.gamma2 * _h(newTime - Ij, p.nu, p.alpha);
+
+            jOnIdx *= p.gamma1 * data.infectivity[j] * data.susceptibility[i]
+			  * _K(data.D.val[begin+tid], p.delta, p.omega);
+
+            buff[threadIdx.x] = jOnIdx;
+
+          }
+
+        _shmemReduce(buff);
+
+        if (threadIdx.x == 0)
+          _atomicAdd(prodCache + i, buff[0]);
+        if (tid == 0) { // Add background pressure, or turn to 1.0f for I1
+          float epsilon = newTime < data.movtBan ? p.epsilon1 : (p.epsilon1*p.epsilon2);
+          _atomicAdd(prodCache + i, epsilon);
+        }
+      }
+  }
+  
   void
   GpuLikelihood::AddInfectionTime(const unsigned int idx, const float inTime)
   {
@@ -2135,6 +2150,10 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     gettimeofday(&start, NULL);
 #endif
 
+    Data data;
+    ParmVals p;
+    wrapDataParms(&data, &p);
+
     if (idx >= hostSuscOccults_->size())
       throw std::range_error("Invalid idx in GpuLikelihood::AddInfectionTime");
 
@@ -2143,53 +2162,48 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 
     unsigned int i = (*hostSuscOccults_)[idx].ptr;
 
-    thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
     float Ni = population_[i].N;
     float newTime = Ni - inTime;
 
+    _updateInfectionTimePrepare<<<1,1>>>(i, inTime, I1Idx_, data, p, devScratch_,
+					 T2P(*devProduct_),
+					 devComponents_);
+    
     // Update the indices
     devInfecIdx_->push_back(i);
     hostInfecIdx_->push_back(i);
     hostSuscOccults_->erase(hostSuscOccults_->begin() + idx);
 
-    (*devProduct_)[i] = 0.0f; // Zero out product cache
     bool haveNewI1 = false;
     if(newTime < I1Time_) {
-      (*devProduct_)[I1Idx_] = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
       haveNewI1 = true;
     }
 
     unsigned int addIdx = devInfecIdx_->size() - 1;
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
-        - 1) / THREADSPERBLOCK + 1;
-    _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime,
-      *devD_, devEventTimes_, eventTimesPitch_, devSusceptibility_,
-												 devInfectivity_, *gamma2_, *delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-			    cudaDeviceSynchronize();
-			    if(blocksPerGrid > 1) {
-    CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
-			    }
-			    else {
-			      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
-#ifndef NDEBUG
-			      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
-#endif
-			    }
+			 - 1) / THREADSPERBLOCK + 1;
+    _addInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (addIdx, T2P(*devInfecIdx_), data, p, devScratch_, T2P(*devWorkspace_));
+    checkCudaError(cudaGetLastError());
+    if(blocksPerGrid > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
+				    T2P(*devWorkspace_),
+				    blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+    }
+    else {
+      checkCudaError(cudaMemcpy(&devComponents_->integral,
+				thrust::raw_pointer_cast(&(*devWorkspace_)[0]),
+				sizeof(float), cudaMemcpyDeviceToDevice));
+    }
+    
+    _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (addIdx, T2P(*devInfecIdx_), data, p, I1Idx_, T2P(*devProduct_));
+    checkCudaError(cudaGetLastError());
 
-    _addInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(addIdx, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), newTime,
-    *devD_, devEventTimes_, eventTimesPitch_,
-    devSusceptibility_, devInfectivity_, *epsilon1_, *epsilon2_, *gamma1_, *gamma2_,
-												*delta_, *omega_, *nu_, *alpha_, movtBan_, I1Idx_, thrust::raw_pointer_cast(&(*devProduct_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-
-    // Update the population
-    eventTimesPtr[i] = newTime;
     if (haveNewI1)
       {
         UpdateI1();
@@ -2204,19 +2218,15 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     // Collect results and update likelihood
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-        + hostComponents_->integral * *gamma1_;
-    if (!haveNewI1) {
-     hostComponents_->bgIntegral += *epsilon1_ * (min(movtBan_,newTime) - min(movtBan_,Ni));
-     hostComponents_->bgIntegral += *epsilon1_ * *epsilon2_ * (max(movtBan_,newTime) - max(movtBan_,Ni));
-    }
+      + hostComponents_->integral * *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
-        - (hostComponents_->integral + hostComponents_->bgIntegral);
+      - (hostComponents_->integral + hostComponents_->bgIntegral);
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-    << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
 #endif
 
 #ifndef NDEBUG
@@ -2228,6 +2238,160 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 #endif
   }
 
+
+
+  /*************************
+   * Delete infection time *
+   *************************/
+
+    __global__ void
+  _delInfectionTimePrepare(const int i, 
+			   const int I1Idx,
+			   const GpuLikelihood::Data data,
+			   const GpuLikelihood::ParmVals p,
+			   float* devOldTime, 
+			   float* prodVector,
+			   GpuLikelihood::LikelihoodComponents* devComponents_)
+  {
+    // Calculate new time
+    float oldTime = data.eventTimes[i];
+    float newTime = data.eventTimes[i+data.eventTimesPitch];
+    
+    // Work out if we're creating a new I1
+    if(i!=I1Idx and newTime > data.eventTimes[I1Idx]) {
+      // Update background pressure IF NOT CHANGING I1.  Else we delegate
+      //  to the UpdateI1() function.
+      devComponents_->bgIntegral += p.epsilon1 * (min(data.movtBan,newTime) 
+						  - min(data.movtBan,oldTime));
+      devComponents_->bgIntegral += p.epsilon1 * p.epsilon2 * (max(data.movtBan,newTime) 
+							       - max(data.movtBan,oldTime));
+    }
+    
+    // Cache the old infection time -- used in subsequent calculations
+    *devOldTime = oldTime;  // Save old time
+    
+    // Insert new time
+    data.eventTimes[i] = newTime;
+    
+    // Zero product vector for movee
+    prodVector[i] = 1.0f;
+  }
+
+  
+  __global__ void
+  _delInfectionTimeIntegral(const unsigned int idx, const InfecIdx_t* infecIdx,
+			    GpuLikelihood::Data data,
+			    GpuLikelihood::ParmVals p,
+			    const float* oldTime,
+			    float* output)
+  {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    extern __shared__
+      float buff[];
+    buff[threadIdx.x] = 0.0f;
+
+    int i = infecIdx[idx].ptr;
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+
+    if (tid < end - begin)
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ii = *oldTime;
+        float Ni = data.eventTimes[i + data.eventTimesPitch];
+        float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+        float Rj = data.eventTimes[j + data.eventTimesPitch * 2];
+
+        float jOnIdx = 0.0f;
+        if (Ij < Nj)
+          {
+            // Recalculate pressure from j on idx
+            jOnIdx -= _H(fminf(Nj, Ii) - fminf(Ii, Ij), p.nu, p.alpha)
+	      + p.gamma2
+	      * (_H(fminf(Rj, Ii) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, Ii) - Ij, p.nu, p.alpha)); // Old pressure
+            jOnIdx += _H(fminf(Nj, Ni) - fminf(Ij, Ni), p.nu, p.alpha)
+	      + p.gamma2
+	      * (_H(fminf(Rj, Ni) - Ij, p.nu, p.alpha)
+		 - _H(fminf(Nj, Ni) - Ij, p.nu, p.alpha)); // New pressure
+	    // Apply infec and suscep
+            jOnIdx *= data.susceptibility[i];
+            jOnIdx *= data.infectivity[j];
+          }
+
+        // Subtract pressure from idx on j
+        float IdxOnj = 0.0f;
+        IdxOnj -= _H(fminf(Ni, Ij) - fminf(Ii, Ij), p.nu, p.alpha);
+        IdxOnj -= p.gamma2
+	  * (_H(fminf(Ri, Ij) - Ii, p.nu, p.alpha)
+	     - _H(fminf(Ni, Ij) - Ii, p.nu, p.alpha));
+        IdxOnj *= data.susceptibility[j];
+        IdxOnj *= data.infectivity[i];
+
+        buff[threadIdx.x] = (IdxOnj + jOnIdx)
+	  * _K(data.D.val[begin+tid], p.delta, p.omega);
+
+        // Reduce buffer into output
+        _shmemReduce(buff);
+
+      }
+
+    if (threadIdx.x == 0)
+      {
+        output[blockIdx.x] = buff[0];
+      }
+  }
+
+
+
+  __global__ void
+  _delInfectionTimeProduct(const unsigned int idx, const InfecIdx_t* infecIdx,
+			   GpuLikelihood::Data data,
+			   GpuLikelihood::ParmVals p,
+			   const float* oldTime,
+			   float* prodCache)
+  {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    int i = infecIdx[idx].ptr;
+
+    int begin = data.D.rowPtr[i];
+    int end = data.D.rowPtr[i + 1];
+
+    if (tid < end - begin) // Massive amount of wasted time just here!
+      {
+        int j = data.D.colInd[begin + tid];
+
+        float Ij = data.eventTimes[j];
+        float Nj = data.eventTimes[j + data.eventTimesPitch];
+
+        if (Ij < Nj)
+          {
+
+            float Ii = *oldTime;
+            float Ni = data.eventTimes[i + data.eventTimesPitch];
+            float Ri = data.eventTimes[i + data.eventTimesPitch * 2];
+
+            // Adjust product cache from idx on others
+            float idxOnj = 0.0;
+            if (Ii < Ij and Ij <= Ni)
+              idxOnj -= _h(Ij - Ii, p.nu, p.alpha);
+            else if (Ni < Ij and Ij <= Ri)
+              idxOnj -= p.gamma2 * _h(Ij - Ii, p.nu, p.alpha);
+
+            idxOnj *= p.gamma1 * data.infectivity[i] * data.susceptibility[j]
+			  * _K(data.D.val[begin+tid],p.delta,p.omega);
+            prodCache[j] += idxOnj;
+          }
+      }
+  }
+
+
   void
   GpuLikelihood::DeleteInfectionTime(const unsigned int idx)
   {
@@ -2238,10 +2402,14 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     gettimeofday(&start, NULL);
 #endif
 
+    Data data;
+    ParmVals p;
+    wrapDataParms(&data, &p);
+
     // Range check
     if (idx >= devInfecIdx_->size() - numKnownInfecs_)
       throw std::range_error(
-          "Invalid idx in GpuLikelihood::DeleteInfectionTime");
+			     "Invalid idx in GpuLikelihood::DeleteInfectionTime");
 
     // Save likelihood components
     float savedIntegral = hostComponents_->integral;
@@ -2250,51 +2418,48 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     unsigned int ii = idx + numKnownInfecs_;
     unsigned int i = (*hostInfecIdx_)[ii].ptr;
 
-    thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
+    _delInfectionTimePrepare<<<1,1>>>(i, I1Idx_, data, p, devScratch_,
+				      T2P(*devProduct_), devComponents_);
+    
+    //thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
 
     float notification = population_[i].N;
-    float oldI = eventTimesPtr[i];
+    //float oldI = eventTimesPtr[i];
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
-        - 1) / THREADSPERBLOCK + 1;
-    _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), notification,
-      *devD_,
-      devEventTimes_, eventTimesPitch_, devSusceptibility_,
-												 devInfectivity_, *gamma2_, *delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-              	    	    checkCudaError(cudaGetLastError());
-			    cudaDeviceSynchronize();
-			    if(blocksPerGrid > 1) {
-    CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
-				  thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
-    if (res != CUDPP_SUCCESS)
-      throw std::runtime_error(
-          "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
-			    }
-			    else {
-			      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
+			 - 1) / THREADSPERBLOCK + 1;
+    _delInfectionTimeIntegral<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (ii, T2P(*devInfecIdx_), data, p, devScratch_, T2P(*devWorkspace_));
+    checkCudaError(cudaGetLastError());
+    if(blocksPerGrid > 1) {
+      CUDPPResult res = cudppReduce(addReduce_, &devComponents_->integral,
+				    thrust::raw_pointer_cast(&(*devWorkspace_)[0]), blocksPerGrid);
+      if (res != CUDPP_SUCCESS)
+	throw std::runtime_error(
+				 "cudppReduce failed in GpuLikelihood::UpdateInfectionTime()");
+    }
+    else {
+      checkCudaError(cudaMemcpy(&devComponents_->integral, thrust::raw_pointer_cast(&(*devWorkspace_)[0]), sizeof(float), cudaMemcpyDeviceToDevice));
 #ifndef NDEBUG
-			      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
+      cerr << __FUNCTION__ << ": blocksPerGrid = " << blocksPerGrid << endl;
 #endif
-			    }
-    _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(ii, thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), notification,
-    *devD_, devEventTimes_, eventTimesPitch_,
-    devSusceptibility_, devInfectivity_, *gamma1_, *gamma2_,
-												*delta_, *omega_, *nu_, *alpha_, thrust::raw_pointer_cast(&(*devProduct_)[0]));
-  	    	    checkCudaError(cudaGetLastError());
+    }
+    
+    _delInfectionTimeProduct<<<blocksPerGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>
+      (ii, T2P(*devInfecIdx_), data, p, devScratch_, T2P(*devProduct_));
+    checkCudaError(cudaGetLastError());
 
     // Make the change to the population
-    bool haveNewI1 = false;
     devInfecIdx_->erase(devInfecIdx_->begin() + ii);
     hostInfecIdx_->erase(hostInfecIdx_->begin() + ii);
     hostSuscOccults_->push_back(i);
-    eventTimesPtr[i] = notification;
-    (*devProduct_)[i] = 1.0f;
+    //eventTimesPtr[i] = notification;
+    //(*devProduct_)[i] = 1.0f;
 
     if (i == I1Idx_)
       {
         UpdateI1();
         CalcBgIntegral();
-        haveNewI1 = true;
 #ifndef NDEBUG
         std::cerr << "New I1" << std::endl;
 #endif
@@ -2303,26 +2468,20 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     ReduceProductVector();
 
     // Collect results and update likelihood
-    //LikelihoodComponents localUpdate;
-    //checkCudaError(cudaMemcpy(&localUpdate, devComponents_, sizeof(LikelihoodComponents), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
     hostComponents_->integral = savedIntegral
-        + hostComponents_->integral * *gamma1_;
-    if (!haveNewI1) {
-      hostComponents_->bgIntegral += *epsilon1_ * (min(movtBan_,notification) - min(movtBan_,oldI));
-      hostComponents_->bgIntegral += *epsilon1_ * *epsilon2_ * (max(movtBan_,notification) - max(movtBan_,oldI));
-    }
+      + hostComponents_->integral * *gamma1_;
 
     logLikelihood_ = hostComponents_->logProduct
-        - (hostComponents_->integral + hostComponents_->bgIntegral);
+      - (hostComponents_->integral + hostComponents_->bgIntegral);
 
 #ifdef GPUTIMING
     gettimeofday(&end, NULL);
     std::cerr << "Time (" << __PRETTY_FUNCTION__ << "): "
-    << timeinseconds(start, end) << std::endl;
+	      << timeinseconds(start, end) << std::endl;
     std::cerr.precision(20);
     std::cerr << "Likelihood (" << __PRETTY_FUNCTION__ << "): " << logLikelihood_
-    << std::endl;
+	      << std::endl;
 #endif
 
 #ifndef NDEBUG
@@ -2352,7 +2511,6 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   float
   GpuLikelihood::GetLogLikelihood() const
   {
-	PrintLikelihoodComponents();
     return logLikelihood_;
   }
 
@@ -2361,7 +2519,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
   {
     float rv;
     checkCudaError(
-        cudaMemcpy(devEventTimes_+idx+eventTimesPitch_,&rv,sizeof(float), cudaMemcpyDeviceToHost));
+		   cudaMemcpy(devEventTimes_+idx+eventTimesPitch_,&rv,sizeof(float), cudaMemcpyDeviceToHost));
     return rv;
   }
 
@@ -2381,7 +2539,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     for (size_t k = 0; k < numSpecies_; ++k)
       {
         result[k] = indirectedSum(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
-            numKnownInfecs_, devAnimalsInfPow_ + animalsInfPowPitch_ * k);
+				  numKnownInfecs_, devAnimalsInfPow_ + animalsInfPowPitch_ * k);
       }
   }
 
@@ -2391,7 +2549,7 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     for (size_t k = 0; k < numSpecies_; ++k)
       {
         thrust::device_ptr<float> p(
-            devAnimalsSuscPow_ + animalsSuscPowPitch_ * k);
+				    devAnimalsSuscPow_ + animalsSuscPowPitch_ * k);
         result[k] = thrust::reduce(p, p + popSize_);
       }
   }
@@ -2402,8 +2560,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     thrust::device_ptr<float> p(devEventTimes_);
     thrust::device_vector<float> buff(numKnownInfecs_);
     thrust::transform(p + eventTimesPitch_,
-        p + eventTimesPitch_ + numKnownInfecs_, p, buff.begin(),
-        thrust::minus<float>());
+		      p + eventTimesPitch_ + numKnownInfecs_, p, buff.begin(),
+		      thrust::minus<float>());
     return thrust::reduce(buff.begin(), buff.end()) / (float) numKnownInfecs_;
   }
 
@@ -2417,23 +2575,23 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
       {
         float sumI = indirectedSum(
 				   thrust::raw_pointer_cast(&(*devInfecIdx_)[numKnownInfecs_]),
-            GetNumOccults(), devEventTimes_);
+				   GetNumOccults(), devEventTimes_);
         float sumN = indirectedSum(
 				   thrust::raw_pointer_cast(&(*devInfecIdx_)[numKnownInfecs_]),
-            GetNumOccults(), devEventTimes_ + eventTimesPitch_);
+				   GetNumOccults(), devEventTimes_ + eventTimesPitch_);
         return (sumN - sumI) / GetNumOccults();
       }
   }
 
   float
   GpuLikelihood::NonCentreInfecTimes(const float oldGamma, const float newGamma,
-      const float prob)
+				     const float prob)
   {
 
     // Generate random numbers
     thrust::device_vector<float> seeds(GetNumKnownInfecs());
     curandStatus_t status = curandGenerateUniform(cuRand_,
-        thrust::raw_pointer_cast(&seeds[0]), GetNumKnownInfecs());
+						  thrust::raw_pointer_cast(&seeds[0]), GetNumKnownInfecs());
     if (status != CURAND_STATUS_SUCCESS)
       {
         throw std::runtime_error("curandGenerateUniform failed");
@@ -2446,12 +2604,12 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     // Update the infection times
     _nonCentreInfecTimes<<<dimGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]), GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, oldGamma/newGamma, thrust::raw_pointer_cast(&seeds[0]), prob);
 
-  // Do known bit -- GPU in parallel with CPU
+    // Do known bit -- GPU in parallel with CPU
     _knownInfectionsLikelihoodPNC<<<dimGrid, THREADSPERBLOCK, THREADSPERBLOCK*sizeof(float)>>>(raw_pointer_cast(&(*devInfecIdx_)[0]), GetNumKnownInfecs(), devEventTimes_, eventTimesPitch_, *a_, oldGamma, newGamma,
 											       thrust::raw_pointer_cast(&seeds[0]), prob, thrust::raw_pointer_cast(&(*devWorkspace_)[0]));
-  	    	    checkCudaError(cudaGetLastError());
+    checkCudaError(cudaGetLastError());
 
-// Todo: GPU-ise this!
+    // Todo: GPU-ise this!
     for (size_t i = GetNumKnownInfecs(); i < GetNumInfecs(); ++i)
       {
         float Ii, Ni;
@@ -2461,11 +2619,11 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
 		       cudaMemcpyAsync(&Ni, devEventTimes_+eventTimesPitch_+(*hostInfecIdx_)[i].ptr, sizeof(float), cudaMemcpyDeviceToHost));
         cudaDeviceSynchronize();
         logLikDiff += logf(gsl_cdf_gamma_Q(Ni - Ii, *a_, 1.0 / newGamma))
-            - logf(gsl_cdf_gamma_Q(Ni - Ii, *a_, 1.0 / oldGamma));
+	  - logf(gsl_cdf_gamma_Q(Ni - Ii, *a_, 1.0 / oldGamma));
       }
 
     logLikDiff += thrust::reduce(devWorkspace_->begin(),
-        devWorkspace_->begin() + dimGrid);
+				 devWorkspace_->begin() + dimGrid);
 
 
     return logLikDiff;
@@ -2479,10 +2637,10 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     thrust::device_vector<float> devOutputVec(GetNumInfecs());
     int blocksPerGrid((GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
     _collectInfectiousPeriods<<<blocksPerGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&(*devInfecIdx_)[0]),
-        GetNumInfecs(),
-        devEventTimes_,
-        eventTimesPitch_,
-        thrust::raw_pointer_cast(&devOutputVec[0]));
+								  GetNumInfecs(),
+								  devEventTimes_,
+								  eventTimesPitch_,
+								  thrust::raw_pointer_cast(&devOutputVec[0]));
 
     thrust::host_vector<float> outputVec(GetNumInfecs());
     outputVec = devOutputVec;
@@ -2493,39 +2651,13 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
       }
   }
 
-  // std::ostream&
-  // operator <<(std::ostream& out, const GpuLikelihood& likelihood)
-  // {
-
-  //   thrust::device_vector<float> devOutputVec(likelihood.GetNumInfecs());
-  //   int blocksPerGrid(
-  //       (likelihood.GetNumInfecs() + THREADSPERBLOCK - 1) / THREADSPERBLOCK);
-  //   _collectInfectiousPeriods<<<blocksPerGrid, THREADSPERBLOCK>>>(thrust::raw_pointer_cast(&likelihood.devInfecIdx_->operator[](0)),
-  //       likelihood.GetNumInfecs(),
-  //       likelihood.devEventTimes_,
-  //       likelihood.eventTimesPitch_,
-  //       thrust::raw_pointer_cast(&devOutputVec[0]));
-
-  //   thrust::host_vector<float> outputVec(likelihood.GetNumInfecs());
-  //   outputVec = devOutputVec;
-
-  //   out << likelihood.population_[likelihood.hostInfecIdx_->operator[](0).ptr].id << ":"
-  //       << outputVec[0];
-  //   for (size_t i = 1; i < likelihood.GetNumInfecs(); ++i)
-  //     out << ","
-  //         << likelihood.population_[likelihood.hostInfecIdx_->operator[](i).ptr].id
-  //         << ":" << outputVec[i];
-
-  //   return out;
-  // }
-
   void
   GpuLikelihood::PrintLikelihoodComponents() const
   {
     cudaDeviceSynchronize();
-    cout << "Background: " << hostComponents_->bgIntegral << "\n";
-    cout << "Integral: " << hostComponents_->integral << "\n";
-    cout << "Product: " << hostComponents_->logProduct << "\n";
+    cerr << "Background: " << hostComponents_->bgIntegral << "\n";
+    cerr << "Integral: " << hostComponents_->integral << "\n";
+    cerr << "Product: " << hostComponents_->logProduct << "\n";
   }
 
   void GpuLikelihood::PrintParameters() const
@@ -2594,6 +2726,8 @@ _calcSpecPow<<<dimGrid, dimBlock>>>(popSize_,numSpecies_,devAnimalsSuscPow_,anim
     delete[] myCSR->val;
     delete myCSR;
   }
+
+
 
 } // namespace EpiRisk
 

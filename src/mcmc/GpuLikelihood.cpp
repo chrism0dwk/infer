@@ -35,6 +35,7 @@ using namespace boost::numeric;
 
 namespace EpiRisk
 {
+
   size_t
   GpuLikelihood::GetNumInfecs() const
   {
@@ -52,5 +53,9 @@ namespace EpiRisk
   {
     return hostInfecIdx_->size() - numKnownInfecs_;
   }
+
+  
+  
+
 } // namespace EpiRisk
 

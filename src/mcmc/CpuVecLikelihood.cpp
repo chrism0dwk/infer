@@ -541,7 +541,7 @@ namespace EpiRisk
         workB = new float[popSize_];
         workC = new float[popSize_];
 
-#pragma omp for ordered schedule(static) reduction(+:res)
+#pragma omp for reduction(+:res)
         for (size_t ii = 0; ii < infecIdx_.size(); ++ii)
           {
             size_t i = infecIdx_[ii].ptr;
@@ -655,19 +655,12 @@ namespace EpiRisk
 
   }
 
-  void
-  CpuLikelihood::UpdateInfectionTimeInteg(const unsigned int i,
-      const fp_t newTime)
-  {
-    unsigned int begin = D_.index1_data()[i];
-    unsigned int end = D_.index1_data()[i + 1];
-    unsigned int dataSize = end - begin;
-    unsigned int vecLen = (dataSize + VECSIZE - 1) & (-VECSIZE);
-    fp_t Ii = eventTimes_(i, 0);
-    fp_t Ni = eventTimes_(i, 1);
-    fp_t Ri = eventTimes_(i, 2);
 
-    // Pack data
+  void
+  CpuLikelihood::PackData(const size_t begin, const size_t end, fp_t** data, size_t* pitch)
+  {
+    size_t dataSize = end - begin;
+    size_t vecLen = (dataSize + VECSIZE - 1) & (-VECSIZE);
     fp_t* jData = new fp_t[vecLen * 5]; // Treat as column-major
 #pragma omp parallel for
     for (unsigned int jj = begin; jj < end; ++jj)
@@ -683,6 +676,26 @@ namespace EpiRisk
     // Not worth parallelising the following
     for(unsigned int col=0; col < 5; ++col) 
       memset(jData+vecLen*col+dataSize,0.0f,(vecLen-dataSize)*sizeof(fp_t));
+
+    *pitch = vecLen; 
+    *data = jData;
+  }
+
+  void
+  CpuLikelihood::UpdateInfectionTimeInteg(const unsigned int i,
+      const fp_t newTime)
+  {
+    unsigned int begin = D_.index1_data()[i];
+    unsigned int end = D_.index1_data()[i + 1];
+    unsigned int dataSize = end - begin;
+    size_t vecLen;
+    fp_t Ii = eventTimes_(i, 0);
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t Ri = eventTimes_(i, 2);
+
+    // Pack data
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
     
     // Vector calculation
     fp_t buff = 0.0f;
@@ -738,28 +751,14 @@ namespace EpiRisk
     unsigned int begin = D_.index1_data()[i];
     unsigned int end = D_.index1_data()[i + 1];
     unsigned int dataSize = end - begin;
-    unsigned vecLen = (dataSize + VECSIZE - 1) & (-VECSIZE);
+    size_t vecLen;
     fp_t Ii = eventTimes_(i, 0);
     fp_t Ni = eventTimes_(i, 1);
     fp_t Ri = eventTimes_(i, 2);
 
-
     // Pack the j data
-    fp_t* jData = new fp_t[vecLen * 5]; // Treat as column-major
-#pragma omp parallel for
-    for (unsigned int jj = begin; jj < end; ++jj)
-      {
-        unsigned int j = D_.index2_data()[jj];
-
-	jData[jj-begin]          = eventTimes_(j,0);
-	jData[jj-begin + vecLen] = eventTimes_(j,1);
-	jData[jj-begin + vecLen*2] = eventTimes_(j,2);
-	jData[jj-begin + vecLen*3] = susceptibility_[j];
-	jData[jj-begin + vecLen*4] = infectivity_[j];
-      }
-    // Not worth parallelising the following
-    for(unsigned int col=0; col < 5; ++col) 
-      memset(jData+vecLen*col+dataSize,0.0f,(vecLen-dataSize)*sizeof(fp_t));
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
 
     // Vectorised calculation
     for (unsigned int jj = 0; jj < vecLen; jj+=VECSIZE)
@@ -787,10 +786,8 @@ namespace EpiRisk
 	// Mask off uninfected j's
 	idxOnj = select(Ij < Nj, idxOnj, 0.0f);
 
-	fp_t toStore[VECSIZE];
-	idxOnj.store(toStore);
 	for(unsigned j=0; j < VECSIZE; ++j)
-	    productCache_[D_.index2_data()[jj+begin+j]] += toStore[j];
+	  productCache_[D_.index2_data()[jj+begin+j]] += idxOnj.extract(j);
 
 	// Recalculate instantaneous pressure on idx
 	Vec8f jOnIdx = 0.0f;
@@ -811,59 +808,6 @@ namespace EpiRisk
 
     delete[] jData;
   }
-
-
-  // void
-  // CpuLikelihood::UpdateInfectionTimeProd(unsigned int i, fp_t newTime)
-  // {
-  //   unsigned int begin = D_.index1_data()[i];
-  //   unsigned int end = D_.index1_data()[i + 1];
-
-  //   for (unsigned int jj = begin; jj < end; ++jj)
-  //     {
-  //       unsigned int j = D_.index2_data()[jj];
-  //       fp_t Ij = eventTimes_(j, 0);
-  //       fp_t Nj = eventTimes_(j, 1);
-
-  //       if (Ij < Nj)
-  //         {
-  //           fp_t Ii = eventTimes_(i, 0);
-  //           fp_t Ni = eventTimes_(i, 1);
-  //           fp_t Ri = eventTimes_(i, 2);
-  //           fp_t Rj = eventTimes_(j, 2);
-
-  //           // Adjust product cache from idx on others
-  //           fp_t idxOnj = 0.0f;
-  //           if (Ii < Ij and Ij <= Ni)
-  //             idxOnj -= h(Ij - Ii, *nu_, *alpha_);
-  //           else if (Ni < Ij and Ij <= Ri)
-  //             {
-  //               idxOnj -= *gamma2_ * h(Ij - Ii, *nu_, *alpha_);
-  //               idxOnj += *gamma2_ * h(Ij - newTime, *nu_, *alpha_);
-  //             }
-  //           if (newTime < Ij and Ij <= Ni)
-  //             idxOnj += h(Ij - newTime, *nu_, *alpha_);
-
-  //           idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
-  //               * K(D_.value_data()[jj], *delta_, *omega_);
-  //           productCache_[j] += idxOnj;
-
-  //           // Recalculate instantaneous pressure on idx
-  //           float jOnIdx = 0.0f;
-  //           if (Ij < newTime and newTime <= Nj)
-  //             jOnIdx = h(newTime - Ij, *nu_, *alpha_);
-  //           else if (Nj < newTime and newTime <= Rj)
-  //             jOnIdx = *gamma2_ * h(newTime - Ij, *nu_, *alpha_);
-
-  //           jOnIdx *= susceptibility_[i] * infectivity_[j]
-  //               * K(D_.value_data()[jj], *delta_, *omega_);
-  //           productCache_[i] += jOnIdx * *gamma1_;
-  //         }
-  //     }
-  //   productCache_[i] +=
-  //       newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
-  // }
-
 
 
   void
@@ -916,97 +860,121 @@ namespace EpiRisk
   void
   CpuLikelihood::AddInfectionTimeProd(const unsigned int i, const fp_t newTime)
   {
-    unsigned int begin = D_.index1_data()[i];
-    unsigned int end = D_.index1_data()[i + 1];
+    size_t begin = D_.index1_data()[i];
+    size_t end = D_.index1_data()[i + 1];
+    size_t dataSize = end - begin;
+    size_t vecLen;
 
-    for (unsigned int jj = begin; jj < end; ++jj)
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t Ri = eventTimes_(i, 2);
+
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
+
+#pragma omp parallel for    
+    for (unsigned int jj = 0; jj < vecLen; jj+=VECSIZE)
       {
         unsigned int j = D_.index2_data()[jj];
 
-        fp_t Ij = eventTimes_(j, 0);
-        fp_t Nj = eventTimes_(j, 1);
+        Vec8f Ij;    Ij.load(jData+jj);
+	Vec8f Nj;    Nj.load(jData+jj+vecLen);
+	Vec8f Rj;    Rj.load(jData+jj+vecLen*2);
+	Vec8f jSusc; jSusc.load(jData+jj+vecLen*3);
+	Vec8f jInf;  jInf.load(jData+jj+vecLen*4);
+	Vec8f d;     d.load(&(D_.value_data()[jj+begin]));
 
-        if (Ij < Nj) // Only look at infected individuals
-          {
-            fp_t Ni = eventTimes_(i, 1);
-            fp_t Ri = eventTimes_(i, 2);
-            fp_t Rj = eventTimes_(j, 2);
+	// Adjust product cache from idx on others
+	Vec8f idxOnj = 0.0;
+	idxOnj += hVec8f(Ij - newTime, *nu_, *alpha_) 
+	  * select(newTime < Ij & Ij <= Ni, 1.0f, 0.0f);
+	idxOnj += *gamma2_ * hVec8f(Ij - newTime, *nu_, *alpha_) 
+	  * select(Ni < Ij & Ij <= Ri, 1.0f, 0.0f);
 
-            // Adjust product cache from idx on others
-            float idxOnj = 0.0;
-            if (newTime < Ij and Ij <= Ni)
-              idxOnj += h(Ij - newTime, *nu_, *alpha_);
-            else if (Ni < Ij and Ij <= Ri)
-              idxOnj += *gamma2_ * h(Ij - newTime, *nu_, *alpha_);
+	idxOnj *= *gamma1_ * infectivity_[i] * jSusc
+	  * KVec8f(d, *delta_, *omega_);
 
-            idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
-                * K(D_.value_data()[jj], *delta_, *omega_);
-            productCache_[j] += idxOnj;
+	// Mask uninfected j's
+	idxOnj = select(Ij < Nj, idxOnj, 0.0f);
 
-            // Calculate instantaneous pressure on idx
-            float jOnIdx = 0.0f;
-            if (Ij < newTime and newTime <= Nj)
-              jOnIdx = h(newTime - Ij, *nu_, *alpha_);
-            else if (Nj < newTime and newTime <= Rj)
-              jOnIdx = *gamma2_ * h(newTime - Ij, *nu_, *alpha_);
+	for(size_t j=0; j < VECSIZE; ++j)
+	  productCache_[D_.index2_data()[jj+begin+j]] += idxOnj.extract(j);
 
-            jOnIdx *= *gamma1_ * infectivity_[j] * susceptibility_[i]
-                * K(D_.value_data()[jj], *delta_, *omega_);
+	// Calculate instantaneous pressure on idx
+	Vec8f jOnIdx = 0.0f;
+	jOnIdx = hVec8f(newTime - Ij, *nu_, *alpha_) 
+	  * select(Ij < newTime & newTime <= Nj, 1.0f, 0.0f);
+	jOnIdx += *gamma2_ * hVec8f(newTime - Ij, *nu_, *alpha_) 
+	  * select(Nj < newTime & newTime <= Rj, 1.0f, 0.0f);
 
-            productCache_[i] += jOnIdx;
-          }
+	jOnIdx *= jInf * susceptibility_[i]
+	  * KVec8f(d, *delta_, *omega_);
 
+	// Mask uninfected j's
+	jOnIdx = select(Ij < Nj, jOnIdx, 0.0f);
+
+	productCache_[i] += horizontal_add(jOnIdx) * *gamma1_;
+          
       }
 
     float epsilon = newTime < movtBan_ ? *epsilon1_ : (*epsilon1_ * *epsilon2_);
     productCache_[i] += epsilon;
+
+    delete[] jData;
   }
 
   void
   CpuLikelihood::AddInfectionTimeInteg(const unsigned int i, const fp_t newTime)
   {
-    unsigned int begin = D_.index1_data()[i];
-    unsigned int end = D_.index1_data()[i + 1];
+    size_t begin = D_.index1_data()[i];
+    size_t end = D_.index1_data()[i + 1];
+    size_t dataLen = end - begin;
+    size_t vecLen;
+
+    fp_t Ii = eventTimes_(i, 0);
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t Ri = eventTimes_(i, 2);
+
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
 
     fp_t buff = 0.0;
-    for (unsigned int jj = begin; jj < end; ++jj)
+#pragma omp parallel for reduction(+:buff)
+    for (unsigned int jj = 0; jj < vecLen; jj += VECSIZE)
       {
-        unsigned int j = D_.index2_data()[jj];
 
-        fp_t Ii = eventTimes_(i, 0);
-        fp_t Ni = eventTimes_(i, 1);
-        fp_t Ri = eventTimes_(i, 2);
+        Vec8f Ij;    Ij.load(jData+jj);
+        Vec8f Nj;    Nj.load(jData+jj+vecLen);
+        Vec8f Rj;    Nj.load(jData+jj+vecLen*2);
+	Vec8f jSusc; jSusc.load(jData+jj+vecLen*3);
+	Vec8f jInf;  jInf.load(jData+jj+vecLen*4);
+	Vec8f d;     d.load(&(D_.value_data()[jj+begin]));
 
-        fp_t Ij = eventTimes_(j, 0);
-        fp_t Nj = eventTimes_(j, 1);
-        fp_t Rj = eventTimes_(j, 2);
-
-        fp_t jOnIdx = 0.0;
-        if (Ij < Nj)  // Pressure from j on i
-          {
-            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ij, Ii), *nu_, *alpha_);
-            jOnIdx -= *gamma2_
-                * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
-                    - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_));
-            jOnIdx += H(fminf(Nj, newTime) - fminf(Ij, newTime), *nu_, *alpha_);
-            jOnIdx += *gamma2_
-                * (H(fminf(Rj, newTime) - Ij, *nu_, *alpha_)
-                    - H(fminf(Nj, newTime) - Ij, *nu_, *alpha_));
-
-            // Apply infec and suscep
-            jOnIdx *= susceptibility_[i];
-            jOnIdx *= infectivity_[j];
-          }
+        Vec8f jOnIdx = 0.0;
+	jOnIdx -= HVec8f(min(Nj, Ii) - min(Ij, Ii), *nu_, *alpha_);
+	jOnIdx -= *gamma2_
+	  * (HVec8f(min(Rj, Ii) - Ij, *nu_, *alpha_)
+	     - HVec8f(min(Nj, Ii) - Ij, *nu_, *alpha_));
+	jOnIdx += HVec8f(min(Nj, newTime) - min(Ij, newTime), *nu_, *alpha_);
+	jOnIdx += *gamma2_
+	  * (HVec8f(min(Rj, newTime) - Ij, *nu_, *alpha_)
+	     - HVec8f(min(Nj, newTime) - Ij, *nu_, *alpha_));
+	
+	// Apply infec and suscep
+	jOnIdx *= susceptibility_[i];
+	jOnIdx *= jInf;
+	
+	jOnIdx = select(Ij < Nj, jOnIdx, 0.0f);
 
         // Add pressure from i on j
-        float IdxOnj = H(fminf(Ni, Ij) - fminf(newTime, Ij), *nu_, *alpha_);
+        Vec8f IdxOnj = 0.0f;
+	IdxOnj += HVec8f(min(Ni, Ij) - min(newTime, Ij), *nu_, *alpha_);
         IdxOnj += *gamma2_
-            * (H(fminf(Ri, Ij) - newTime, *nu_, *alpha_)
-                - H(fminf(Ni, Ij) - newTime, *nu_, *alpha_));
-        IdxOnj *= susceptibility_[j];
+            * (HVec8f(min(Ri, Ij) - newTime, *nu_, *alpha_)
+                - HVec8f(min(Ni, Ij) - newTime, *nu_, *alpha_));
+        IdxOnj *= jSusc;
         IdxOnj *= infectivity_[i];
 
-        buff += (IdxOnj + jOnIdx) * K(D_.value_data()[jj], *delta_, *omega_);
+        buff += horizontal_add((IdxOnj + jOnIdx) * KVec8f(d, *delta_, *omega_));
       }
 
     likComponents_.integral += buff * *gamma1_;
@@ -1065,83 +1033,98 @@ namespace EpiRisk
   void
   CpuLikelihood::DelInfectionTimeProd(const unsigned int i)
   {
-    unsigned int begin = D_.index1_data()[i];
-    unsigned int end = D_.index1_data()[i + 1];
+    size_t begin = D_.index1_data()[i];
+    size_t end = D_.index1_data()[i + 1];
+    size_t dataSize = end - begin;
+    size_t vecLen;
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
 
-    for (unsigned int jj = begin; jj < end; ++jj)
+    fp_t Ii = eventTimes_(i, 0);
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t Ri = eventTimes_(i, 2);
+
+#pragma omp parallel for
+    for (unsigned int jj = 0; jj < vecLen; jj+=VECSIZE)
       {
-        unsigned int j = D_.index2_data()[jj];
+        Vec8f Ij; Ij.load(jData+jj);
+        Vec8f Nj; Nj.load(jData+jj+vecLen);
+	Vec8f jSusc; jSusc.load(jData+jj+vecLen*3);
+	Vec8f d;     d.load(&(D_.value_data()[jj+begin]));
+ 
+	// Adjust product cache from idx on others
+	Vec8f idxOnj = 0.0;
+	idxOnj -= hVec8f(Ij - Ii, *nu_, *alpha_) 
+	  * select(Ii < Ij & Ij <= Ni, 1.0f, 0.0f);
+	idxOnj -= *gamma2_ * hVec8f(Ij - Ii, *nu_, *alpha_) 
+	  * select(Ni < Ij & Ij <= Ri, 1.0f, 0.0f);
 
-        fp_t Ij = eventTimes_(j, 0);
-        fp_t Nj = eventTimes_(j, 1);
+	idxOnj *= *gamma1_ * infectivity_[i] * jSusc
+	  * KVec8f(d, *delta_, *omega_);
 
-        if (Ij < Nj)
-          {
-            fp_t Ii = eventTimes_(i, 0);
-            fp_t Ni = eventTimes_(i, 1);
-            fp_t Ri = eventTimes_(i, 2);
+	// Mask uninfected j's
+	idxOnj = select(Ij < Nj, idxOnj, 0.0f);
 
-            // Adjust product cache from idx on others
-            fp_t idxOnj = 0.0;
-            if (Ii < Ij and Ij <= Ni)
-              idxOnj -= h(Ij - Ii, *nu_, *alpha_);
-            else if (Ni < Ij and Ij <= Ri)
-              idxOnj -= *gamma2_ * h(Ij - Ii, *nu_, *alpha_);
-
-            idxOnj *= *gamma1_ * infectivity_[i] * susceptibility_[j]
-                * K(D_.value_data()[jj], *delta_, *omega_);
-            productCache_[j] += idxOnj;
-          }
-      }
+	for(size_t j=0; j<VECSIZE; ++j)
+	  productCache_[D_.index2_data()[jj+begin+j]] += idxOnj.extract(j);
+       }
   }
 
   void
   CpuLikelihood::DelInfectionTimeInteg(const unsigned int i)
   {
-    unsigned int begin = D_.index1_data()[i];
-    unsigned int end = D_.index1_data()[i + 1];
+    size_t begin = D_.index1_data()[i];
+    size_t end = D_.index1_data()[i + 1];
+    size_t dataLen = end - begin;
+    size_t vecLen;
+
+    fp_t Ii = eventTimes_(i, 0);
+    fp_t Ni = eventTimes_(i, 1);
+    fp_t Ri = eventTimes_(i, 2);
+
+    fp_t* jData;
+    PackData(begin, end, &jData, &vecLen);
 
     fp_t buff = 0.0;
-    for (unsigned int jj = begin; jj < end; ++jj)
+#pragma omp parallel for reduction(+:buff)
+    for (unsigned int jj = 0; jj < vecLen; jj+=VECSIZE)
       {
-        unsigned int j = D_.index2_data()[jj];
+        Vec8f Ij;    Ij.load(jData+jj);
+        Vec8f Nj;    Nj.load(jData+jj+vecLen);
+        Vec8f Rj;    Rj.load(jData+jj+vecLen*2);
+	Vec8f jSusc; jSusc.load(jData+jj+vecLen*3);
+	Vec8f jInf;  jInf.load(jData+jj+vecLen*4);
+	Vec8f d;     d.load(&(D_.value_data()[jj+begin]));
 
-        fp_t Ii = eventTimes_(i, 0);
-        fp_t Ni = eventTimes_(i, 1);
-        fp_t Ri = eventTimes_(i, 2);
+        Vec8f jOnIdx = 0.0;
+	// Recalculate pressure from j on idx
+	jOnIdx -= HVec8f(min(Nj, Ii) - min(Ii, Ij), *nu_, *alpha_)
+	  + *gamma2_
+	  * (HVec8f(min(Rj, Ii) - Ij, *nu_, *alpha_)
+	     - HVec8f(min(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
+	jOnIdx += HVec8f(min(Nj, Ni) - min(Ij, Ni), *nu_, *alpha_)
+	  + *gamma2_
+	  * (HVec8f(min(Rj, Ni) - Ij, *nu_, *alpha_)
+	     - HVec8f(min(Nj, Ni) - Ij, *nu_, *alpha_)); // New pressure
 
-        fp_t Ij = eventTimes_(j, 0);
-        fp_t Nj = eventTimes_(j, 1);
-        fp_t Rj = eventTimes_(j, 2);
+	// Apply infec and suscep
+	jOnIdx *= susceptibility_[i];
+	jOnIdx *= jInf;
 
-        fp_t jOnIdx = 0.0;
-        if (Ij < Nj)
-          {
-            // Recalculate pressure from j on idx
-            jOnIdx -= H(fminf(Nj, Ii) - fminf(Ii, Ij), *nu_, *alpha_)
-                + *gamma2_
-                    * (H(fminf(Rj, Ii) - Ij, *nu_, *alpha_)
-                        - H(fminf(Nj, Ii) - Ij, *nu_, *alpha_)); // Old pressure
-            jOnIdx += H(fminf(Nj, Ni) - fminf(Ij, Ni), *nu_, *alpha_)
-                + *gamma2_
-                    * (H(fminf(Rj, Ni) - Ij, *nu_, *alpha_)
-                        - H(fminf(Nj, Ni) - Ij, *nu_, *alpha_)); // New pressure
-                // Apply infec and suscep
-            jOnIdx *= susceptibility_[i];
-            jOnIdx *= infectivity_[j];
-          }
+	// Mask uninfected j's
+	jOnIdx = select(Ij < Nj, jOnIdx, 0.0f);
 
         // Subtract pressure from idx on j
-        fp_t IdxOnj = 0.0f;
-        IdxOnj -= H(fminf(Ni, Ij) - fminf(Ii, Ij), *nu_, *alpha_);
+        Vec8f IdxOnj = 0.0f;
+        IdxOnj -= HVec8f(min(Ni, Ij) - min(Ii, Ij), *nu_, *alpha_);
         IdxOnj -= *gamma2_
-            * (H(fminf(Ri, Ij) - Ii, *nu_, *alpha_)
-                - H(fminf(Ni, Ij) - Ii, *nu_, *alpha_));
-        IdxOnj *= susceptibility_[j];
+            * (HVec8f(min(Ri, Ij) - Ii, *nu_, *alpha_)
+                - HVec8f(min(Ni, Ij) - Ii, *nu_, *alpha_));
+        IdxOnj *= jSusc;
         IdxOnj *= infectivity_[i];
 
-        buff += (IdxOnj + jOnIdx)
-            * K(D_.value_data()[jj], *delta_, *omega_);
+        buff += horizontal_add((IdxOnj + jOnIdx)
+			       * KVec8f(d, *delta_, *omega_));
       }
 
     likComponents_.integral += buff * *gamma1_;
