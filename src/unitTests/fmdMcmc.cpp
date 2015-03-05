@@ -469,7 +469,7 @@ main(int argc, char* argv[])
   updateInfecTime->SetParameters(infecPeriod);
   updateInfecTime->SetUpdateTuning(2.5);
   updateInfecTime->SetReps(900);
-  updateInfecTime->SetOccults(true);
+  updateInfecTime->SetOccults(false);
 
   UpdateBlock bUpdate; bUpdate.add(b);
   Mcmc::InfectionTimeGammaCentred* updateBC =

@@ -20,14 +20,19 @@ cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES} Likelihood.cpp)
 target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
 
 set(cpulikelihood_SOURCES CpuLikelihood.cpp Likelihood.cpp)
-cuda_add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
+add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
 set_target_properties(cpulikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpulikelihood data stlstrtok)
 
 set(cpuveclikelihood_SOURCES CpuVecLikelihood.cpp Likelihood.cpp)
-cuda_add_library(cpuveclikelihood STATIC ${cpuveclikelihood_SOURCES})
+add_library(cpuveclikelihood STATIC ${cpuveclikelihood_SOURCES})
 set_target_properties(cpuveclikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpuveclikelihood data stlstrtok)
+
+set(dummylikelihood_SOURCES DummyLikelihood.cpp Likelihood.cpp)
+add_library(dummylikelihood STATIC ${dummylikelihood_SOURCES})
+set_target_properties(dummylikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
+target_link_libraries(dummylikelihood data stlstrtok)
 
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})

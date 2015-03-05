@@ -49,3 +49,7 @@ add_executable(fmdMcmcGpu ${fmdMcmcGpu_SOURCES})
 set_target_properties(fmdMcmcGpu PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(fmdMcmcGpu data parameter mcmc gpulikelihood posteriorwriter)
 
+set(fmdMcmcDummy_SOURCES fmdMcmcDummy.cpp)
+add_executable(fmdMcmcDummy ${fmdMcmcDummy_SOURCES})
+set_target_properties(fmdMcmcDummy PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+target_link_libraries(fmdMcmcDummy data parameter mcmc dummylikelihood posteriorwriter)

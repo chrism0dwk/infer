@@ -231,8 +231,9 @@ main(int argc, char* argv[])
       cpu.FullCalculate();
       clock_gettime(THECLOCK, &end);
       avgtime += (timediff(start, end) - avgtime)/(i+1);
+      cout << "." << flush;
     }
-  cout << "CPU Vec FullCalculate: " << avgtime << " nanoseconds" << endl;
+  cout << "\nCPU Vec FullCalculate: " << avgtime << " nanoseconds" << endl;
 
   // Moving
   avgtime = 0.0;
