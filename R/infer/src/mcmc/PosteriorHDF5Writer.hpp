@@ -24,7 +24,7 @@ namespace EpiRisk
   class PosteriorHDF5Writer : public PosteriorWriter
   {
   public:
-    PosteriorHDF5Writer(std::string filename, GpuLikelihood& likelihood);
+    PosteriorHDF5Writer(std::string filename, Likelihood& likelihood);
     virtual
     ~PosteriorHDF5Writer();
     void

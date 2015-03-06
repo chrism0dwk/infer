@@ -128,7 +128,7 @@ namespace EpiRisk
     }
 
 
-    McmcRoot::McmcRoot(GpuLikelihood& likelihood, size_t seed)
+    McmcRoot::McmcRoot(Likelihood& likelihood, size_t seed)
     {
       likelihood_ = new LikelihoodHandler(likelihood);
       random_ = new Random(seed);

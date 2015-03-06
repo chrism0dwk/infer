@@ -27,7 +27,7 @@
 #ifndef MCMCLIKELIHOOD_HPP_
 #define MCMCLIKELIHOOD_HPP_
 
-#include "GpuLikelihood.hpp"
+#include "Likelihood.hpp"
 
 
 
@@ -42,7 +42,7 @@ namespace EpiRisk
   {
   public:
     explicit
-    LikelihoodHandler(GpuLikelihood& likelihood);
+    LikelihoodHandler(Likelihood& likelihood);
     virtual
     ~LikelihoodHandler();
     float
@@ -84,20 +84,16 @@ namespace EpiRisk
     float
     GetValue() const;
     float
-    GetSumI() const { return likelihood_->GetSumI(); }
-    float
-    ProposeNCInfecTimes(const float oldGamma, const float newGamma, const float r);
-    float
-    GetNCInfecTimes(const float power) const;
-    const GpuLikelihood::LikelihoodComponents*
+    NonCentreInfecTimes(const float oldGamma, const float newGamma, const float prob);
+    Likelihood::LikelihoodComponents
     GetProposal() const { return proposal_->GetLikelihoodComponents(); }
-    const GpuLikelihood::LikelihoodComponents*
+    Likelihood::LikelihoodComponents
     GetCurrent() const { return likelihood_->GetLikelihoodComponents(); }
     void
     CompareProdVectors() const;
   private:
-    GpuLikelihood* likelihood_;
-    GpuLikelihood* proposal_;
+    Likelihood* likelihood_;
+    Likelihood* proposal_;
     enum move_t
     {
       PARAMETER=0,

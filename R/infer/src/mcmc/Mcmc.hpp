@@ -104,7 +104,7 @@ namespace EpiRisk
     {
     public:
       explicit
-      McmcRoot(GpuLikelihood& likelihood, const size_t seed);
+      McmcRoot(Likelihood& likelihood, const size_t seed);
       ~McmcRoot();
     };
 

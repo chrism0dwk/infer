@@ -21,11 +21,6 @@ namespace EpiRisk
          return new SingleSiteLogMRW;
        }
        Mcmc*
-       CreateAdaptiveSingleMRW()
-       {
-	 return new AdaptiveSingleMRW;
-       }
-       Mcmc*
        CreateAdaptiveMultiMRW()
        {
          return new AdaptiveMultiMRW;
@@ -67,9 +62,6 @@ namespace EpiRisk
       {
       const bool singleSiteLogMRW = McmcFactory::Instance().RegisterUpdater(
           "SingleSiteLogMRW", CreateSingleSiteLogMRW);
-      
-      const bool adaptiveSingleMRW = McmcFactory::Instance().RegisterUpdater(
-	  "AdaptiveSingleMRW", CreateAdaptiveSingleMRW);
 
       const bool adaptiveMultiMRW = McmcFactory::Instance().RegisterUpdater(
           "AdaptiveMultiMRW", CreateAdaptiveMultiMRW);

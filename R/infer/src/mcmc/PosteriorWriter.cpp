@@ -31,7 +31,7 @@
 namespace EpiRisk
 {
 
-  PosteriorWriter::PosteriorWriter(GpuLikelihood& likelihood) : likelihood_(likelihood)
+  PosteriorWriter::PosteriorWriter(Likelihood& likelihood) : likelihood_(likelihood)
   {
   }
 
