@@ -60,8 +60,8 @@ setMethod("initialize","SpatPointSINR", function(.Object, population, epidemic, 
   .Object@movtBan <- movtBan
 
   # Set up the default prior
-  .Object@param.names <- c("epsilon1","epsilon2","gamma1","gamma2","xi_2","xi_3","psi_1","psi_2","psi_3","zeta_2","zeta_3","phi_1","phi_2","phi_3","delta","a","b","alpha")
-  .Object@prior <- list(epsilon1=c(1,1), epsilon2=c(1,1), gamma1=c(1,1), gamma2=c(1,1), xi_2=c(1,1), xi_3=c(1,1), psi_1=c(2,2), psi_2=c(2,2), psi_3=c(2,2), zeta_2=c(1,1), zeta_3=c(1,1), phi_1=c(2,2), phi_2=c(2,2), phi_3=c(2,2), delta=c(1,1), b=c(1,1))
+  .Object@param.names <- c("epsilon1","epsilon2","gamma1","gamma2","xi_2","xi_3","psi_1","psi_2","psi_3","zeta_2","zeta_3","phi_1","phi_2","phi_3","delta","a","b","nu","alpha","omega")
+  .Object@prior <- list(epsilon1=c(1,1), epsilon2=c(1,1), gamma1=c(1,1), gamma2=c(1,1), xi_2=c(1,1), xi_3=c(1,1), psi_1=c(2,2), psi_2=c(2,2), psi_3=c(2,2), zeta_2=c(1,1), zeta_3=c(1,1), phi_1=c(2,2), phi_2=c(2,2), phi_3=c(2,2), delta=c(1,1), a=c(1,1),b=c(1,1),alpha=c(1,1), omega=c(1,1))
   
   .Object
 } )
