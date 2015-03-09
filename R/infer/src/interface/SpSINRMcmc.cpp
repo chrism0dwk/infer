@@ -19,18 +19,6 @@
 
 #define RNUM(x) Rcpp::NumericVector(x)
 
-
-static void chkIntFn(void *dummy)
-{
-  R_CheckUserInterrupt();
-}
-
-bool checkInterrupt() {
-  return (R_ToplevelExec(chkIntFn,NULL) == false);
-}
-
-
-
 class GammaPrior : public EpiRisk::Prior
 {
   float shape_;
@@ -149,7 +137,12 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::NumericVector startval =_init["epsilon1"];
   EpiRisk::Parameter epsilon1(startval[0], GammaPrior(prior[0], prior[1]), "epsilon1");
 
-  startval = _init["epsilon2"]; prior = _priorParms["epsilon2"]; 
+  if(doNDiff[0])
+    startval = _init["epsilon2"]; 
+  else
+    startval = 1.0;
+
+  prior = _priorParms["epsilon2"]; 
   EpiRisk::Parameter epsilon2(startval[0], GammaPrior(prior[0], prior[1]), "epsilon2");
   startval = _init["gamma1"]; prior = _priorParms["gamma1"];
   EpiRisk::Parameter gamma1(startval[0], GammaPrior(prior[0], prior[1]), "gamma1");
@@ -223,28 +216,15 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   EpiRisk::UpdateBlock txDelta;
   txDelta.add(epsilon1);
-  txDelta.add(epsilon2);
-  //if(doMovtBan[0]) txDelta.add(epsilon2);
+  if(doMovtBan[0]) txDelta.add(epsilon2);
   txDelta.add(gamma1);
   if(doNDiff[0]) txDelta.add(gamma2);
   txDelta.add(delta);
-  //txDelta.add(omega);
+  txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
-  						      "txBase");
+          "txBase");
   updateDistance->SetParameters(txDelta);
-
-  // EpiRisk::Mcmc::SingleSiteLogMRW* updateDistance = 
-  //   (EpiRisk::Mcmc::SingleSiteLogMRW*) mcmc.Create("SingleSiteLogMRW","txBase");
-  // updateDistance->SetParameters(txDelta);
-  // updateDistance->SetTuning(0.005);
-
-  // EpiRisk::UpdateBlock ep1;
-  // ep1.add(epsilon1);
-  // EpiRisk::Mcmc::SingleSiteLogMRW* updateEp1 = 
-  //   (EpiRisk::Mcmc::SingleSiteLogMRW*) mcmc.Create("SingleSiteLogMRW", "epsilon1");
-  // updateEp1->SetParameters(ep1);
-  // updateEp1->SetTuning(2.0);
 
   EpiRisk::UpdateBlock txPsi;
   EpiRisk::UpdateBlock txPhi;
@@ -282,24 +262,35 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     
     if(nSpecies > 1) {
       
-      txInfec.add(gamma1);
+      //txInfec.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
-    	txInfec.add(xi[i]);
-      EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
-        (EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
-      //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
-      //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txInfec");
+	txInfec.add(xi[i]);
+      //EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
+      // 	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txInfec");
       updateInfec->SetParameters(txInfec);
       
-      txSuscep.add(gamma1);
+      //txSuscep.add(gamma1);
       for(int i=1; i<nSpecies; ++i)
-    	txSuscep.add(zeta[i]);
-      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
-        (EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-      //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
-      //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
+	txSuscep.add(zeta[i]);
+      //      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
+      //	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
       updateSuscep->SetParameters(txSuscep);
     }
+
+  EpiRisk::UpdateBlock infecPeriod;
+  infecPeriod.add(a);
+  infecPeriod.add(b);
+  EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
+    (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+          "infecTimes");
+  updateInfecTime->SetParameters(infecPeriod);
+  updateInfecTime->SetUpdateTuning(tuneI[0]);
+  updateInfecTime->SetReps(repsI[0]);
+  updateInfecTime->SetOccults(doOccults);
 
   EpiRisk::UpdateBlock bUpdate;
   if(doLatentPeriodScale[0]) {
@@ -313,19 +304,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       (EpiRisk::Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
     updateBNC->SetParameters(bUpdate);
     updateBNC->SetTuning(0.0007);
-    updateBNC->SetNCRatio(1.0);
+    updateBNC->SetNCRatio(ncratio[0]);
   }
-
-  EpiRisk::UpdateBlock infecPeriod;
-  infecPeriod.add(a);
-  infecPeriod.add(b);
-  EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
-    (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-          "infecTimes");
-  updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetUpdateTuning(tuneI[0]);
-  updateInfecTime->SetReps(repsI[0]);
-  updateInfecTime->SetOccults(doOccults);
 
     //// Output ////
 
@@ -364,21 +344,9 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   Rcpp::Rcout << "Running MCMC" << std::endl;
   for(int k=0; k<numIter[0]; ++k)
     {
-      if(checkInterrupt()) {
-	cerr << ("Execution cancelled by user");
-	output.flush();
-	break;
-      }
       mcmc.Update();
       output.write();
-      cout.precision(15);
-      // cout << "-----FAST-----" << endl;
-      // likelihood.PrintLikelihoodComponents();
-      // likelihood.FullCalculate();
-      // cout << "-----CORRECTED-----" << endl;
-      // likelihood.PrintLikelihoodComponents();
-      // cout << "-------------------" << endl;
-      // likelihood.DumpProductVector(1.0f);
+
       if(k % 500 == 0)
   	{
 	  Rcpp::Rcout << "Iteration " << k << std::endl;
