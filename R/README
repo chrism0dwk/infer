@@ -1,0 +1,27 @@
+README for 'infer' R package
+============================
+
+This is the README file for the 'infer' R package.  If you are reading this
+document, you have already found the location of this package in the infer project git repository.  Congratulations!
+
+Files
+=====
+
+infer -- directory containing the R package files.
+test.pop -- ids, x/y coordinates (OSGB1936), number of cattle, pigs, and sheep for farms in the test population.
+test.epi -- CSV file containing ids, infection, notification (i.e. detection), and removal times of infected farms in the test epidemic.
+testscript.r -- example of how to run the inference algorithm on a Spatial Point Population model (e.g. for UKFMD2001).
+
+Building
+========
+
+1. > cd infer
+2. > autoremake -i # Creates configure script and Makefiles
+3. > cd ..
+4. Ensure CUDA, CUDPP >= 2.1, Boost >= 1_51_0, GSL >= 1.15, HDF5 >= 1.8.12 are installed.  Set CUDA_HOME, CUDPP_HOME, BOOST_HOME, GSL_HOME if CUDA, CUDPP, Boost and GSL are in non-standard locations.  Set CPPFLAGS and LDFLAGS appropriately for HDF5 if non installed in standard locations (needs a HDF5_HOME implementing).
+5. > R CMD INSTALL infer
+
+Usage
+=====
+
+See example 'testscript.r'.
