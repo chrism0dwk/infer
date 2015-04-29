@@ -554,16 +554,16 @@ main(int argc, char* argv[])
   updateInfecTime->SetOccults(true);
 
    UpdateBlock bUpdate; bUpdate.add(b);
-   //Mcmc::InfectionTimeGammaCentred* updateBC =
-   //   (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
-   //updateBC->SetParameters(bUpdate);
-   //updateBC->SetTuning(0.014);
+   Mcmc::InfectionTimeGammaCentred* updateBC =
+     (Mcmc::InfectionTimeGammaCentred*) mcmc.Create("InfectionTimeGammaCentred", "b_centred");
+   updateBC->SetParameters(bUpdate);
+   updateBC->SetTuning(0.014);
 
-   //Mcmc::InfectionTimeGammaNC* updateBNC =
-   //   (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
-   //updateBNC->SetParameters(bUpdate);
-   //updateBNC->SetTuning(0.0007);
-   //updateBNC->SetNCRatio(1.0);
+   Mcmc::InfectionTimeGammaNC* updateBNC =
+     (Mcmc::InfectionTimeGammaNC*)mcmc.Create("InfectionTimeGammaNC", "b_ncentred");
+   updateBNC->SetParameters(bUpdate);
+   updateBNC->SetTuning(0.0007);
+   updateBNC->SetNCRatio(1.0);
 
     //// Output ////
 
