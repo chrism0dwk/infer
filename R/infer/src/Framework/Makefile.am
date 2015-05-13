@@ -1,4 +1,4 @@
-INCLUDES = -I. -I@CUDA_HOME@/include -I@BOOST_HOME@/include -I@GSL_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
+AM_CPPFLAGS = -I. -I@CUDA_HOME@/include -I@BOOST_HOME@/include -I@GSL_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
 
 CUEXT = cu 
 EXT = cpp
@@ -14,7 +14,7 @@ LD_PARAMS = @RPATHFLAG@
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
-	$(CXX) -c $(INCLUDES) $(PARAMS) $^ -o $@
+	$(CXX) -c $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
 
 clean:
 	rm -rf *o

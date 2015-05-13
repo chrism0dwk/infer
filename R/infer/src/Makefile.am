@@ -1,6 +1,6 @@
 SUBDIRS = interface mcmc sim Framework data
 #data Framework mcmc sim
-INCLUDES = -I. -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
+AM_CPPFLAGS = -I. -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
 
 CUEXT = cu 
 EXT = cpp
