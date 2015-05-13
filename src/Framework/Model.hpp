@@ -138,7 +138,7 @@ namespace EpiRisk
 
     virtual
     double
-    NtoR() const = 0;
+    NtoR(Random& random) const = 0;
 
     Population&
     getPopulation() const { return population_; };

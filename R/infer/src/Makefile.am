@@ -35,7 +35,7 @@ TARGETS = infer.so
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(CC) -shared $(LIBS) $(OBJS) $(LD_PARAMS) -o $@
+	$(CC) -shared $(OBJS) $(LIBS) $(LD_PARAMS) -o $@
 
 clean:
 	rm -rf *o

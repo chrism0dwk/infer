@@ -1,4 +1,4 @@
-INCLUDES = -I. -I../Framework @R_INCLUDE@ @RCPP_PKG_INCLUDE@ -I@BOOST_HOME@/include
+INCLUDES = -I. -I../Framework @R_INCLUDE@ @RCPP_PKG_INCLUDE@ -I@BOOST_HOME@/include -I@GSL_HOME@/include
 
 PARAMS = @CPICFLAGS@ -fPIC
 

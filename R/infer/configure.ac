@@ -178,7 +178,7 @@ AC_CANONICAL_HOST
 case "${host_os}" in
         *darwin*)
                 R_LIB=""
-		RPATHFLAG="-rpath,${CUDA_HOME}${CUDA_LIB_DIR}"
+		RPATHFLAG="-Wl,-rpath,${CUDA_HOME}${CUDA_LIB_DIR}:${CUDPP_HOME}/lib"
 		R_LIB=""
                 AC_PATH_PROG([SW_VERS],[sw_vers],[no],[$PATH])
                 if test "$arch" = "i386"; then
@@ -200,7 +200,10 @@ esac
 
 # Check headers
 AC_CHECK_HEADERS([math.h])
+CPPFLAGSOLD=${CPPFLAGS}
+CPPFLAGS=-I${HDF5_HOME}/include
 AC_CHECK_HEADERS([H5Cpp.h],,[AC_MSG_ERROR([HDF5 library headers not found])])
+CPPFLAGS=${CPPFLAGSOLD}
 
 # Assemble library requirements
 RCPP_PKG_LIBS=`${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()"`

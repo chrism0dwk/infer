@@ -19,16 +19,14 @@
 #include <thrust/sort.h>
 #include <thrust/count.h>
 #include <thrust/find.h>
+#include <thrust/extrema.h>
 #include <gsl/gsl_cdf.h>
 
 #ifndef __CUDACC__
 #define __CUDACC__
 #endif
 
-//#define ALPHA 0.3
-
 #include "GpuLikelihood.hpp"
-
 
 #define T2P(thrustvec) thrust::raw_pointer_cast(&(thrustvec)[0])
 
@@ -1259,13 +1257,12 @@ namespace EpiRisk
     devD_ = makeSparseDistance(coords, popSize_, dLimit);
     dnnz_ = devD_->nnz;
 
-    cerr << "About to allocate hostDRowPtr" << endl;
     hostDRowPtr_ = new int[popSize_ + 1];
-    cerr << "Allocated hostDRowPtr_ " << endl;
     checkCudaError(
 		   cudaMemcpy(hostDRowPtr_, devD_->rowPtr, (popSize_+1)*sizeof(int), cudaMemcpyDeviceToHost));
 
     delete[] coords;
+    cerr << "Distance matrix allocated with " << dnnz_ << " valid elements." << endl;
   }
 
   void
@@ -2421,10 +2418,7 @@ namespace EpiRisk
     _delInfectionTimePrepare<<<1,1>>>(i, I1Idx_, data, p, devScratch_,
 				      T2P(*devProduct_), devComponents_);
     
-    //thrust::device_ptr<float> eventTimesPtr(devEventTimes_);
-
     float notification = population_[i].N;
-    //float oldI = eventTimesPtr[i];
 
     int blocksPerGrid = (hostDRowPtr_[i + 1] - hostDRowPtr_[i] + THREADSPERBLOCK
 			 - 1) / THREADSPERBLOCK + 1;

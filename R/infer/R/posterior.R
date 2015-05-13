@@ -76,12 +76,11 @@ HD5InfecProxy <- function(filename)
 
 # Proxy classes -- these classes provide an interface to the posterior in
 #   the underlying disc storage.
-setClass("HD5ParamProxy",representation(filename="character",tags="character",length="numeric"))
+setClass("HD5ParamProxy",representation(filename="character",tags="character"))
 setMethod("initialize","HD5ParamProxy",
 		function(.Object,filename) {
 			.Object@filename <- filename
 			info <- .Call("getPosteriorParamInfo", filename)
-			.Object@length <- info$length
 			.Object@tags <- info$tags
 			return(.Object)
 		}
@@ -89,12 +88,11 @@ setMethod("initialize","HD5ParamProxy",
 
 
 
-setClass("HD5InfecProxy",representation(filename="character",tags="character",length="numeric"))
+setClass("HD5InfecProxy",representation(filename="character",tags="character"))
 setMethod("initialize","HD5InfecProxy",
 		function(.Object,filename) {
 			.Object@filename <- filename
 			info <- .Call("getPosteriorInfecInfo", filename)
-			.Object@length <- info$length
 			.Object@tags <- info$tags
 			return(.Object)
 		}
@@ -115,20 +113,20 @@ setMethod("initialize", "Posterior", function(.Object, filename) {
 
 
 # Metadata methods
-setMethod("show","Posterior", function(object) cat("Instance of Posterior for model '",object@model,"', length=",object@param@length,"\n",sep=''))
+setMethod("show","Posterior", function(object) cat("Instance of Posterior for model '",object@model,"', length=",length(object),"\n",sep=''))
 setMethod("show","HD5ParamProxy", function(object) cat("Instance of HD5ParamProxy\n"))
 setMethod("show","HD5InfecProxy", function(object) cat("Instance of HD5InfecProxy\n"))
 setMethod("names","Posterior", function(x) c("param","infec","model","filename"))
 setMethod("names","HD5ParamProxy", function(x) x@tags)
 setMethod("names","HD5InfecProxy", function(x) x@tags)
-setMethod("dim", "HD5ParamProxy", function(x) c(x@length, length(x@tags)))
-setMethod("dim", "HD5InfecProxy", function(x) c(x@length, length(x@tags)))
-setMethod("length", "HD5ParamProxy", function(x) dim(x)[1])
-setMethod("length", "HD5InfecProxy", function(x) dim(x)[1])
-setMethod("length", "Posterior", function(x) dim(x@param)[1])
+#setMethod("length", "HD5ParamProxy", function(x) getPosteriorLen(x@filename))
+#setMethod("length", "HD5InfecProxy", function(x) getPosteriorLen(x@filename))
+setMethod("length", "Posterior", function(x) getPosteriorLen(x@filename))
 setGeneric("nrow")
-setMethod("nrow", "HD5ParamProxy", function(x) dim(x)[1])
-setMethod("nrow", "HD5InfecProxy", function(x) dim(x)[1])
+setMethod("nrow", "HD5ParamProxy", function(x) getPosteriorLen(x@filename))
+setMethod("nrow", "HD5InfecProxy", function(x) getPosteriorLen(x@filename))
+setMethod("dim", "HD5ParamProxy", function(x) c(nrow(x), length(x@tags)))
+setMethod("dim", "HD5InfecProxy", function(x) c(nrow(x), length(x@tags)))
 setGeneric("ncol")
 setMethod("ncol", "HD5ParamProxy", function(x) dim(x)[2])
 setMethod("ncol", "HD5InfecProxy", function(x) dim(x)[2])
@@ -140,9 +138,9 @@ setMethod("[","HD5ParamProxy",
 			rows <- integer(0)
 			cols <- integer(0)
 			if(!missing(i)) {
-				rows <- (0:(x@length-1))[i] # May seem odd, but it delegates bounds checking to R's internals
+				rows <- (0:(nrow(x)-1))[i] # May seem odd, but it delegates bounds checking to R's internals
 			}
-			else rows <- 0:(x@length-1)
+			else rows <- 0:(nrow(x)-1)
 			
 			if(!missing(j)) {
 				if(class(j) == "character") {
@@ -158,9 +156,8 @@ setMethod("[","HD5ParamProxy",
 )
 setMethod("$","HD5ParamProxy",
 		function(x,name) {
-			col=grep(name,names(x))
-			if(length(col) != 1) NULL
-			else x[,col]
+			if(name %in% names(x)) x[,name]
+			else NULL
 		}
 )
 setMethod("[","HD5InfecProxy",
@@ -168,9 +165,9 @@ setMethod("[","HD5InfecProxy",
 			rows <- integer(0)
 			cols <- integer(0)
 			if(!missing(i)) {
-				rows <- (0:(x@length-1))[i]
+				rows <- (0:(nrow(x)-1))[i]
 			}
-			else rows <- 0:(x@length-1)
+			else rows <- 0:(nrow(x)-1)
 			
 #			if(!missing(j)) {
 #				cols <- (1:length(x@tags))[j]
@@ -182,6 +179,10 @@ setMethod("[","HD5InfecProxy",
 			.Call("getPosteriorInfecs",x@filename,rows,cols)
 		}
 )
+
+# Occult probs
+setGeneric("poccult", function(x, from, to) standardGeneric("poccult"))
+setMethod("poccult", "Posterior", function(x, from, to) .Call("getOccultProb", x@filename, from=1, to=length(x))) 
 
 # Coercion
 setGeneric("as.data.frame")

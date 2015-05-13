@@ -55,7 +55,7 @@ struct Settings
   double psi_c, psi_p, psi_s;
   double zeta_p, zeta_s;
   double phi_c, phi_p, phi_s;
-  double a, b;
+  double a, b, c, d;
   double latency;
   double ntor;
 
@@ -99,7 +99,9 @@ struct Settings
     a = pt.get<double> ("fmdGillespieSim.parameters.a");
     b = pt.get<double> ("fmdGillespieSim.parameters.b");
     latency = pt.get<double> ("fmdGillespieSim.options.latency", 0.0f);
-    ntor = pt.get<double> ("fmdGillespieSim.options.ntor",1.0f);
+    //ntor = pt.get<double> ("fmdGillespieSim.options.ntor",1.0f);
+    c = pt.get<double> ("fmdGillespieSim.parameters.c");
+    d = pt.get<double> ("fmdGillespieSim.parameters.d");
   }
 
 };
@@ -208,7 +210,9 @@ main(int argc, char* argv[])
   parameters.latency = Parameter(settings.latency, GammaPrior(1,1), "latency");
   parameters.a = Parameter(settings.a, GammaPrior(1, 1), "a");
   parameters.b = Parameter(settings.b, GammaPrior(1, 1), "b");
-  parameters.ntor = Parameter(settings.ntor, GammaPrior(1,1), "ntor");
+  parameters.c = Parameter(settings.c, GammaPrior(1,1),"c");
+  parameters.d = Parameter(settings.d, GammaPrior(1,1),"d");
+  //parameters.ntor = Parameter(settings.ntor, GammaPrior(1,1), "ntor");
   parameters.movtban = Parameter(settings.movtban, GammaPrior(1,1), "movtban");
 
   FmdModel model(myPopulation, parameters);

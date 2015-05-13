@@ -104,6 +104,8 @@ struct FmdParameters
   Parameter phi_s;
   Parameter a;
   Parameter b;
+  Parameter c;
+  Parameter d;
   Parameter latency;
   Parameter ntor;
   Parameter movtban;
@@ -126,10 +128,10 @@ public:
   double background(const Individual& j, const double t) const;
   double hFunction(const Individual& j, const double time) const;
   double ItoN(Random& random) const;
-  double NtoR() const;
+  double NtoR(Random& random) const;
 
   double leftTruncatedItoN(Random& random, const Individual& j) const;
-
+  double leftTruncatedNtoR(Random& random, const Individual& j) const;
 private:
   FmdParameters& params_;
 

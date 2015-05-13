@@ -346,3 +346,59 @@ getPosteriorModel(SEXP filename)
 }
 
 
+RcppExport SEXP
+getOccultProb(SEXP filename, SEXP from, SEXP to)
+{
+  // Rows and cols are 0-based!
+  // No subscript boundary checking is performed
+  // cols is currently unused
+
+  Rcpp::CharacterVector _filename(filename);
+  Rcpp::IntegerVector _from(from);
+  Rcpp::IntegerVector _to(to);
+
+  Rcpp::List info = getPosteriorInfecInfo(filename);
+  Rcpp::CharacterVector tags = info[1];
+
+  Rcpp::NumericVector occprob(tags.size());
+  occprob.attr("names") = tags;
+  std::fill(occprob.begin(), occprob.end(), 0.0);
+
+  try
+    {
+      H5::H5File file(_filename[0], H5F_ACC_RDONLY, H5P_DEFAULT, H5P_DEFAULT);
+      FL_PacketTable infections(file.getId(), infecpath);
+
+      hvl_t buff;
+      for (size_t i = _from[0]-1; i < (_to[0]-1); ++i)
+        {
+          infections.GetPacket(i, &buff);
+          ipTuple_t* records = (ipTuple_t*) buff.p;
+
+          for (size_t j = 0; j < buff.len; ++j)
+            {
+              occprob[records[j].idx]++;
+            }
+          free(buff.p);
+        }
+
+      file.close();
+    }
+  catch (std::exception& __ex__)
+    {
+      forward_exception_to_r(__ex__);
+    }
+  catch (H5::Exception& e)
+    {
+      ::Rf_error(e.getCDetailMsg());
+    }
+  catch (...)
+    {
+      ::Rf_error("c++ exception (unknown reason)");
+    }
+
+  double len = _to[0] - _from[0];
+  for(size_t i=0; i<occprob.size(); ++i) occprob[i] /= len;
+
+  return occprob;
+}

@@ -1,4 +1,4 @@
-Package: infer
+Package: inferfmd
 Type: Package
 Title: Inference For Epidemic-related Risk
 Version: 1.2
