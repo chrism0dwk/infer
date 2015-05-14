@@ -5,8 +5,6 @@ EXT = cpp
 
 OBJS = SpatMetaPop.o SmpIndividual.o stlStrTok.o Random.o
 
-#compiler/preprocessor options
-PARAMS = @CPICFLAGS@ -fPIC
 
 #linker options
 LD_PARAMS = @RPATHFLAG@
@@ -14,7 +12,7 @@ LD_PARAMS = @RPATHFLAG@
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
-	$(CXX) -c $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
+	$(CXX) -c $(AM_CXXFLAGS) $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
 
 clean:
 	rm -rf *o

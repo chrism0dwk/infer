@@ -5,7 +5,7 @@ EXT = cpp
 OBJS = posterior.o SmpIface.o SpSINRMcmc.o RData.o
 
 #compiler/preprocessor options
-PARAMS = @CPICFLAGS@ @AM_CXXFLAGS@
+PARAMS = @AM_CXXFLAGS@
 
 #linker options
 LD_PARAMS = @RPATHFLAG@
