@@ -1,18 +1,14 @@
-AM_CPPFLAGS = -I. -I@CUDA_HOME@/include -I@BOOST_HOME@/include -I@GSL_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
+AM_CPPFLAGS = -I. @PKG_CPPFLAGS@
 
 CUEXT = cu 
 EXT = cpp
 
 OBJS = SpatMetaPop.o SmpIndividual.o stlStrTok.o Random.o
 
-
-#linker options
-LD_PARAMS = @RPATHFLAG@
-
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
-	$(CXX) -c $(AM_CXXFLAGS) $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
+	$(CXX) -c $(PKG_CXXFLAGS) $(PKG_CPPFLAGS) $^ -o $@
 
 clean:
 	rm -rf *o

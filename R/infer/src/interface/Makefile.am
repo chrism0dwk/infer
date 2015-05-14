@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I. -I../data -I../Framework -I../sim -I../mcmc -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@ -I@CUDPP_HOME@/include -I@BOOST_HOME@/include -I@GSL_HOME@/include -I@HDF5_HOME@/include
+AM_CPPFLAGS = -I. -I../data -I../Framework -I../sim -I../mcmc @PKG_CPPFLAGS@
 
 EXT = cpp
 
@@ -13,7 +13,7 @@ LD_PARAMS = @RPATHFLAG@
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
-	$(CXX) -c $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
+	$(CXX) -c @PKG_CXXFLAGS@ $(AM_CPPFLAGS) $(AM_CXXFLAGS) $^ -o $@
 
 clean:
 	rm -rf *o

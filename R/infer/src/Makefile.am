@@ -17,16 +17,7 @@ DATAOBJS = data/Data.o
 
 OBJS = $(IFACEOBJS) $(FRAMEWORKOBJS) $(SIMOBJS) $(MCMCOBJS) $(DATAOBJS) 
 
-
-#linker options
-LD_PARAMS = @RPATHFLAG@
-NVLD_PARAMS = @DEVICEOPTS@ -Xlinker @RPATHFLAG@
-
-CUDPP_LIBS = -L@CUDPP_HOME@/lib -lcudpp
-CUDA_LIBS = -L@CUDA_HOME@@CUDA_LIB_DIR@ -lcudart -lcublas -lcurand -lcusparse
-GSL_LIBS = -L@GSL_HOME@/lib -lgsl -lgslcblas
-HDF5_LIBS= -L@HDF5_HOME@/lib -lhdf5 -lhdf5_cpp -lhdf5_hl -lhdf5_hl_cpp
-LIBS =  @R_LIB@ @LIBS@ @RCPP_PKG_LIBS@ $(HDF5_LIBS) $(CUDA_LIBS) $(CUDPP_LIBS) $(GSL_LIBS)
+LIBS =  @HDF5_LIBS@ @CUDA_LIBS@ @GSL_LIBS@
 
 TARGETS = infer.so
 
@@ -34,7 +25,7 @@ TARGETS = infer.so
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(CXX) -shared $(OBJS) $(LIBS) $(LD_PARAMS) -o $@
+	$(CXX) @PKG_CXXFLAGS@ @PKG_CPPFLAGS@ -shared $(OBJS) @PKG_LDFLAGS@ $(LIBS) -o $@
 
 clean:
 	rm -rf *o

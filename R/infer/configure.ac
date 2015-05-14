@@ -1,11 +1,11 @@
 # Configure.ac to produce configure file by autoconf
 #
-# Author: Chris Jewell <c.p.jewell@massey.ac.nz> (c) 2013
+# Author: Chris Jewell <c.jewell@lancaster.ac.uk> (c) 2013
 # License: GPL(>=3.0)
 #
 # With help from gputools automake structure.
 
-AC_INIT([DESCRIPTION],[VERSION],[c.p.jewell@massey.ac.nz])
+AC_INIT([DESCRIPTION],[VERSION],[c.jewell@lancaster.ac.uk])
 AC_CONFIG_SRCDIR([src])
 AC_CONFIG_AUX_DIR([tools])
 LT_INIT
@@ -21,203 +21,118 @@ AC_LANG([C++])
 # Host OS
 AC_CANONICAL_HOST
 
+# Don't touch user flags!
+USR_CPPFLAGS=${CPPFLAGS}
+USR_LDFLAGS=${LDFLAGS}
 
-# Library directories
-AC_ARG_WITH([compiler-bindir],
-        AC_HELP_STRING([--with-compiler-bindir=compiler_bindir],
-                [specify the directory containing gcc, e.g. /usr/bin]),
-        [COMPILER_BINDIR="$withval"])
-
-AC_ARG_WITH([cuda-home],
-        [AC_HELP_STRING([--with-cuda-home=cuda_home],
-                [specify the root of your cuda install @<:@default=/usr/local/cuda@:>@])],
-        [CUDA_HOME="$withval"])
-
-AC_ARG_WITH([cudpp-home],
-	AC_HELP_STRING([--with-cudpp-home=cudpp_home],
-		[specify the root of your cudpp install, [/usr/local]]),
-	[CUDPP_HOME="$withval"])
-
-AC_ARG_WITH([r-include],
-        AC_HELP_STRING([--with-r-include=r_include],
-                [specify the full path to your R header files, e.g. /usr/share/R/include]),
-        [R_INCLUDE="$withval"])
-
-AC_ARG_WITH([r-lib],
-        AC_HELP_STRING([--with-r-lib=r-lib],
-                [specify the full path to your R shared libraries, e.g. /usr/lib64/R/lib]),
-        [R_LIB="$withval"])
-
-AC_ARG_WITH([boost-home],
-	AC_HELP_STRING([--with-boost-home=boost_home],
-		[specify the root of your boost install, e.g. /usr/local/boost]),
-	[BOOST_HOME="$withval"])
-
-AC_ARG_WITH([gsl-home],
-	AC_HELP_STRING([--with-gsl-home],
-		[specify the root of your GSL install, e.g. /usr/local/gsl]),
-	[GSL_HOME="$withval"])
-
-AC_ARG_WITH([hdf5-home],
-	AC_HELP_STRING([--with-hdf5-home],
-		[specify the root of your HDF5 install, e.g. /usr/local/hdf5]),
-	[HDF5_HOME="$withval"])
-
-# Check directory locations
-AC_MSG_CHECKING("environment variable COMPILER_BINDIR")
-if test -z "${COMPILER_BINDIR}"; then
-        AC_MSG_RESULT("COMPILER_BINDIR not set; using user's default path")
-else
-        AC_MSG_RESULT("using COMPILER_BINDIR=${COMPILER_BINDIR}")
-        AC_CHECK_FILE([${COMPILER_BINDIR}/gcc], [HAS_GCC="yes"])
-        if test -z "${HAS_GCC}"; then
-                AC_MSG_ERROR("cannot find gcc; check that ${COMPILER_BINDIR} is the correct location; using user's default path")
-                MISC_PARAMS=""
-        else
-                AC_MSG_RESULT("gcc found in ${COMPILER_BINDIR}")
-                MISC_PARAMS="--compiler-bindir ${COMPILER_BINDIR}"
-        fi
-fi
-
-AC_MSG_CHECKING("environment variable CUDA_HOME")
-if test -z "${CUDA_HOME}"; then
-        AC_MSG_RESULT("CUDA_HOME not set; using default /usr/local/cuda")
-        CUDA_HOME="/usr/local/cuda"
-else
-        AC_MSG_RESULT("using CUDA_HOME=${CUDA_HOME}")
-fi
-
-AC_MSG_CHECKING("environment variable CUDPP_HOME")
-if test -z "${CUDPP_HOME}"; then
-   	AC_MSG_RESULT("CUDPP_HOME not set; using default /usr/local")
-	CUDPP_HOME="/usr/local"
-else
-	AC_MSG_RESULT("using CUDPP_HOME=${CUDPP_HOME}")
-fi
-
-AC_CHECK_FILE([${CUDA_HOME}/bin/nvcc], [HAS_NVCC="yes"])
-if test -z "${HAS_NVCC}"; then
-        AC_MSG_ERROR("cannot find nvcc; check CUDA install")
-else
-	CUDA_VERSION=`${CUDA_HOME}/bin/nvcc --version | awk -F, 'END{print $3}'`
-        AC_MSG_RESULT(["Using CUDA version ${CUDA_VERSION}"])
-fi
-
-AC_CHECK_FILE([${CUDA_HOME}/lib64/libcublas.so], [BIT64="yes"])
-if test -z "${BIT64}"; then
-        AC_MSG_RESULT("Using ${CUDA_HOME}/lib for CUDA libs")
-        CUDA_LIB_DIR="/lib"
-else
-        AC_MSG_RESULT("Using ${CUDA_HOME}/lib64 for CUDA libs")
-        CUDA_LIB_DIR="/lib64"
-fi
-
-AC_MSG_NOTICE("environment variable BOOST_HOME")
-if test -z "${BOOST_HOME}"; then
-   	AC_MSG_RESULT("BOOST_HOME not set; using default /usr")
-	BOOST_HOME="/usr"
-else
-	AC_MSG_RESULT("using BOOST_HOME=${BOOST_HOME}")
-fi
-
-AC_MSG_NOTICE("environment variable GSL_HOME")
-if test -z "${GSL_HOME}"; then
-   	AC_MSG_RESULT("GSL_HOME not set; using default /usr")
-	GSL_HOME="/usr"
-else
-	AC_MSG_RESULT("using GSL_HOME=${GSL_HOME}")
-fi
-
-AC_MSG_NOTICE("environment variable HDF5_HOME")
-if test -z "${HDF5_HOME}"; then
-   	AC_MSG_RESULT("HDF5_HOME not set; using default /usr")
-	HDF5_HOME="/usr"
-else
-	AC_MSG_RESULT("using HDF5_HOME=${HDF5_HOME}")
-fi
-
+##################
+# R requirements #
+##################
 : ${R_HOME=`R RHOME`}
 if test -z "${R_HOME}"; then
-        AC_MSG_ERROR("could not determine R_HOME")
-else
-        CPICFLAGS="`"${R_HOME}/bin/R" CMD config CPICFLAGS`"
-	AM_CXXFLAGS="${CPICFLAGS} `${R_HOME}/bin/R CMD config CXXFLAGS`"
-	AM_CXXFLAGS="${AM_CXXFLAGS} -DNDEBUG"
-        if test -z "${R_INCLUDE}"; then
-                R_INCLUDE=`"${R_HOME}/bin/R" CMD config --cppflags`
-        else
-                R_INCLUDE="-I${R_INCLUDE}"
-        fi
-        if test -z "${R_LIB}"; then
-                R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
-        else
-                R_LIB="-L${R_LIB} -lR"
-        fi
+  echo "could not determine R_HOME"
+  exit 1
 fi
-AC_MSG_RESULT("using ${R_INCLUDE} for R header files")
-AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
+CXX=`"${R_HOME}/bin/R" CMD config CXX`
+CPP=`"${R_HOME}/bin/R" CMD config CPP`
+R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
+R_CXXPICFLAGS=`"${R_HOME}/bin/R" CMD config CXXPICFLAGS`
+R_CPPFLAGS=`"${R_HOME}/bin/R" CMD config --cppflags`
 
 
-# Set platform-dependent constants
-DEVICEOPTS="-O3 -use_fast_math"
+######################
+# CUDA related stuff #
+######################
+SAVED_LDFLAGS=${LDFLAGS}
 
-AC_MSG_NOTICE([determining host platform])
-arch=`uname -m`
-osrelease=`uname -r`
-osversion=`uname -v`
+AX_CHECK_CUDA
 
-RPATHFLAG=""
-case "${host_os}" in
-        *darwin*)
-		RPATHFLAG="-Wl,-rpath,${CUDA_HOME}${CUDA_LIB_DIR},-rpath,${CUDPP_HOME}/lib"
-                AC_PATH_PROG([SW_VERS],[sw_vers],[no],[$PATH])
-                if test "$arch" = "i386"; then
-                        $SW_VERS -productVersion | grep '^10.6' > /dev/null 2>&1
-                        if test "x$?" = "x0" ; then
-                                DEVICEOPTS="-m64"
-                        fi
-                elif test "$arch" = "x86_64"; then
-                        DEVICEOPTS="-m64"
-                else
-                        AC_MSG_WARN([Unrecognised Darwin Architecture])
-                fi
-        ;;
-	*linux*)
-		RPATHFLAG="-Wl,-rpath=${CUDA_HOME}${CUDA_LIB_DIR}:${CUDPP_HOME}/lib"
-	;;
-esac
+CUDA_VERSION=`${NVCC} --version | awk -F, 'END{print $3}'`
+AC_MSG_NOTICE([Using CUDA version ${CUDA_VERSION}])
+
+LDFLAGS=${CUDA_LDFLAGS}
+AC_CHECK_LIB([cublas],[cublasGetVersion],,[AC_MSG_ERROR([libcublas not found])])
+AC_CHECK_LIB([curand],[curandCreateGenerator],,[AC_MSG_ERROR([libcurand not found])])
+AC_CHECK_LIB([cusparse],[cusparseCreate],,[AC_MSG_ERROR([libcusparse not found])])
+LDFLAGS="${CUDA_LDFLAGS} ${SAVED_LDFLAGS}"
+
+# CUDPP
+AC_CHECK_HEADER([cudpp.h],,[AC_MSG_ERROR([cudpp.h not found])])
+AC_CHECK_LIB([cudpp],[cudppReduce],,[AC_MSG_ERROR([libcudpp not found])])
+
+CUDA_LIBS=${LIBS}
+
+# Reset libs
+LIBS="" # Clear libs
+LDFLAGS=${USR_LDFLAGS}
 
 
-# Check headers
-AC_CHECK_HEADERS([math.h])
-CPPFLAGSOLD=${CPPFLAGS}
-CPPFLAGS=-I${HDF5_HOME}/include
-AC_CHECK_HEADERS([H5Cpp.h],,[AC_MSG_ERROR([HDF5 library headers not found])])
-CPPFLAGS=${CPPFLAGSOLD}
+#########
+# Boost #
+#########
+AC_CHECK_HEADER([boost/numeric/ublas/matrix_sparse.hpp],,[AC_MSG_ERROR([Boost headers not found])])
 
-# Assemble library requirements - not required since R 3.1
+#######
+# GSL #
+#######
+AC_CHECK_HEADER([gsl/gsl_randist.h],,[AC_MSG_ERROR([GSL headers not found.])])
+AC_CHECK_LIB([m],[cos],,[AC_MSG_ERROR([libm not found])])
+AC_CHECK_LIB([gslcblas],[cblas_dgemm],,[AC_MSG_ERROR([libgslcblas not found. Either set LDFLAGS or install GSL])])
+AC_CHECK_LIB([gsl],[gsl_blas_dgemm],,[AC_MSG_ERROR([libgsl not found.  Either set LDFLAGS or install GSL])])
+
+GSL_LIBS=${LIBS}
+LIBS=""
+
+# HDF5
+AC_CHECK_HEADER([H5Cpp.h],,[AC_MSG_ERROR([H5Cpp.h not found])])
+AC_CHECK_HEADER([H5PacketTable.h],,[AC_MSG_ERROR([H5Packetable.h not found])])
+AC_CHECK_LIB([hdf5],[H5get_libversion],,[AC_MSG_ERROR([libhdf5 not found])])
+AC_CHECK_LIB([hdf5_hl],[H5PTopen],,[AC_MSG_ERROR([libhdf5_hl not found])])
+
+# Following test from
+# http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/
+AC_MSG_CHECKING([for PacketTable in -lhdf5_hl_cpp])
+AC_LANG(C++)
+SAVED_LDFLAGS=${LDFLAGS}
+LDFLAGS="${LDFLAGS} -lhdf5_hl_cpp -lhdf5_cpp"
+AC_LINK_IFELSE(
+	[AC_LANG_PROGRAM([#include <H5Cpp.h>]
+	                 [#include <H5PacketTable.h>],
+			 [PacketTable p])],
+	[LIBS="-lhdf5_cpp -lhdf5_hl_cpp ${LIBS}"]
+	[HAVE_HDF5_CPP=1]
+	[HAVE_HDF5_HL_CPP=1]
+	[AC_MSG_RESULT([yes])],
+	[AC_MSG_RESULT([no])]
+	[AC_MSG_ERROR([HDF5 C++ high level interface not found])])
+LDFLAGS=${SAVED_LDFLAGS}
+
+HDF5_LIBS=${LIBS}
+LIBS=""
+
+LDFLAGS=${USR_LDFLAGS}
+
+# Rcpp library requirements - not required since R 3.1
 RCPP_PKG_LIBS=`${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()"`
 RCPP_PKG_INCLUDE=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
 
+# Libraries
+PKG_CPPFLAGS="${CPPFLAGS} ${CUDA_CPPFLAGS} ${R_CPPFLAGS} ${RCPP_PKG_INCLUDE} -DNDEBUG"
+PKG_CXXFLAGS="${PKG_CXXFLAGS} ${R_CXXFLAGS} ${R_CXXPICFLAGS}"
+PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS}"
+AM_CXXFLAGS=${RCPP_PKG_INCLUDE}
+
 
 AC_SUBST([RCPP_PKG_LIBS])
-AC_SUBST([RCPP_PKG_INCLUDE])
+AC_SUBST([CUDA_LIBS])
+AC_SUBST([GSL_LIBS])
 AC_SUBST([HDF5_LIBS])
-AC_SUBST([LIBS])
-AC_SUBST([CUDA_HOME])
-AC_SUBST([CUDA_LIB_DIR])
-AC_SUBST([CUDPP_HOME])
-AC_SUBST([CUDPP_LIBS])
-AC_SUBST([DEVICEOPTS])
-AC_SUBST([BOOST_HOME])
-AC_SUBST([GSL_HOME])
-AC_SUBST([HDF5_HOME])
-AC_SUBST([R_INCLUDE])
-AC_SUBST([R_LIB])
-AC_SUBST([RPATHFLAG])
-AC_SUBST([CPICFLAGS])
-AC_SUBST([AM_CXXFLAGS])
+AC_SUBST([PKG_CPPFLAGS])
+AC_SUBST([PKG_CXXFLAGS])
+AC_SUBST([PKG_LDFLAGS])
+AC_SUBST([NVCC])
+AC_SUBST([NVCC_OPTS])
 
 # Generate Makefiles
-AC_CONFIG_FILES([src/Makefile src/interface/Makefile src/data/Makefile src/sim/Makefile src/mcmc/Makefile src/Framework/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile src/interface/Makefile src/data/Makefile src/sim/Makefile src/mcmc/Makefile src/Framework/Makefile])
 AC_OUTPUT

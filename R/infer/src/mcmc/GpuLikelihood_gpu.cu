@@ -1857,11 +1857,6 @@ namespace EpiRisk
     gettimeofday(&start, NULL);
 #endif
 
-#ifndef NDEBUG
-    float oldTime = eventTimesPtr[i];
-    cerr << "Moving idx " << idx << " from " <<  oldTime << " to " << newTime << endl;
-#endif
-
     // Pack data and parameters (Delegate to constructor!)
     Data data;
     ParmVals p;

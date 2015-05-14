@@ -1,20 +1,14 @@
-AM_CPPFLAGS = -I. -I../Framework -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
+AM_CPPFLAGS = -I. -I../Framework @PKG_CPPFLAGS@
 
 CUEXT = cu 
 EXT = cpp
 
 OBJS = SmpSirSim.o
 
-#compiler/preprocessor options
-PARAMS = @CPICFLAGS@ @AM_CXXFLAGS@
-
-#linker options
-LD_PARAMS = @RPATHFLAG@
-
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
-	$(CXX) -c $(AM_CPPFLAGS) $(PARAMS) $^ -o $@
+	$(CXX) -c @PKG_CXXFLAGS@ $(AM_CPPFLAGS) $^ -o $@
 
 clean:
 	rm -rf *o
