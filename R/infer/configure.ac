@@ -38,6 +38,7 @@ CPP=`"${R_HOME}/bin/R" CMD config CPP`
 R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
 R_CXXPICFLAGS=`"${R_HOME}/bin/R" CMD config CXXPICFLAGS`
 R_CPPFLAGS=`"${R_HOME}/bin/R" CMD config --cppflags`
+R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
 
 
 ######################
@@ -119,8 +120,10 @@ RCPP_PKG_INCLUDE=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
 # Libraries
 PKG_CPPFLAGS="${CPPFLAGS} ${CUDA_CPPFLAGS} ${R_CPPFLAGS} ${RCPP_PKG_INCLUDE} -DNDEBUG"
 PKG_CXXFLAGS="${PKG_CXXFLAGS} ${R_CXXFLAGS} ${R_CXXPICFLAGS}"
-PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS}"
+PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS} ${R_LIB}"
 AM_CXXFLAGS=${RCPP_PKG_INCLUDE}
+
+# RPATH -- a PITA!
 
 
 AC_SUBST([RCPP_PKG_LIBS])
