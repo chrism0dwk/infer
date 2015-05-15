@@ -7,13 +7,11 @@
 
 AC_INIT([DESCRIPTION],[VERSION],[c.jewell@lancaster.ac.uk])
 AC_CONFIG_SRCDIR([src])
-AC_CONFIG_AUX_DIR([tools])
-LT_INIT
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([tools])
 AM_INIT_AUTOMAKE
 
 # Get C++ compiler
-#AC_PROG_CXXCPP
 AC_PROG_CXX
 AC_PROG_CC
 AC_LANG([C++])
@@ -60,11 +58,11 @@ LDFLAGS="${CUDA_LDFLAGS} ${SAVED_LDFLAGS}"
 # CUDPP
 AC_CHECK_HEADER([cudpp.h],,[AC_MSG_ERROR([cudpp.h not found])])
 AC_CHECK_LIB([cudpp],[cudppReduce],,[AC_MSG_ERROR([libcudpp not found])])
+AC_MSG_NOTICE([LDFLAGS: ${LDFLAGS}])
 
+# Cache and reset LIBS
 CUDA_LIBS=${LIBS}
-
-# Reset libs
-LIBS="" # Clear libs
+LIBS=""
 LDFLAGS=${USR_LDFLAGS}
 
 
@@ -81,6 +79,7 @@ AC_CHECK_LIB([m],[cos],,[AC_MSG_ERROR([libm not found])])
 AC_CHECK_LIB([gslcblas],[cblas_dgemm],,[AC_MSG_ERROR([libgslcblas not found. Either set LDFLAGS or install GSL])])
 AC_CHECK_LIB([gsl],[gsl_blas_dgemm],,[AC_MSG_ERROR([libgsl not found.  Either set LDFLAGS or install GSL])])
 
+# Cache and reset LIBS
 GSL_LIBS=${LIBS}
 LIBS=""
 
@@ -90,7 +89,7 @@ AC_CHECK_HEADER([H5PacketTable.h],,[AC_MSG_ERROR([H5Packetable.h not found])])
 AC_CHECK_LIB([hdf5],[H5get_libversion],,[AC_MSG_ERROR([libhdf5 not found])])
 AC_CHECK_LIB([hdf5_hl],[H5PTopen],,[AC_MSG_ERROR([libhdf5_hl not found])])
 
-# Following test from
+# Following C++ test from
 # http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/
 AC_MSG_CHECKING([for PacketTable in -lhdf5_hl_cpp])
 AC_LANG(C++)
@@ -121,9 +120,17 @@ RCPP_PKG_INCLUDE=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
 PKG_CPPFLAGS="${CPPFLAGS} ${CUDA_CPPFLAGS} ${R_CPPFLAGS} ${RCPP_PKG_INCLUDE} -DNDEBUG"
 PKG_CXXFLAGS="${PKG_CXXFLAGS} ${R_CXXFLAGS} ${R_CXXPICFLAGS}"
 PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS} ${R_LIB}"
-AM_CXXFLAGS=${RCPP_PKG_INCLUDE}
+PKG_CXXFLAGS=${RCPP_PKG_INCLUDE}
 
-# RPATH -- a PITA!
+# Rpath
+PKG_RPATH="-Wl"
+for i in ${PKG_LDFLAGS}; do
+    path=`sed -ne '/^\-L/p' <<< ${i} | sed 's/^\-L//'`
+    if test ${path}; then
+      PKG_RPATH="${PKG_RPATH},-rpath,${path}"
+    fi
+done
+AC_MSG_NOTICE([RPath: ${PKG_RPATH}])
 
 
 AC_SUBST([RCPP_PKG_LIBS])
@@ -133,6 +140,7 @@ AC_SUBST([HDF5_LIBS])
 AC_SUBST([PKG_CPPFLAGS])
 AC_SUBST([PKG_CXXFLAGS])
 AC_SUBST([PKG_LDFLAGS])
+AC_SUBST([PKG_RPATH])
 AC_SUBST([NVCC])
 AC_SUBST([NVCC_OPTS])
 
