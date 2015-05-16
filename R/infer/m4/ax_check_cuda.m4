@@ -8,7 +8,7 @@
 #
 # Figures out if CUDA Runtime API/nvcc is available, i.e. existence of:
 #   cudart.h
-#   libcuda.so
+#   libcudart.so
 #   nvcc
 #
 # If something isn't found, fails straight away.
@@ -57,22 +57,19 @@ fi
 
 # We need to add the CUDA search directories for header and lib searches
 
-# Announcing the new variables
-CUDA_CPPFLAGS="-I$CUDA_DIR/include"
-
-#AC_SUBST([CUDA_CPPFLAGS])
-#AC_SUBST([CUDA_LDFLAGS])
-
 # Check header
+CUDA_CPPFLAGS="-I$CUDA_DIR/include"
 SAVED_CPPFLAGS=${CPPFLAGS}
 CPPFLAGS=${CUDA_CPPFLAGS}
 AC_CHECK_HEADER([cuda_runtime.h], [], AC_MSG_ERROR([Couldn't find cuda_runtime.h]), [#include <cuda_runtime.h>])
 CPPFLAGS=${SAVED_CPPFLAGS}
 
 # Check for lib in CUDA_DIR/lib64 (Linux) and CUDA_DIR/lib (Darwin/Linux32?)
-if test -x "-L${CUDA_DIR}/lib64"; then
+if test -d "${CUDA_DIR}/lib64"; then
+   AC_MSG_NOTICE([Using lib64 CUDA])
    CUDA_LDFLAGS="-L${CUDA_DIR}/lib64"
 else
+   AC_MSG_NOTICE([Using lib CUDA])
    CUDA_LDFLAGS="-L${CUDA_DIR}/lib"
 fi
 AC_MSG_NOTICE([CUDA LDFLAGS: ${CUDA_LDFLAGS}])

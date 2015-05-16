@@ -4,12 +4,6 @@ EXT = cpp
 
 OBJS = posterior.o SmpIface.o SpSINRMcmc.o RData.o
 
-#compiler/preprocessor options
-PARAMS = @AM_CXXFLAGS@
-
-#linker options
-LD_PARAMS = @RPATHFLAG@
-
 all: $(OBJS) 
 
 $(OBJS): %.o: %.$(EXT)
