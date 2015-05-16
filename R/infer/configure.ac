@@ -1,6 +1,6 @@
 # Configure.ac to produce configure file by autoconf
 #
-# Author: Chris Jewell <c.jewell@lancaster.ac.uk> (c) 2013
+# Author: Chris Jewell <c.jewell@lancaster.ac.uk> (c) 2015
 # License: GPL(>=3.0)
 #
 # With help from gputools automake structure.
@@ -58,7 +58,6 @@ LDFLAGS="${CUDA_LDFLAGS} ${SAVED_LDFLAGS}"
 # CUDPP
 AC_CHECK_HEADER([cudpp.h],,[AC_MSG_ERROR([cudpp.h not found])])
 AC_CHECK_LIB([cudpp],[cudppReduce],,[AC_MSG_ERROR([libcudpp not found])])
-AC_MSG_NOTICE([LDFLAGS: ${LDFLAGS}])
 
 # Cache and reset LIBS
 CUDA_LIBS=${LIBS}
@@ -122,9 +121,11 @@ PKG_CXXFLAGS="${PKG_CXXFLAGS} ${R_CXXFLAGS} ${R_CXXPICFLAGS}"
 PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS} ${R_LIB}"
 PKG_CXXFLAGS=${RCPP_PKG_INCLUDE}
 
-# Rpath
+# Rpath -- break LDFLAGS into tokens, get unique list,
+#   find tokens beginning with -L, strip the -L and
+#   add to PKG_RPATH
 PKG_RPATH="-Wl"
-for i in ${PKG_LDFLAGS}; do
+for i in `tr " " "\n" <<< ${PKG_LDFLAGS} | sort -u`; do
     path=`sed -ne '/^\-L/p' <<< ${i} | sed 's/^\-L//'`
     if test ${path}; then
       PKG_RPATH="${PKG_RPATH},-rpath,${path}"

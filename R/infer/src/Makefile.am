@@ -25,7 +25,7 @@ TARGETS = infer.so
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(CXX) @PKG_CXXFLAGS@ @PKG_CPPFLAGS@ -shared $(OBJS) @PKG_LDFLAGS@ $(LIBS) -o $@
+	$(CXX) @PKG_CXXFLAGS@ @PKG_CPPFLAGS@ -shared $(OBJS) @PKG_LDFLAGS@ $(LIBS) @PKG_RPATH@ -o $@
 
 clean:
 	rm -rf *o

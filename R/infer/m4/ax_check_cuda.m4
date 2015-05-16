@@ -59,18 +59,26 @@ fi
 
 # Announcing the new variables
 CUDA_CPPFLAGS="-I$CUDA_DIR/include"
-CUDA_LDFLAGS="-L$CUDA_DIR/lib"
+
 #AC_SUBST([CUDA_CPPFLAGS])
 #AC_SUBST([CUDA_LDFLAGS])
 
-# And the header and the lib
+# Check header
 SAVED_CPPFLAGS=${CPPFLAGS}
 CPPFLAGS=${CUDA_CPPFLAGS}
 AC_CHECK_HEADER([cuda_runtime.h], [], AC_MSG_ERROR([Couldn't find cuda_runtime.h]), [#include <cuda_runtime.h>])
 CPPFLAGS=${SAVED_CPPFLAGS}
+
+# Check for lib in CUDA_DIR/lib64 (Linux) and CUDA_DIR/lib (Darwin/Linux32?)
+if test -x "-L${CUDA_DIR}/lib64"; then
+   CUDA_LDFLAGS="-L${CUDA_DIR}/lib64"
+else
+   CUDA_LDFLAGS="-L${CUDA_DIR}/lib"
+fi
+AC_MSG_NOTICE([CUDA LDFLAGS: ${CUDA_LDFLAGS}])
 SAVED_LDFLAGS=${LDFLAGS}
 LDFLAGS=${CUDA_LDFLAGS}
-AC_CHECK_LIB([cudart], [cudaRuntimeGetVersion], [], AC_MSG_ERROR([Couldn't find libcudart]))
+AC_CHECK_LIB([cudart], [cudaRuntimeGetVersion],,[AC_MSG_ERROR([Cannot find CUDA library.  Check your CUDA installation, and/or supply --with-cuda= to configure])])
 LDFLAGS=${SAVED_LDFLAGS}
 
 
