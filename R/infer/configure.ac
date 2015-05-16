@@ -118,7 +118,8 @@ RCPP_PKG_INCLUDE=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
 # Libraries
 PKG_CPPFLAGS="${CPPFLAGS} ${CUDA_CPPFLAGS} ${R_CPPFLAGS} ${RCPP_PKG_INCLUDE} -DNDEBUG"
 PKG_CXXFLAGS="${PKG_CXXFLAGS} ${R_CXXFLAGS} ${R_CXXPICFLAGS}"
-PKG_CXXFLAGS=`sed 's/-Wp,-D_FORTIFY_SOURCE=2//' <<< ${PKG_CXXFLAGS}` # Hack to get rid of -Wp,... on Linux, nvcc doesn't like it.
+PKG_CXXFLAGS=`sed 's/,/\\\\,/g' <<< ${PKG_CXXFLAGS}` # Escape commas to stop them being turned into spaces by nvcc when passed to GCC
+AC_MSG_NOTICE([CXXFLAGS: $PKG_CXXFLAGS])
 PKG_LDFLAGS="${CUDA_LDFLAGS} ${LDFLAGS} ${R_LIB}"
 
 # Rpath -- break LDFLAGS into tokens, get unique list,
