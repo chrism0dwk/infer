@@ -44,6 +44,11 @@ if test "$CUDA_DIR" == "yes"; then
 	fi
 fi
 
+# User options to NVCC (such as -ccbin)
+AC_ARG_WITH(nvcc-flags, [AS_HELP_STRING([--with-nvcc-flags=OPT],
+				  [Options to NVCC])],
+				  [NVCCFLAGS=$withval])
+
 # Checking for nvcc
 AC_MSG_CHECKING([nvcc in $CUDA_DIR/bin])
 if test -x "$CUDA_DIR/bin/nvcc"; then
@@ -58,10 +63,10 @@ fi
 # We need to add the CUDA search directories for header and lib searches
 
 # Check header
-CUDA_CPPFLAGS="-I$CUDA_DIR/include"
+CUDA_CPPFLAGS="-I${CUDA_DIR}/include"
 SAVED_CPPFLAGS=${CPPFLAGS}
 CPPFLAGS=${CUDA_CPPFLAGS}
-AC_CHECK_HEADER([cuda_runtime.h], [], AC_MSG_ERROR([Couldn't find cuda_runtime.h]), [#include <cuda_runtime.h>])
+AC_CHECK_HEADER([cuda_runtime.h], [], AC_MSG_ERROR([Couldn't find cuda_runtime.h in ${CPPFLAGS}]), [#include <cuda_runtime.h>])
 CPPFLAGS=${SAVED_CPPFLAGS}
 
 # Check for lib in CUDA_DIR/lib64 (Linux) and CUDA_DIR/lib (Darwin/Linux32?)

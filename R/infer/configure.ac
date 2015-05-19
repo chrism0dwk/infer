@@ -11,6 +11,23 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([tools])
 AM_INIT_AUTOMAKE
 
+##################
+# R requirements #
+##################
+: ${R_HOME=`R RHOME`}
+if test -z "${R_HOME}"; then
+  echo "could not determine R_HOME"
+  exit 1
+fi
+CC=`"${R_HOME}/bin/R" CMD config CC`
+CXX=`"${R_HOME}/bin/R" CMD config CXX`
+CPP=`"${R_HOME}/bin/R" CMD config CPP`
+R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
+R_CXXPICFLAGS=`"${R_HOME}/bin/R" CMD config CXXPICFLAGS`
+R_CPPFLAGS="-I${R_HOME}/include `${R_HOME}/bin/R CMD config CPPFLAGS`"
+R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
+
+
 # Get C++ compiler
 AC_PROG_CXX
 AC_PROG_CC
@@ -23,20 +40,6 @@ AC_CANONICAL_HOST
 USR_CPPFLAGS=${CPPFLAGS}
 USR_LDFLAGS=${LDFLAGS}
 
-##################
-# R requirements #
-##################
-: ${R_HOME=`R RHOME`}
-if test -z "${R_HOME}"; then
-  echo "could not determine R_HOME"
-  exit 1
-fi
-CXX=`"${R_HOME}/bin/R" CMD config CXX`
-CPP=`"${R_HOME}/bin/R" CMD config CPP`
-R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
-R_CXXPICFLAGS=`"${R_HOME}/bin/R" CMD config CXXPICFLAGS`
-R_CPPFLAGS=`"${R_HOME}/bin/R" CMD config --cppflags`
-R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
 
 
 ######################
@@ -144,7 +147,7 @@ AC_SUBST([PKG_CXXFLAGS])
 AC_SUBST([PKG_LDFLAGS])
 AC_SUBST([PKG_RPATH])
 AC_SUBST([NVCC])
-AC_SUBST([NVCC_OPTS])
+AC_SUBST([NVCCFLAGS])
 
 # Generate Makefiles
 AC_CONFIG_FILES([Makefile src/Makefile src/interface/Makefile src/data/Makefile src/sim/Makefile src/mcmc/Makefile src/Framework/Makefile])

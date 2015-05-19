@@ -2,7 +2,7 @@ AM_CPPFLAGS = -I. -I../data -I../Framework @PKG_CPPFLAGS@
 
 NVCC = @NVCC@
 
-NVCC_CXXFLAGS = -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 --use_fast_math -O3 -Xcompiler "@PKG_CXXFLAGS@"
+NVCC_CXXFLAGS = @NVCCFLAGS@ -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 --use_fast_math -O3 -Xcompiler "@PKG_CXXFLAGS@"
 
 OBJS = SmpSirMcmc.o Likelihood.o GpuLikelihood.o Mcmc.o McmcFactory.o MCMCUpdater.o McmcLikelihood.o PosteriorHDF5Writer.o PosteriorHDF5Reader.o PosteriorWriter.o 
 

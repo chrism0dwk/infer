@@ -3,7 +3,7 @@
 #ifndef _infer_POSTERIOR_CPP
 #define _infer_POSTERIOR_CPP
 
-#include <R.h>
+//#include <R.h>
 #include <Rcpp.h>
 
 RcppExport SEXP getPosteriorParams(SEXP filename,
