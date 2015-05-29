@@ -1,0 +1,13 @@
+Package: nztheileria
+Type: Package
+Title: NZ Theileria simulation and inference
+Version: 1.0
+Date: 2015-05-29
+Authors@R: c(person("Chris", "Jewell", role=c("aut","cre"),email="c.jewell@lancaster.ac.uk"))
+Author: Chris Jewell (c) 2015 [aut, cre]
+Maintainer: Chris Jewell <c.jewell@lancaster.ac.uk>
+Description: This package performs Bayesian Inference on the Theileria orientalis (Ikeda) outbreak in NZ cattle from 2012 onwards. It contains code accompanying Jewell CP, Brown RG (2015) Bayesian data assimilation provides rapid decision support for vector-borne diseases. J. Roy. Soc. Interface. In press.
+License: GPLv3
+Depends: Rcpp (>= 0.9.10), methods
+LinkingTo: Rcpp
+Packaged: 2015-05-28 00:41:57 UTC; Chris Jewell

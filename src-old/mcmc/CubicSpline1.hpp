@@ -3,7 +3,7 @@
  * Created: 08-08-2014
  * Author: Chris Jewell <c.p.jewell@massey.ac.nz> (c) 2014
  * Co-author: Richard Brown <r.g.brown@massey.ac.nz>
- * Purpose: Implements CUDA periodic square wave functions
+ * Purpose: Implements CUDA periodic cubic spline functions
  *    given knots at t=0, 0.25, 0.5, 0.75, and 1.
  *
  * Parameters: alpha1 -- height at t=0,1
@@ -17,18 +17,33 @@
  *  can be used.
  */
 
-#ifndef SQUAREWAVE_HPP
-#define SQUAREWAVE_HPP
+#ifndef CUBICSPLINE1_HPP
+#define CUBICSPLINE1_HPP
 
 namespace EpiRisk {
 
-  static __device__  const float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-
+  
+  // extern __device__ float
+  // _s(const float t, const float I, float nu, float alpha1, float alpha2, float alpha3);
+  
+  // extern __device__ float
+  // _S(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float alpha3, const float* hCache);
+  
+  // extern void
+  // CalcSIntegCache(const float alpha1, const float alpha2, const float alpha3, float* cache, const bool setZero=false);
+  
+  // __device__ float
+  // _SIntegrand(float t, const float* T, const float* Y);
+  
+  // __global__ void
+  // _SIntegConst(const float alpha1, const float alpha2, const float alpha3, float* cache);
     __device__ float
   _s(const float t, const float I, float nu, float alpha1, float alpha2, float alpha3)
   {
-    // Periodic piece-wise square wave
+    // Periodic piece-wise cubic spline
+    float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
     float Y[] = {1.0f, 1.0f, 1.0f, 1.0f,1.0f};
+    float delta = 0.25;
     
     assert(t-I >= 0);
     
@@ -39,21 +54,35 @@ namespace EpiRisk {
     // Set up parameters
     Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3; Y[4] = alpha1;
     
-    // Calculate which epoch we are in
-    int epoch = 0;
-    assert(tAdj <= 1.0f);
-    while(tAdj > T[epoch+1]) epoch++;
+    // Calculate spline value
+    int epoch = (int)(tAdj*4.0f);
     
-    //int epoch = (int)(tAdj*4.0f);
+    float a = -6.0f*(Y[epoch+1]-Y[epoch])/(delta*delta);
+    float b = -a;
     
-    return Y[epoch];
+    float h = a/(6.0f*delta) * powf(tAdj - T[epoch], 3);
+    h      += (Y[epoch+1]/delta - (a*delta)/6.0f) *  (tAdj - T[epoch]);
+    h      += b/(6.0f*delta) * powf(T[epoch+1] - tAdj, 3);
+    h      += (Y[epoch]/delta - (b*delta)/6.0f) * (T[epoch+1] - tAdj);
+    
+    return h;
   }
   
   
   __device__ float
   _SIntegrand(float t, const float* T, const float* Y) {
-    // Calculates epoch integral
-    return (t-T[0])*Y[0];
+    // Calculates cubic spline integral between t1 and t2
+    float delta = 0.25f;
+    float a = -6.0f * (Y[1] - Y[0])/(delta * delta);
+    float b = -a;
+    
+    float h;
+    h =  a/(24.0f*delta) * powf(t - T[0], 4);
+    h += (Y[1]/(2.0f*delta) - (a*delta)/12.0f) * powf(t - T[0],2);
+    h -= b/(24.0f*delta) * powf(T[1] - t, 4);
+    h -= (Y[0]/(2.0f*delta) - (b*delta)/12.0f) * powf(T[1] - t,2);
+    
+    return h;
   }
   
   
@@ -61,6 +90,7 @@ namespace EpiRisk {
   _SIntegConst(const float alpha1, const float alpha2, const float alpha3, float* cache)
   {
     // Calculates cached integral -- requires only 4 threads
+    float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
     float Y[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     
     __shared__ float buff[4];
@@ -106,7 +136,9 @@ namespace EpiRisk {
   _S(const float b, const float a, const float nu, const float alpha1, const float alpha2, const float alpha3, const float* hCache)
   {
     // Returns the integral of the 'h' function over [a,b]
+    float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
     float Y[] = {1.0f, 1.0f,  1.0f, 1.0f,  1.0f};
+    
     Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3; Y[4] = alpha1;
     
     
@@ -119,11 +151,9 @@ namespace EpiRisk {
     t2 = t2 - floorf(t1);
     t1 = t1 - floorf(t1);
     
-    //int epoch1 = t1*4;
-    int epoch1 = 0; while(t1 > T[epoch1+1]) epoch1++;
+    int epoch1 = t1*4;
     int period2 = t2;
-    //int epoch2 = (t2-floorf(t2))*4;
-    int epoch2 = 0; while((t2-floorf(t2)) > T[epoch2+1]) epoch2++;
+    int epoch2 = (t2-floorf(t2))*4;
     
     float integrand1 = hCache[epoch1] + _SIntegrand(t1, T+epoch1, Y+epoch1) - _SIntegrand(epoch1*0.25f, T+epoch1, Y+epoch1);
     float integrand2 = hCache[4]*period2 + hCache[epoch2] + _SIntegrand(t2-period2, T+epoch2, Y+epoch2) - _SIntegrand(epoch2*0.25f, T+epoch2, Y+epoch2);

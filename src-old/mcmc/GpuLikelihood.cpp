@@ -38,7 +38,7 @@ namespace EpiRisk
 {
 
   void
-  GpuLikelihood::LoadPopulation(DataImporter<TheilData>& importer)
+  GpuLikelihood::LoadPopulation(PopDataImporter& importer)
   {
     idMap_.clear();
     hostPopulation_.clear();
@@ -49,15 +49,15 @@ namespace EpiRisk
         size_t idx = 0;
         while (1)
           {
-            DataImporter<TheilData>::Record record = importer.next();
+            PopDataImporter::Record record = importer.next();
             Covars covars;
             covars.id = record.id;
             covars.status = SUSC;
             covars.x = record.data.x;
             covars.y = record.data.y;
-            covars.I = obsTime_;
-            covars.N = obsTime_;
-            covars.R = obsTime_;
+            covars.I = obsTime_; //EpiRisk::POSINF;
+            covars.N = obsTime_; //EpiRisk::POSINF;
+            covars.R = obsTime_; //EpiRisk::POSINF;
             covars.ticks = record.data.ticks;
 	    covars.isDairy = record.data.isDairy;
             idMap_.insert(make_pair(covars.id, idx));
@@ -186,66 +186,66 @@ namespace EpiRisk
 
 
 
-  // void
-  // GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
-  // {
-  //   ublas::mapped_matrix<float>* Dimport = new ublas::mapped_matrix<float>(
-  //       maxInfecs_, hostPopulation_.size());
-  //   try
-  //     {
-  //       importer.open();
-  //       while (1)
-  //         {
-  //           DistMatrixImporter::Record record = importer.next();
-  //           map<string, size_t>::const_iterator i = idMap_.find(record.id);
-  //           map<string, size_t>::const_iterator j = idMap_.find(record.data.j);
-  //           if (i == idMap_.end() or j == idMap_.end())
-  //             throw range_error("Key pair not found in population");
+  void
+  GpuLikelihood::LoadDistanceMatrix(DistMatrixImporter& importer)
+  {
+    ublas::mapped_matrix<float>* Dimport = new ublas::mapped_matrix<float>(
+        maxInfecs_, hostPopulation_.size());
+    try
+      {
+        importer.open();
+        while (1)
+          {
+            DistMatrixImporter::Record record = importer.next();
+            map<string, size_t>::const_iterator i = idMap_.find(record.id);
+            map<string, size_t>::const_iterator j = idMap_.find(record.data.j);
+            if (i == idMap_.end() or j == idMap_.end())
+              throw range_error("Key pair not found in population");
 
-  //           if (i != j
-  //               and i->second < maxInfecs_ /* Don't require distances with i known susc */)
-  //             try
-  //               {
-  //                 Dimport->operator()(i->second, j->second) =
-  //                     record.data.val * record.data.val;
-  //               }
-  //             catch (std::exception& e)
-  //               {
-  //                 cerr << "Inserting distance |" << i->second << " - "
-  //                     << j->second << "| = "
-  //                     << record.data.val * record.data.val
-  //                     << " failed" << endl;
-  //                 throw e;
-  //               }
-  //         }
-  //     }
-  //   catch (EpiRisk::fileEOF& e)
-  //     {
-  //       cout << "Imported " << Dimport->nnz() << " distance elements" << endl;
-  //     }
-  //   catch (exception& e)
-  //     {
-  //       throw e;
-  //     }
+            if (i != j
+                and i->second < maxInfecs_ /* Don't require distances with i known susc */)
+              try
+                {
+                  Dimport->operator()(i->second, j->second) =
+                      record.data.val * record.data.val;
+                }
+              catch (std::exception& e)
+                {
+                  cerr << "Inserting distance |" << i->second << " - "
+                      << j->second << "| = "
+                      << record.data.val * record.data.val
+                      << " failed" << endl;
+                  throw e;
+                }
+          }
+      }
+    catch (EpiRisk::fileEOF& e)
+      {
+        cout << "Imported " << Dimport->nnz() << " distance elements" << endl;
+      }
+    catch (exception& e)
+      {
+        throw e;
+      }
 
-  //   importer.close();
+    importer.close();
 
-  //   // Set up distance matrix
-  //   dnnz_ = Dimport->nnz();
-  //   ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(
-  //       *Dimport);
-  //   int* rowPtr = new int[D->index1_data().size()];
-  //   for (size_t i = 0; i < D->index1_data().size(); ++i)
-  //     rowPtr[i] = D->index1_data()[i];
-  //   int* colInd = new int[D->index2_data().size()];
-  //   for (size_t i = 0; i < D->index2_data().size(); ++i)
-  //     colInd[i] = D->index2_data()[i];
-  //   SetDistance(D->value_data().begin(), rowPtr, colInd);
-  //   delete[] rowPtr;
-  //   delete[] colInd;
-  //   delete D;
-  //   delete Dimport;
-  // }
+    // Set up distance matrix
+    dnnz_ = Dimport->nnz();
+    ublas::compressed_matrix<float>* D = new ublas::compressed_matrix<float>(
+        *Dimport);
+    int* rowPtr = new int[D->index1_data().size()];
+    for (size_t i = 0; i < D->index1_data().size(); ++i)
+      rowPtr[i] = D->index1_data()[i];
+    int* colInd = new int[D->index2_data().size()];
+    for (size_t i = 0; i < D->index2_data().size(); ++i)
+      colInd[i] = D->index2_data()[i];
+    SetDistance(D->value_data().begin(), rowPtr, colInd);
+    delete[] rowPtr;
+    delete[] colInd;
+    delete D;
+    delete Dimport;
+  }
 
 #define CONTACTIMPORTOFFSET 1.1111f
  void
@@ -356,14 +356,14 @@ namespace EpiRisk
 
 
   void
-  GpuLikelihood::SetParameters(Parameter& epsilon, Parameters& phi,
+  GpuLikelihood::SetParameters(Parameter& epsilon1, Parameter& gamma1, Parameters& phi,
 			       Parameter& delta, Parameter& omega, Parameter& beta1, Parameter& beta2, 
 			       Parameter& nu, Parameter& alpha1, Parameter& alpha2, Parameter& alpha3,
 			       Parameter& zeta, Parameter& a, Parameter& b)
   {
 
-    epsilon1_ = epsilon.GetValuePtr();
-    gamma1_ = new float; *gamma1_=1.0f; // Unused multiplicative constant.
+    epsilon1_ = epsilon1.GetValuePtr();
+    gamma1_ = gamma1.GetValuePtr();
     delta_ = delta.GetValuePtr();
     omega_ = omega.GetValuePtr();
     beta1_ = beta1.GetValuePtr();

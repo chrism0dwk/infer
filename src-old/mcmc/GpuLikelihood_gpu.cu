@@ -19,7 +19,6 @@
 #include <thrust/sort.h>
 #include <thrust/count.h>
 #include <thrust/find.h>
-#include <thrust/extrema.h>
 #include <gsl/gsl_cdf.h>
 
 #include <assert.h>
@@ -28,15 +27,18 @@
 #define __CUDACC__
 #endif
 
-#include "GpuLikelihood.hpp"
+//#define ALPHA 0.3
 
-// Uncomment and rebuild to use cubic spline
+#include "GpuLikelihood.hpp"
 //#include "CubicSpline1.hpp"
 #include "SquareWave.hpp"
-
 namespace EpiRisk
 {
   // Constants
+  const float UNITY = 1.0;
+  const float ZERO = 0.0;
+#define PI (atanf(1.0f)*4.0f)
+  
   float
   GetDistElement(const CsrMatrix* d, const int row, const int col) {
     assert(row < d->n);
@@ -105,10 +107,6 @@ namespace EpiRisk
     {
       return ptr_[lhs.ptr] < ptr_[rhs.ptr];
     }
-
-    __host__ __device__
-    ~IndirectMin() {};
-
   private:
     T* ptr_;
   };
@@ -1259,7 +1257,7 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
 
   }
 
-  GpuLikelihood::GpuLikelihood(DataImporter<TheilData>& population,
+  GpuLikelihood::GpuLikelihood(PopDataImporter& population,
 			       EpiDataImporter& epidemic, 
 			       ContactDataImporter& contact, 
 			       const size_t nSpecies, 
@@ -1656,7 +1654,6 @@ _H(const float b, const float a, const float nu, const float alpha1, const float
     // Choose whether to destroy shared members
     if (*covariateCopies_ == 1) // We're the last copy to be destroyed
       {
-	delete gamma1_;
         cudaFree(devAnimals_);
         destroyCsrMatrix(devD_);
 	destroyCsrMatrix(devC_);

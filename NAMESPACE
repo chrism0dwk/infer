@@ -1,0 +1,26 @@
+useDynLib(nztheileria)
+
+exportClasses(Posterior,
+              HD5ParamProxy,
+              HD5InfecProxy,
+              SpatPointSINR)
+
+export(Posterior,
+       SpatPointSINR,
+       read.posterior,
+       write.posterior,
+       mcmc,
+       simulate)
+	   
+exportMethods(show,
+              names,
+              dim,
+              length,
+              nrow,
+              ncol,
+              "[",
+              "$",
+              as.data.frame,
+              summary)
+
+

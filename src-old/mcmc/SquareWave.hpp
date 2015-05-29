@@ -29,6 +29,7 @@ namespace EpiRisk {
   {
     // Periodic piece-wise square wave
     float Y[] = {1.0f, 1.0f, 1.0f, 1.0f,1.0f};
+    float delta = 0.25;
     
     assert(t-I >= 0);
     

@@ -1,6 +1,0 @@
-// Package name
-#define PACKAGE_NAME "@PACKAGE_NAME@"
-
-// Package version
-#define PACKAGE_VERSION "@VERSION_MAJOR@.@VERSION_MINOR@-@VERSION_PATCH@"
-

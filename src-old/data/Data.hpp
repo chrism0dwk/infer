@@ -43,6 +43,14 @@ struct TestCovars {
 };
 
 
+struct COOMatrixElement
+{
+  string i;
+  string j;
+  float val;
+};
+
+
 class PopDataImporter : public EpiRisk::DataImporter<TestCovars>
 {
 private:
@@ -67,25 +75,33 @@ private:
 
 public:
   EpiDataImporter(const string filename);
-  EpiDataImporter();
   virtual ~EpiDataImporter();
-  virtual void open();
-  virtual void close();
-  virtual Record next();
-  virtual void reset();
+  void open();
+  void close();
+  Record next();
+  void reset();
 };
 
-struct COOMatrixElement
+
+class DistMatrixImporter : public EpiRisk::DataImporter<COOMatrixElement>
 {
-  std::string i;
-  std::string j;
-  EpiRisk::FP_t val;
+protected:
+  ifstream matrixFile_;
+  string filename_;
+public:
+  DistMatrixImporter(const string filename);
+  virtual ~DistMatrixImporter();
+  void open();
+  void close();
+  Record next();
+  void reset();
 };
 
-class ContactDataImporter : public EpiRisk::DataImporter<COOMatrixElement>
+class ContactDataImporter : public DistMatrixImporter
 {
 public:
-  virtual ~ContactDataImporter() {};
+  ContactDataImporter(const string filename) : DistMatrixImporter(filename) {};
 };
+
 
 #endif /* IMPORTERS_HPP_ */

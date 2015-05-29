@@ -46,9 +46,9 @@
 
 #include "types.hpp"
 #include "Data.hpp"
-#include  "TheileriaData.hpp"
 #include "PosteriorWriter.hpp"
 #include "GpuUtils.hpp"
+
 
 #ifndef __CUDACC__
 #include "Parameter.hpp"
@@ -66,7 +66,7 @@
 namespace EpiRisk
 {
 
-  // Data structures
+// Data structures
 
   struct CsrMatrix
   {
@@ -95,63 +95,63 @@ namespace EpiRisk
   };
 
 
-  // Helper classes
+// Helper classes
   template<typename T>
-  class PointerVector
-  {
-  public:
-    PointerVector()
+    class PointerVector
     {
-    }
-    ;
+    public:
+      PointerVector()
+      {
+      }
+      ;
 
-    PointerVector(const size_t size)
-    {
-      content_.resize(size);
-    }
+      PointerVector(const size_t size)
+      {
+        content_.resize(size);
+      }
 
-    PointerVector(PointerVector& other)
-    {
-      content_ = other.content_;
-    }
+      PointerVector(PointerVector& other)
+      {
+        content_ = other.content_;
+      }
 
-    const PointerVector&
-    operator=(const PointerVector& other)
-    {
-      content_ = other.content_;
-      return *this;
-    }
+      const PointerVector&
+      operator=(const PointerVector& other)
+      {
+        content_ = other.content_;
+        return *this;
+      }
 
-    void
-    push_back(T* x)
-    {
-      content_.push_back(x);
-    }
+      void
+      push_back(T* x)
+      {
+        content_.push_back(x);
+      }
 
-    T
-    operator[](const size_t index) const
-    {
-      return *(content_[index]);
-    }
-    ;
+      T
+      operator[](const size_t index) const
+      {
+        return *(content_[index]);
+      }
+      ;
 
-    size_t
-    size() const
-    {
-      return content_.size();
-    }
-    ;
+      size_t
+      size() const
+      {
+        return content_.size();
+      }
+      ;
 
-    void
-    clear()
-    {
-      content_.clear();
-    }
-    ;
+      void
+      clear()
+      {
+        content_.clear();
+      }
+      ;
 
-  private:
-    std::vector<T*> content_;
-  };
+    private:
+      std::vector<T*> content_;
+    };
 
 
   class GpuLikelihood
@@ -166,14 +166,9 @@ namespace EpiRisk
     };
 
     explicit
-    GpuLikelihood(DataImporter<TheilData>& population,
-		  EpiDataImporter& epidemic, 
-		  ContactDataImporter& contact,
-		  const size_t nSpecies,
-		  const float obsTime, 
-		  const float dLimit, 
-		  const bool occultsOnlyDC = false, 
-		  const int gpuId=0);
+    GpuLikelihood(PopDataImporter& population, EpiDataImporter& epidemic, ContactDataImporter& contact,
+        const size_t nSpecies,
+		  const float obsTime, const float dLimit, const bool occultsOnlyDC = false, const int gpuId=0);
     explicit
     GpuLikelihood(const GpuLikelihood& other);
     virtual
@@ -183,13 +178,15 @@ namespace EpiRisk
     void
     InfecCopy(const GpuLikelihood& other);
     void
-    LoadPopulation(DataImporter<TheilData>& filename);
+    LoadPopulation(PopDataImporter& filename);
     void
     LoadEpidemic(EpiDataImporter& importer);
     void
     LoadContact(ContactDataImporter& importer);
     void
     SortPopulation();
+    void
+    LoadDistanceMatrix(DistMatrixImporter& filename);
     void
     CalcDistanceMatrix(const float dLimit);
     void
@@ -199,7 +196,8 @@ namespace EpiRisk
     void
     SetDistance(const float* data, const int* rowptr, const int* colind);
     void
-    SetParameters(Parameter& epsilon, 
+    SetParameters(Parameter& epsilon1, 
+		  Parameter& gamma1,
 		  Parameters& phi,
 		  Parameter& delta, 
 		  Parameter& omega, 
@@ -292,7 +290,7 @@ namespace EpiRisk
     LazyAddInfecTime(const int idx, const float inTime);
     float
     NonCentreInfecTimes(const float oldGamma, const float newGamma,
-			const float prob);
+        const float prob);
     void
     GetInfectiousPeriods(std::vector<EpiRisk::IPTuple_t>& periods);
     void 
@@ -322,9 +320,9 @@ namespace EpiRisk
 
     // Data import
     enum DiseaseStatus
-      {
-	IP = 0, DC = 1, SUSC = 2
-      };
+    {
+      IP = 0, DC = 1, SUSC = 2
+    };
 
     struct Covars
     {

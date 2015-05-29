@@ -1,13 +1,10 @@
 AM_CPPFLAGS = -I. -I../Framework @PKG_CPPFLAGS@
 
-CUEXT = cu 
-EXT = cpp
+OBJS = Data.o
 
-OBJS = simulate.o
+all: $(OBJS)
 
-all: $(OBJS) 
-
-$(OBJS): %.o: %.$(EXT)
+$(OBJS): %.o: %.cpp
 	$(CXX) -c @PKG_CXXFLAGS@ $(AM_CPPFLAGS) $^ -o $@
 
 clean:

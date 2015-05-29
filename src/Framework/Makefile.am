@@ -1,14 +1,16 @@
-AM_CPPFLAGS = @BOOST_CPPFLAGS@ @GSL_CPPFLAGS@
-METASOURCES = AUTO
-noinst_LTLIBRARIES = libstlstrtok.la librandom.la libparameter.la
-noinst_HEADERS = stlStrTok.hpp Random.hpp Individual.hpp \
- Contact.hpp DataImporter.hpp EmpCovar.hpp EpiRiskException.hpp \
- McmcWriter.hpp Parameter.hpp SpatPointPop.hpp types.hpp StochasticNode.hpp Model.hpp
+AM_CPPFLAGS = -I. @PKG_CPPFLAGS@
 
-libstlstrtok_la_SOURCES = stlStrTok.cpp
+CUEXT = cu 
+EXT = cpp
 
-librandom_la_SOURCES = Random.cpp
-librandom_la_LIBADD = -lgsl -lgslcblas
+OBJS = Random.o stlStrTok.o
 
-libparameter_la_SOURCES = Parameter.cpp
+all: $(OBJS) 
 
+$(OBJS): %.o: %.$(EXT)
+	$(CXX) -c $(PKG_CXXFLAGS) $(PKG_CPPFLAGS) $^ -o $@
+
+clean:
+	rm -rf *o
+
+.PHONY: all clean
