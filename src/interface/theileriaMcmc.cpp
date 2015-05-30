@@ -242,8 +242,8 @@ TheileriaMcmc(SEXP population,
   Parameter epsilon(startval[0], GammaPrior(prior[0], prior[1]), "epsilon");
   prior = _priorParms["delta"]; startval = _init["delta"];
   Parameter delta(startval[0], GammaPrior(prior[0], prior[1]), "delta");
-  prior = _priorParms["omega"]; startval = _init["omega"];
-  Parameter omega(startval[0], GammaPrior(prior[0],prior[1]), "omega");
+  startval = _init["omega"];
+  Parameter omega(startval[0], GammaPrior(1,1), "omega");// Dummy prior
   prior = _priorParms["beta1"]; startval = _init["beta1"];
   Parameter beta1(startval[0], GammaPrior(prior[0],prior[1]), "beta1");
   prior = _priorParms["beta2"]; startval = _init["beta2"];
