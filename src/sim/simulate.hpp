@@ -34,8 +34,8 @@ namespace Theileria {
       IntegerVector::const_iterator rowbegin = rowidx_.begin() + colptr_[col];
       IntegerVector::const_iterator rowend = rowidx_.begin() + colptr_[col+1];
       IntegerVector::const_iterator it = std::find(rowbegin,rowend,row);
-
-      if(it != rowend) return val_[it - rowidx_.begin()];
+      int valpos = it - rowidx_.begin();
+      if(it != rowend) return val_[valpos];
       else return 0.0;
     }
 
