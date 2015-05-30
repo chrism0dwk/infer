@@ -59,6 +59,7 @@ AC_CHECK_LIB([cusparse],[cusparseCreate],,[AC_MSG_ERROR([libcusparse not found])
 LDFLAGS="${CUDA_LDFLAGS} ${SAVED_LDFLAGS}"
 
 # CUDPP
+AC_MSG_NOTICE([Using CPPFLAGS=${CPPFLAGS}])
 AC_CHECK_HEADER([cudpp.h],,[AC_MSG_ERROR([cudpp.h not found])])
 AC_CHECK_LIB([cudpp],[cudppReduce],,[AC_MSG_ERROR([libcudpp not found])])
 

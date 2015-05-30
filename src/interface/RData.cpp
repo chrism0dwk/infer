@@ -85,6 +85,7 @@ ContactRImporter::next()
 {
   if(rowptr_ == from_.size()) throw EpiRisk::fileEOF();
   Record record;
+  record.id = std::string(from_[rowptr_]);
   record.data.i = std::string(from_[rowptr_]);
   record.data.j = std::string(to_[rowptr_]);
   record.data.val = val_[rowptr_];
