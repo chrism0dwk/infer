@@ -7,7 +7,7 @@ EXT = cpp
 
 MCMCOBJS = mcmc/GpuLikelihood.o mcmc/GpuLikelihood_gpu.o mcmc/Mcmc.o mcmc/McmcFactory.o mcmc/MCMCUpdater.o mcmc/McmcLikelihood.o mcmc/PosteriorWriter.o mcmc/PosteriorHDF5Reader.o mcmc/PosteriorHDF5Writer.o mcmc/GpuUtils.o
 
-FRAMEWORKOBJS = Framework/Random.o Framework/stlStrTok.o
+FRAMEWORKOBJS = Framework/Random.o Framework/stlStrTok.o Framework/RUtils.o
 
 IFACEOBJS = interface/posterior.o interface/theileriaMcmc.o interface/RData.o
 

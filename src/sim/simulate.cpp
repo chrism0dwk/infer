@@ -8,61 +8,37 @@
 
 #include <math.h>
 
+#include "RUtils.hpp"
 #include "simulate.hpp"
 
-#ifdef NDEBUG
-#undef NDEBUG
-#endif
 
-static void chkIntFn(void *dummy)
+float _h(const float t, const float I, float nu, float alpha1, float alpha2, float alpha3)
 {
-  R_CheckUserInterrupt();
-}
-
-bool checkInterrupt() {
-  return (R_ToplevelExec(chkIntFn,NULL) == false);
-}
-
-float
-_h(const float t, const float I, float nu, float ys, float yw, float ysp)
-{
-  // Periodic piece-wise cubic spline
-  float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+  // Periodic piece-wise square wave
+  const float T[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
   float Y[] = {1.0f, 1.0f, 1.0f, 1.0f,1.0f};
-  float delta = 0.25;
-  
+
   assert(t-I >= 0);
-  
+
   // Re-scale time to unit period
   float tAdj = (t+nu)/365.0f;
   tAdj = tAdj - floorf(tAdj);
-
+    
   // Set up parameters
-  Y[0] = ys; Y[2] = yw; Y[3] = ysp; Y[4] = ys;
-  
-  // Calculate spline value
-  //int epoch = (int)(tAdj*4.0f);
+  Y[0] = alpha1; Y[2] = alpha2; Y[3] = alpha3; Y[4] = alpha1;
+    
+  // Calculate which epoch we are in
   int epoch = 0;
+  assert(tAdj <= 1.0f);
   while(tAdj > T[epoch+1]) epoch++;
-  
+    
   return Y[epoch];
-
-
-  // float a = -6.0f*(Y[epoch+1]-Y[epoch])/(delta*delta);
-  // float b = -a;
-  
-  // float h = a/(6.0f*delta) * powf(tAdj - T[epoch], 3);
-  // h      += (Y[epoch+1]/delta - (a*delta)/6.0f) *  (tAdj - T[epoch]);
-  // h      += b/(6.0f*delta) * powf(T[epoch+1] - tAdj, 3);
-  // h      += (Y[epoch]/delta - (b*delta)/6.0f) * (T[epoch+1] - tAdj);
-  
-  // return h;
 }
 
 
 
 
-namespace Theileria {
+namespace EpiRisk {
 
   Simulator::Simulator(DataFrame population, S4 contact, NumericVector parameter, NumericVector dLimit) :
     population_(population),
@@ -221,55 +197,6 @@ namespace Theileria {
     }
   }
 
-  void
-  Simulator::Euler(const double maxtime, const double timestep)
-  {
-    
-    Initialize();
-
-    RNGScope rng_;
-
-
-    while(time_ <= maxtime) {
-
-      if(checkInterrupt()) throw std::runtime_error("Execution cancelled by user");
-
-      double nextTime = floor(time_) + timestep;
-   
-      // Calculate infectees
-      IntPtrList newInfecs;
-      for(int j=0; j<popSize_; ++j)
-	{
-	  if(infecTime_[j] == R_PosInf)
-	    {
-
-	      // Calculate the pressure
-	      double jPressure = 0.0;
-	      for(IntPtrList::const_iterator i = infecList_.begin();
-		  i != infecList_.end(); ++i)
-		{
-		  jPressure += 0.0;//beta(*i,j)*(H(*i,nextTime) - H(*i,time_));
-		}
-
-	      // Choose if infected
-	      if(rbinom(1,1,1-exp(-jPressure))[0] == 1.0) {
-		newInfecs.push_back(j);
-		infecTime_[j] = nextTime;
-	      }
-
-	    }
-	}
-      
-      // Update time
-      time_ = nextTime;
-
-      // Merge infecList with newInfecs
-      infecList_.insert(infecList_.end(), newInfecs.begin(), newInfecs.end());
-      cerr << "Time: " << time_ << endl;
-    }
-    
-  }
-    
   DataFrame
   Simulator::GetPopulation() const
   {
@@ -338,7 +265,7 @@ namespace Theileria {
 SEXP GetMatrixElement(SEXP contact, SEXP i, SEXP j)
 {
   using namespace Rcpp;
-  using namespace Theileria;
+  using namespace EpiRisk;
   IntegerVector i_(i);
   IntegerVector j_(j);
   S4CMatrixView mat(contact);
@@ -346,22 +273,16 @@ SEXP GetMatrixElement(SEXP contact, SEXP i, SEXP j)
 }
 
 
-SEXP Simulate(SEXP population, SEXP contact, SEXP parameter, SEXP dLimit, SEXP maxtime, SEXP alg, SEXP timestep)
+SEXP Simulate(SEXP population, SEXP contact, SEXP parameter, SEXP dLimit, SEXP maxtime)
 {
   using namespace Rcpp ;
-  using namespace Theileria ;
+  using namespace EpiRisk ;
     
   try {
     Simulator sim(population, contact,parameter, dLimit);
     NumericVector t(maxtime);
-    IntegerVector algorithm(alg);
     
-    if(algorithm[0] == 0)
-      sim.Gillespie(t[0]);
-    else if(algorithm[0] == 1) {
-      NumericVector ts(timestep);
-      sim.Euler(t[0], ts[0]);
-    }
+    sim.Gillespie(t[0]);
 
     return wrap(sim.GetPopulation());
   }

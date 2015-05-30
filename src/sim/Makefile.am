@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I. -I../Framework @PKG_CPPFLAGS@
+AM_CPPFLAGS = -I. -I../Framework -I../mcmc @PKG_CPPFLAGS@
 
 CUEXT = cu 
 EXT = cpp

@@ -10,7 +10,7 @@
 using namespace Rcpp;
 using std::cerr; using std::endl;
 
-namespace Theileria {
+namespace EpiRisk {
 
 
 
@@ -64,7 +64,6 @@ namespace Theileria {
       Simulator(DataFrame population, S4 contact, NumericVector parameters, NumericVector dLimit);
       ~Simulator();
       void Gillespie(const double maxtime);
-      void Euler(const double maxtime, const double timestep=1.0);
       DataFrame GetPopulation() const;
       
     private:
@@ -102,6 +101,6 @@ namespace Theileria {
 RcppExport SEXP GetMatrixElement(SEXP contact, SEXP i, SEXP j);
 
 
-RcppExport SEXP Simulate(SEXP population, SEXP contact, SEXP parameters, SEXP dLimit, SEXP maxtime, SEXP alg, SEXP timestep);
+RcppExport SEXP Simulate(SEXP population, SEXP contact, SEXP parameters, SEXP dLimit, SEXP maxtime);
 
 #endif

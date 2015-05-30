@@ -37,7 +37,7 @@
 #include "GpuLikelihood.hpp"
 #include "PosteriorHDF5Writer.hpp"
 #include "RData.hpp"
-
+#include "RUtils.hpp"
 #include "theileriaMcmc.hpp"
 
 #define NSPECIES 3
@@ -47,6 +47,7 @@
 
 using namespace EpiRisk;
 
+// Prior functors
 class GammaPrior : public Prior
 {
   float shape_;
@@ -383,6 +384,7 @@ TheileriaMcmc(SEXP population,
           {
 	    Rcpp::Rcout << "Iteration " << k << std::endl;
             output.flush();
+	    if(checkInterrupt()) break;
           }
         mcmc.Update();
         output.write();

@@ -3,7 +3,7 @@ AM_CPPFLAGS = -I. @PKG_CPPFLAGS@
 CUEXT = cu 
 EXT = cpp
 
-OBJS = Random.o stlStrTok.o
+OBJS = Random.o stlStrTok.o RUtils.o
 
 all: $(OBJS) 
 
