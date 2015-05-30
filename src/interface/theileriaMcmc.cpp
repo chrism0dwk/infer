@@ -237,8 +237,8 @@ TheileriaMcmc(SEXP population,
 
 
   // Initialize parameters
-  Rcpp::NumericVector prior = _priorParms["epsilon1"];
-  Rcpp::NumericVector startval = _init["epsilon1"];
+  Rcpp::NumericVector prior = _priorParms["epsilon"];
+  Rcpp::NumericVector startval = _init["epsilon"];
   Parameter epsilon(startval[0], GammaPrior(prior[0], prior[1]), "epsilon");
   prior = _priorParms["delta"]; startval = _init["delta"];
   Parameter delta(startval[0], GammaPrior(prior[0], prior[1]), "delta");
