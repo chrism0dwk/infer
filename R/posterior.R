@@ -152,7 +152,7 @@ setMethod("[","HD5ParamProxy",
 				else cols <- (0:(length(x@tags)-1))[j]
 			}
 			else cols <- 0:(length(x@tags)-1)
-			
+
 			.Call("getPosteriorParams",x@filename,rows,cols)
 		}
 )

@@ -8,6 +8,6 @@ Author: Chris Jewell (c) 2015 [aut, cre]
 Maintainer: Chris Jewell <c.jewell@lancaster.ac.uk>
 Description: This package performs Bayesian Inference on the Theileria orientalis (Ikeda) outbreak in NZ cattle from 2012 onwards. It contains code accompanying Jewell CP, Brown RG (2015) Bayesian data assimilation provides rapid decision support for vector-borne diseases. J. Roy. Soc. Interface. In press.
 License: GPLv3
-Depends: Rcpp (>= 0.11.6), methods
+Depends: Rcpp (>= 0.11.5), methods
 LinkingTo: Rcpp
 Packaged: 2015-05-28 00:41:57 UTC; Chris Jewell

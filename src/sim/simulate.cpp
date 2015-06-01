@@ -287,6 +287,7 @@ SEXP Simulate(SEXP population, SEXP contact, SEXP parameter, SEXP dLimit, SEXP m
     return wrap(sim.GetPopulation());
   }
   catch (std::exception& e) {
+    std::cerr << "Exception caught!" << std::endl;
     forward_exception_to_r(e);
   }
   catch (...) {

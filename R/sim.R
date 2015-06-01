@@ -20,17 +20,17 @@ simulate <- function(pop,epi,contact,params,dlimit=50,maxtime=Inf)
 
                                         # Parameters
     param.names <- c('epsilon','delta','omega','beta1','beta2','alpha1','alpha2','alpha3','nu','zeta','a','b','phi')
-    if(any(!(names(param.names) %in% names(params))))
+    if(any(!(param.names %in% names(params))))
         stop("Missing required parameters 'epsilon','delta','omega','beta1','beta2','alpha1','alpha2','alpha3','nu','zeta','a','b','phi'")
     
     p<-NULL # Put parameters in below.  Zeta is dealt with outside the simulation.
-    with(parameters, p<<-c(epsilon,beta1,beta2,0,nu,delta,alpha1,alpha2,alpha3))
+    with(params, p<<-c(epsilon,beta1,beta2,0,nu,delta,alpha1,alpha2,alpha3))
     
     tlanums <- as.numeric(names(params$phi))
     pop$ticks<-params$phi[match(pop$tla,tlanums)]
     pop$ticks[pop$isdairy==1] <- pop$ticks[pop$isdairy==1] * params$zeta
     
-    rtn <- .Call("Simulate",population=pop,contact=contact,parameter=params,dLimit=dlimit,maxtime=maxtime)
+    rtn <- .Call("Simulate",population=pop,contact=spContact,parameter=p,dLimit=dlimit,maxtime=maxtime)
 
     rtn <- rtn[rtn$i<Inf,]
     rtn$d <- rtn$i + rgamma(nrow(rtn),params$a,params$b)
