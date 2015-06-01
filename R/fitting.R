@@ -1,11 +1,27 @@
                                         # Model fitting algorithms
 
+
+#' Fits the Theileria model of Jewell and Brown (2012) JRS Interface to data.
+#'
+#' MCMC algorithm for fitting dynamical SI model with latent vector surface to a vector-borne disease.
+#'
+#' @param pop a \code{data.frame} with column headings 'id','x','y','isdairy','region' for the individuals' labels, x and y coordinates (in Mercatorial projection), dairy farm or not, and the region the farm is located in.
+#' @param epi a \code{data.frame} with column headings 'id','i','d' for the individuals' labels, (best guess) infection time, and detection time.
+#' @param contact a \code{data.frame} representing a weighted edge list of a contact graph.  Headings must be 'from','to','weight' containing from and to labels, and a weight.
+#' @param ticks a \code{data.frame} with headings 'region','numpos','total','a','b'.  Here, 'numpos' herds out of 'total' test positive for related vector-borne disease strains.  'a' and 'b' are the parameters of a Beta(a,b) distribution encoding prior belief about tick activity in each region.
+#' @param init List containing MCMC starting values for parameters 'epsilon,delta,omega,beta1,beta2,alpha1,alpha2,alpha3,nu,zeta,b'
+#' @param prior List of vectors of length 2 with hyperparameters for '(epsilon, delta, beta1, beta2, alpha1, alpha2, alpha3, b'
+#' @param obsTime the 'observation' (or analysis) time of the epidemic.
+#' @param control \code{list} of MCMC control settings, including \code{dlimit} (distance matrix limit), \code{n.iter} (number of MCMC iterations), \code{gpuid} (GPU device id for likelihood calculation), \code{seed} (PRNG seed), \code{tune.I} (MH tuning constant for infection times), \code{reps.I} (number of infection times to update per sweep of transmission parameters), \code{tmpdir} (path to temporary backing file for posterior output)
+#' @return an object of type \code{Posterior}
+#' @references Jewell CP, Brown RG (2015) Bayesian data assimilation provides rapid decision support for vector borne diseases. \emph{J. Roy. Soc. Interface} In press.
+#' @author Chris Jewell \email{c.jewell@@lancaster.ac.uk}
 mcmc <- function(pop, epi, contact, ticks, init, priors, obsTime=max(epi$n), control)
     {
 
     # Sanitize data
-    if(any(names(pop) != c('id','x','y','isdairy','tla')))
-        stop('Malformed population data.  Must have columns "<id>,<x>,<y>,<isdairy>".')
+    if(any(names(pop) != c('id','x','y','isdairy','region')))
+        stop('Malformed population data.  Must have columns "<id>,<x>,<y>,<isdairy>,<region>".')
     if(any(names(epi) != c('id','i','d')))
         stop('Malformed epidemic data. Must have columns "<id>,<i>,<d>".')
     if(any(names(contact) != c('from','to','weight')))

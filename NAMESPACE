@@ -2,11 +2,9 @@ useDynLib(nztheileria)
 
 exportClasses(Posterior,
               HD5ParamProxy,
-              HD5InfecProxy,
-              SpatPointSINR)
+              HD5InfecProxy)
 
 export(Posterior,
-       SpatPointSINR,
        read.posterior,
        write.posterior,
        mcmc,

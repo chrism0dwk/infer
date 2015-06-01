@@ -1,11 +1,20 @@
-
+#' Simulate a theileriosis SI epidemic
+#'
+#' Simulates an SI epidemic model of a vector-borne disease with latent vector surface.
+#' 
+#' @param pop a \code{data.frame} with column headings 'id','x','y','isdairy','region' for the individuals' labels, x and y coordinates (in Mercatorial projection), dairy farm or not, and the region the farm is located in.
+#' @param epi a \code{data.frame} with column headings 'id','i','d' for the individuals' labels, (best guess) infection time, and detection time.
+#' @param contact a \code{data.frame} representing a weighted edge list of a contact graph.  Headings must be 'from','to','weight' containing from and to labels, and a weight.
+#' @param params a \code{list} of parameters with atomic 'epsilon','delta','omega','beta1','beta2','alpha1','alpha2','alpha3','nu','zeta','a','b', and a vector representing the 'phi's.  The \code{name} of each element of the \code{params@@phi} vector link the value to the correct region.
+#' @param dlimit distance limit for spatial spread
+#' @param maxtime the maximum time up to which to simulate.
 simulate <- function(pop,epi,contact,params,dlimit=50,maxtime=Inf)
 {
     require(Matrix)
 
                                         # Population
-    if(any(names(pop) != c('id','x','y','isdairy','tla')))
-        stop('Malformed population data.  Must have columns "<id>,<x>,<y>,<isdairy>".')
+    if(any(names(pop) != c('id','x','y','isdairy','region')))
+        stop('Malformed population data.  Must have columns "<id>,<x>,<y>,<isdairy>,<region>".')
 
                                         # Epidemic seeds
     if(any(names(epi) != c('id','i','d')))
