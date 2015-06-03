@@ -44,15 +44,28 @@ simulate <- function(pop,epi,contact,params,dlimit=50,maxtime=Inf)
                                         # Contact matrix
     if(any(names(contact) != c('from','to','weight')))
         stop("Malformed contact matrix edge list.  Should have fields <from>,<to>,<weight>.")
-    spContact <- sparseMatrix(i=match(contact$from,pop$id), j=match(contact$to,pop$id), x=contact$weight, dims=rep(nrow(pop),2))
+    spContact <- sparseMatrix(i=match(contact$from,pop$id),
+                              j=match(contact$to,pop$id),
+                              x=contact$weight,
+                              dims=rep(nrow(pop),2))
 
                                         # Parameters
-    param.names <- c('epsilon','delta','omega','beta1','beta2','alpha1','alpha2','alpha3','nu','zeta','a','b','phi')
+    param.names <- c('epsilon','delta','omega','beta1','beta2',
+                     'alpha1','alpha2','alpha3','nu','zeta','a','b','phi')
     if(any(!(param.names %in% names(params))))
         stop("Missing required parameters 'epsilon','delta','omega','beta1','beta2','alpha1','alpha2','alpha3','nu','zeta','a','b','phi'")
     
     p<-NULL # Put parameters in below.  Zeta is dealt with outside the simulation.
     with(params, p<<-c(epsilon,beta1,beta2,0,nu,delta,alpha1,alpha2,alpha3))
+
+    ## simulation requires 0 <= h() <= 1, so scale alpha by max(alpha),
+    ## and multiply beta1 and beta2 instead.
+    mx <- max(alpha1, alpha2, alpha3)
+    alpha1 <- alpha1/mx
+    alpha2 <- alpha2/mx
+    alpha3 <- alpha3/mx
+    beta1 <- beta1 * mx
+    beta2 <- beta2 * mx
     
     tlanums <- as.numeric(names(params$phi))
     pop$ticks<-params$phi[match(pop$tla,tlanums)]
