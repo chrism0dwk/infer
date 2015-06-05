@@ -12,7 +12,7 @@
 #include <H5Cpp.h>
 #include <H5PacketTable.h>
 
-#include "GpuLikelihood.hpp"
+#include "Likelihood.hpp"
 #include "PosteriorWriter.hpp"
 
 #define PARAMCHUNK 1024
