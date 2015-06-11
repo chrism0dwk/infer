@@ -40,7 +40,6 @@
 #include "Parameter.hpp"
 #include "Random.hpp"
 #include "EmpCovar.hpp"
-#include "GpuLikelihood.hpp"
 #include "McmcLikelihood.hpp"
 
 

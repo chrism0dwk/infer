@@ -23,7 +23,7 @@ string( REGEX REPLACE "^([^ ]+).*" "\\1" VERSION_PATCH "${GITCOMMIT}")
 
 
 
-find_package(CUDA REQUIRED)
+find_package(CUDA QUIET)
 find_package(Boost 1.47.0 REQUIRED)
 find_package(GSL REQUIRED)
 

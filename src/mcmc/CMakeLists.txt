@@ -1,9 +1,11 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/Framework
-${CMAKE_SOURCE_DIR}/src/data ${CUDA_INCLUDE_DIRS} ${GSL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${CMAKE_INCLUDE_PATH})
+${CMAKE_SOURCE_DIR}/src/data ${GSL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${CMAKE_INCLUDE_PATH})
 link_directories(${CMAKE_ARCHIVE_DIR}/src/Framework ${CMAKE_LIBRARY_PATH})
 
+if(CUDA_FOUND)
+include_directories(${CUDA_INCLUDE_DIRS})
 include(FindCUDA)
 
 set(CUDA_64_BIT_DEVICE_CODE ON)
@@ -18,6 +20,7 @@ endif()
 
 cuda_add_library(gpulikelihood STATIC ${gpulikelihood_SOURCES} Likelihood.cpp)
 target_link_libraries(gpulikelihood data stlstrtok ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY} ${CUDA_curand_LIBRARY} cudpp)
+endif()
 
 set(cpulikelihood_SOURCES CpuLikelihood.cpp Likelihood.cpp)
 add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
@@ -29,15 +32,10 @@ add_library(cpuveclikelihood STATIC ${cpuveclikelihood_SOURCES})
 set_target_properties(cpuveclikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpuveclikelihood data stlstrtok)
 
-set(dummylikelihood_SOURCES DummyLikelihood.cpp Likelihood.cpp)
-add_library(dummylikelihood STATIC ${dummylikelihood_SOURCES})
-set_target_properties(dummylikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
-target_link_libraries(dummylikelihood data stlstrtok)
-
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)
 add_library(mcmc STATIC ${mcmc_SOURCES})
 add_dependencies(mcmc random)
-target_link_libraries(mcmc random gpulikelihood)
+target_link_libraries(mcmc random)
 
 set(posteriorwriter_SOURCES PosteriorHDF5Writer.cpp PosteriorWriter.cpp)
 add_library(posteriorwriter STATIC ${posteriorwriter_SOURCES})
