@@ -4,6 +4,11 @@ include_directories(${CMAKE_SOURCE_DIR}/src/Framework
 ${CMAKE_SOURCE_DIR}/src/data ${GSL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${CMAKE_INCLUDE_PATH})
 link_directories(${CMAKE_ARCHIVE_DIR}/src/Framework ${CMAKE_LIBRARY_PATH})
 
+if(OPENMP_FOUND)
+add_definitions(-DHAVEOMP)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
 include(FindCUDA)
@@ -24,12 +29,10 @@ endif()
 
 set(cpulikelihood_SOURCES CpuLikelihood.cpp Likelihood.cpp)
 add_library(cpulikelihood STATIC ${cpulikelihood_SOURCES})
-set_target_properties(cpulikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpulikelihood data stlstrtok)
 
 set(cpuveclikelihood_SOURCES CpuVecLikelihood.cpp Likelihood.cpp)
 add_library(cpuveclikelihood STATIC ${cpuveclikelihood_SOURCES})
-set_target_properties(cpuveclikelihood PROPERTIES COMPILE_FLAGS "-fopenmp")
 target_link_libraries(cpuveclikelihood data stlstrtok)
 
 set(mcmc_SOURCES Mcmc.cpp MCMCUpdater.cpp McmcLikelihood.cpp McmcFactory.cpp)

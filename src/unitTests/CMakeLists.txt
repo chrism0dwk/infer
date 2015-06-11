@@ -7,24 +7,21 @@ link_directories(${CMAKE_SOURCE_DIR}/src/Framework ${GSL_LINK_DIRECTORIES} ${Boo
 
 set(testCpuLik_SOURCES testCpuLik.cpp)
 add_executable(testCpuLik ${testCpuLik_SOURCES})
-set_target_properties(testCpuLik PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(testCpuLik data parameter mcmc random cpulikelihood)
 
+if(OPENMP_FOUND)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 set(testCpuLik_SOURCES testCpuVecLik.cpp)
 add_executable(testCpuVecLik ${testCpuLik_SOURCES})
-set_target_properties(testCpuVecLik PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(testCpuVecLik data parameter mcmc random cpuveclikelihood)
+endif()
 
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
 set(testGpuLik_SOURCES testGpuLik.cpp)
 add_executable(testGpuLik ${testGpuLik_SOURCES})
 target_link_libraries(testGpuLik data parameter mcmc random gpulikelihood)
-
-set(testBoth_SOURCES testBoth.cpp)
-add_executable(testBoth ${testBoth_SOURCES})
-set_target_properties(testBoth PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
-target_link_libraries(testBoth data parameter random gpulikelihood cpulikelihood)
 endif()
 
 

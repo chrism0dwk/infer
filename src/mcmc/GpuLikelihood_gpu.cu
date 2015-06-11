@@ -19,6 +19,7 @@
 #include <thrust/sort.h>
 #include <thrust/count.h>
 #include <thrust/find.h>
+#include <thrust/extrema.h>
 #include <gsl/gsl_cdf.h>
 
 #ifndef __CUDACC__

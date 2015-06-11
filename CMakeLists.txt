@@ -24,7 +24,14 @@ string( REGEX REPLACE "^([^ ]+).*" "\\1" VERSION_PATCH "${GITCOMMIT}")
 
 
 find_package(CUDA QUIET)
+
+find_package(OpenMP QUIET)
+if(OPENMP_FOUND)
+add_definitions(-DHAVEOMP)
+endif()
+
 find_package(Boost 1.47.0 REQUIRED)
+
 find_package(GSL REQUIRED)
 
 set(LIBS ${LIBS} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})

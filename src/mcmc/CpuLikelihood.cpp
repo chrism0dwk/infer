@@ -19,9 +19,12 @@
 #include <gsl/gsl_cdf.h>
 #include <boost/numeric/ublas/operation.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
+#ifdef HAVEOMP
 #include <omp.h>
+#endif
 
 #include "CpuLikelihood.hpp"
+
 
 #define VECSIZE 8
 
@@ -73,6 +76,7 @@ namespace EpiRisk
   {
 
     // Load data into host memory
+#ifdef HAVEOMP
     int np;
 #pragma omp parallel
       {
@@ -80,8 +84,13 @@ namespace EpiRisk
       }
     cout << "Using " << np << " threads" << endl;
     omp_set_num_threads(8);
+#endif
+
     CalcDistanceMatrix(dLimit);
+
+#ifdef HAVEOMP
     omp_set_num_threads(np);
+#endif
 
     // Set up species and events
     SetSpecies();
