@@ -33,13 +33,7 @@
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
-
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
-#include <boost/program_options.hpp>
 #include <boost/bind.hpp>
-namespace po = boost::program_options;
 
 #include "config.h"
 #include "Mcmc.hpp"
@@ -81,15 +75,6 @@ sig_handler(int signo)
       doCompareProdVec = true;
   }
 }
-
-// inline
-// double
-// timeinseconds(const timeval a, const timeval b)
-// {
-//   timeval result;
-//   timersub(&b, &a, &result);
-//   return result.tv_sec + result.tv_usec / 1000000.0;
-// }
 
 class GammaPrior : public Prior
 {
@@ -145,198 +130,6 @@ public:
   }
 };
 
-class InfSuscSN : public StochasticNode
-{
-  Parameter* A_;
-public:
-  InfSuscSN(Parameter& A, Parameter& B) :
-      A_(&A), StochasticNode(B)
-  {
-  }
-  InfSuscSN*
-  clone()
-  {
-    return new InfSuscSN(*this);
-  }
-  double
-  getValue() const
-  {
-    return *A_ * *param_;
-  }
-  void
-  setValue(const double x)
-  {
-    *param_ = x / *A_;
-  }
-};
-
-struct ParamSetting
-{
-  double value;
-  double priorparams[2];
-};
-
-struct ParamSettings
-{
-  ParamSetting epsilon;
-  ParamSetting gamma1;
-  ParamSetting gamma2;
-  ParamSetting delta;
-  ParamSetting xi_p, xi_s;
-  ParamSetting psi_c, psi_p, psi_s;
-  ParamSetting zeta_p, zeta_s;
-  ParamSetting phi_c, phi_p, phi_s;
-  ParamSetting a, b;
-};
-
-struct Settings
-{
-  string populationfile;
-  string epidemicfile;
-  string connectionfile;
-  string posteriorfile;
-
-  double obstime;
-  size_t iterations;
-  size_t iupdates;
-  int seed;
-
-  ParamSettings parameters;
-
-  void
-  load(const string& filename)
-  {
-    using boost::property_tree::ptree;
-
-    typedef boost::property_tree::ptree_bad_data bad_data;
-    typedef boost::property_tree::ptree_bad_path bad_xml;
-    typedef boost::property_tree::ptree_error runtime_error;
-    ptree pt;
-
-    read_xml(filename, pt);
-
-    populationfile = pt.get<string>("fmdMcmc.paths.population");
-    epidemicfile = pt.get<string>("fmdMcmc.paths.epidemic");
-    connectionfile = pt.get<string>("fmdMcmc.paths.connections");
-    posteriorfile = pt.get<string>("fmdMcmc.paths.posterior");
-
-    obstime = pt.get<double>("fmdMcmc.options.obstime", POSINF);
-    iterations = pt.get<double>("fmdMcmc.options.iterations", 1);
-    iupdates = pt.get<double>("fmdMcmc.options.iupdates", 0);
-    seed = pt.get<int>("fmdMcmc.options.seed", 1);
-
-    parameters.epsilon.value = pt.get<double>(
-        "fmdMcmc.parameters.epsilon.value", 0.5);
-    parameters.epsilon.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.epsilon.prior.gamma.a", 1);
-    parameters.epsilon.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.epsilon.prior.gamma.b", 1);
-
-    parameters.gamma1.value = pt.get<double>("fmdMcmc.parameters.gamma1.value",
-        0.5);
-    parameters.gamma1.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.gamma1.prior.gamma.a", 1);
-    parameters.gamma1.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.gamma1.prior.gamma.b", 1);
-
-    parameters.gamma2.value = pt.get<double>("fmdMcmc.parameters.gamma2.value",
-        0.5);
-    parameters.gamma2.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.gamma2.prior.gamma.a", 1);
-    parameters.gamma2.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.gamma2.prior.gamma.b", 1);
-
-    parameters.delta.value = pt.get<double>("fmdMcmc.parameters.delta.value",
-        0.5);
-    parameters.delta.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.delta.prior.gamma.a", 1);
-    parameters.delta.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.delta.prior.gamma.b", 1);
-
-    parameters.xi_p.value = pt.get<double>("fmdMcmc.parameters.xi_p.value",
-        0.5);
-    parameters.xi_p.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.xi_p.prior.gamma.a", 1);
-    parameters.xi_p.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.xi_p.prior.gamma.b", 1);
-
-    parameters.xi_s.value = pt.get<double>("fmdMcmc.parameters.xi_s.value",
-        0.5);
-    parameters.xi_s.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.xi_s.prior.gamma.a", 1);
-    parameters.xi_s.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.xi_s.prior.gamma.b", 1);
-
-    parameters.phi_c.value = pt.get<double>("fmdMcmc.parameters.phi_c.value",
-        0.5);
-    parameters.phi_c.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.phi_c.prior.beta.a", 1);
-    parameters.phi_c.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.phi_c.prior.beta.b", 1);
-
-    parameters.phi_p.value = pt.get<double>("fmdMcmc.parameters.phi_p.value",
-        0.5);
-    parameters.phi_p.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.phi_p.prior.beta.a", 1);
-    parameters.phi_p.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.phi_p.prior.beta.b", 1);
-
-    parameters.phi_s.value = pt.get<double>("fmdMcmc.parameters.phi_s.value",
-        0.5);
-    parameters.phi_s.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.phi_s.prior.beta.a", 1);
-    parameters.phi_s.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.phi_s.prior.beta.b", 1);
-
-    parameters.zeta_p.value = pt.get<double>("fmdMcmc.parameters.zeta_p.value",
-        0.5);
-    parameters.zeta_p.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.zeta_p.prior.gamma.a", 1);
-    parameters.zeta_p.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.zeta_p.prior.gamma.b", 1);
-
-    parameters.zeta_s.value = pt.get<double>("fmdMcmc.parameters.zeta_s.value",
-        0.5);
-    parameters.zeta_s.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.zeta_s.prior.gamma.a", 1);
-    parameters.zeta_s.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.zeta_s.prior.gamma.b", 1);
-
-    parameters.psi_c.value = pt.get<double>("fmdMcmc.parameters.psi_c.value",
-        0.5);
-    parameters.psi_c.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.psi_c.prior.beta.a", 1);
-    parameters.psi_c.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.psi_c.prior.beta.b", 1);
-
-    parameters.psi_p.value = pt.get<double>("fmdMcmc.parameters.psi_p.value",
-        0.5);
-    parameters.psi_p.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.psi_p.prior.beta.a", 1);
-    parameters.psi_p.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.psi_p.prior.beta.b", 1);
-
-    parameters.psi_s.value = pt.get<double>("fmdMcmc.parameters.psi_s.value",
-        0.5);
-    parameters.psi_s.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.psi_s.prior.beta.a", 1);
-    parameters.psi_s.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.psi_s.prior.beta.b", 1);
-
-    parameters.a.value = pt.get<double>("fmdMcmc.parameter.a.value", 0.08);
-    parameters.b.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.a.prior.gamma.a", 1);
-    parameters.b.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.a.prior.gamma.b", 1);
-
-    parameters.b.value = pt.get<double>("fmdMcmc.parameter.b.value", 0.005);
-    parameters.b.priorparams[0] = pt.get<double>(
-        "fmdMcmc.parameters.b.prior.gamma.a", 1);
-    parameters.b.priorparams[1] = pt.get<double>(
-        "fmdMcmc.parameters.b.prior.gamma.b", 1);
-
-  }
-};
 
 int
 main(int argc, char* argv[])
@@ -346,10 +139,10 @@ main(int argc, char* argv[])
   cerr << PACKAGE_NAME << " " << PACKAGE_VERSION << " compiled " << __DATE__
       << " " << __TIME__ << endl;
 
-  if (argc != 9)
+  if (argc != 8)
     {
       cerr
-          << "Usage: fmdMcmc <pop file> <epi file> <output folder> <obs time> <num iterations> <seed> <nc percentage> <gpu>"
+          << "Usage: fmdMcmc <pop file> <epi file> <output filename> <obs time> <num iterations> <seed> <nc percentage>"
           << endl;
       return EXIT_FAILURE;
     }
@@ -361,7 +154,6 @@ main(int argc, char* argv[])
   EpiDataImporter* epiDataImporter = new EpiDataImporter(argv[2]);
   float obsTime = atof(argv[4]);
   size_t seed = atoi(argv[6]);
-  int gpuId = atoi(argv[8]);
 
   CpuLikelihood likelihood(*popDataImporter, *epiDataImporter,
 			   (size_t) 3, obsTime, 25.0f, false);
