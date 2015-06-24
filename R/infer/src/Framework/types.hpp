@@ -22,8 +22,8 @@
 // Types used for epidemic MCMC code
 
 
-#ifndef INCLUDE_AITYPES_HPP
-#define INCLUDE_AITYPES_HPP
+#ifndef INCLUDE_TYPES_HPP
+#define INCLUDE_TYPES_HPP
 
 #include <limits>
 #include <string>
@@ -53,7 +53,6 @@ namespace EpiRisk
   {
     typedef std::string TagType;
     typedef std::string UpdaterType;
-
   }
 
 }

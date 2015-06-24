@@ -225,7 +225,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   if(doOmega[0]) txDelta.add(omega);
   EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateDistance =
     (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW",
-          "txBase");
+						      "txBase");
   updateDistance->SetParameters(txDelta);
 
   EpiRisk::UpdateBlock txPsi;
@@ -238,13 +238,13 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     }
 
     if(nSpecies > 1) {
-    EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePsi =
-      (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
-    updatePsi->SetParameters(txPsi);
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePsi =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPsi");
+      updatePsi->SetParameters(txPsi);
 
-    EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePhi =
-      (EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
-    updatePhi->SetParameters(txPhi);
+      EpiRisk::Mcmc::AdaptiveMultiLogMRW* updatePhi =
+	(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txPhi");
+      updatePhi->SetParameters(txPhi);
     }
     else {
       EpiRisk::Mcmc::AdaptiveSingleMRW* updatePsi = 
@@ -259,40 +259,58 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
 
   // Make decisions here based on number of species
 
-    EpiRisk::UpdateBlock txInfec;
-    EpiRisk::UpdateBlock txSuscep;
+  EpiRisk::UpdateBlock txInfec;
+  EpiRisk::UpdateBlock txSuscep;
     
-    if(nSpecies > 1) {
+  if(nSpecies > 1) {
       
-      txInfec.add(gamma1);
-      for(int i=1; i<nSpecies; ++i)
-	txInfec.add(xi[i]);
-      EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
-       	(EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
-      //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
-      //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txInfec");
-      updateInfec->SetParameters(txInfec);
+    txInfec.add(gamma1);
+    for(int i=1; i<nSpecies; ++i)
+      txInfec.add(xi[i]);
+    EpiRisk::Mcmc::InfectivityMRW* updateInfec = 
+      (EpiRisk::Mcmc::InfectivityMRW*) mcmc.Create("InfectivityMRW", "txInfec");
+    //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateInfec =
+    //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txInfec");
+    updateInfec->SetParameters(txInfec);
       
-      txSuscep.add(gamma1);
-      for(int i=1; i<nSpecies; ++i)
-	txSuscep.add(zeta[i]);
-      EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
-      	(EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-      //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
-      //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
-      updateSuscep->SetParameters(txSuscep);
-    }
+    txSuscep.add(gamma1);
+    for(int i=1; i<nSpecies; ++i)
+      txSuscep.add(zeta[i]);
+    EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
+      (EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
+    //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
+    //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
+    updateSuscep->SetParameters(txSuscep);
+  }
+
+  // EpiRisk::UpdateBlock infecPeriod;
+  // infecPeriod.add(a);
+  // infecPeriod.add(b);
+  // EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
+  //   (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
+  //         "infecTimes");
+  // updateInfecTime->SetParameters(infecPeriod);
+  // updateInfecTime->SetUpdateTuning(tuneI[0]);
+  // updateInfecTime->SetReps(repsI[0]);
+  // updateInfecTime->SetOccults(doOccults);
 
   EpiRisk::UpdateBlock infecPeriod;
   infecPeriod.add(a);
   infecPeriod.add(b);
-  EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
-    (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-          "infecTimes");
-  updateInfecTime->SetParameters(infecPeriod);
-  updateInfecTime->SetUpdateTuning(tuneI[0]);
-  updateInfecTime->SetReps(repsI[0]);
-  updateInfecTime->SetOccults(doOccults);
+  EpiRisk::Mcmc::InfectionTimeMove* moveInfecTime =
+    (EpiRisk::Mcmc::InfectionTimeMove*) mcmc.Create("InfectionTimeMove",
+						    "moveInfec");
+  moveInfecTime->SetParameters(infecPeriod);
+  moveInfecTime->SetUpdateTuning(tuneI[0]);
+  moveInfecTime->SetReps(repsI[0]);
+    
+  if(doOccults) {
+    EpiRisk::Mcmc::OccultAddDel* occultAddDel =
+      (EpiRisk::Mcmc::OccultAddDel*) mcmc.Create("OccultAddDel",
+						 "occult");
+    occultAddDel->SetParameters(infecPeriod);
+    occultAddDel->SetReps(repsI[1]);
+  }
 
   EpiRisk::UpdateBlock bUpdate;
   if(doLatentPeriodScale[0]) {
@@ -309,9 +327,9 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
     updateBNC->SetNCRatio(1);
   }
 
-    //// Output ////
+  //// Output ////
 
-    // Make output directory
+  // Make output directory
   string outputFile(_outputfile[0]);
   EpiRisk::PosteriorHDF5Writer output(outputFile, likelihood);
   output.AddParameter(epsilon1); output.AddParameter(epsilon2);
@@ -336,7 +354,7 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   output.AddSpecial("meanI2N", getmeanI2N);
   boost::function< float () > getmeanOccI = boost::bind(&EpiRisk::GpuLikelihood::GetMeanOccI, &likelihood);
   output.AddSpecial("meanOccI", getmeanOccI);
-   boost::function< float () > getlikelihood = boost::bind(&EpiRisk::GpuLikelihood::GetLogLikelihood, &likelihood);
+  boost::function< float () > getlikelihood = boost::bind(&EpiRisk::GpuLikelihood::GetLogLikelihood, &likelihood);
   output.AddSpecial("loglikelihood",getlikelihood);
  
   float sums[3];
@@ -361,10 +379,10 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
   map<string, float> acceptance = mcmc.GetAcceptance();
   
   for(map<string, float>::const_iterator it = acceptance.begin();
-     it != acceptance.end(); ++it)
-   {
-     Rcpp::Rcout << it->first << ": " << it->second << "\n";
-   }
+      it != acceptance.end(); ++it)
+    {
+      Rcpp::Rcout << it->first << ": " << it->second << "\n";
+    }
   
   // cout << "Covariances\n";
   // cout << updateDistance->GetCovariance() << "\n";

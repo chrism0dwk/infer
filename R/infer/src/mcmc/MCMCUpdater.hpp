@@ -341,6 +341,56 @@ namespace EpiRisk
 
     };
 
+    //! InfectionTimeMove performs an infection time move
+    class InfectionTimeMove : public McmcUpdate
+    {
+    public:
+      explicit
+      InfectionTimeMove();
+      virtual
+      ~InfectionTimeMove();
+      void
+      SetUpdateTuning(const float tuning)
+      {
+	updateTuning_ = tuning;
+      }
+      void
+      SetReps(const size_t reps);
+      void
+      Update();
+    private:
+      size_t reps_;
+      size_t ucalls_;
+      float updateTuning_;
+      bool
+      UpdateI();
+    };
+
+    class OccultAddDel : public McmcUpdate
+    {
+    public:
+      explicit
+      OccultAddDel();
+      virtual 
+      ~OccultAddDel();
+      void
+      SetReps(const size_t reps);
+      void
+      Update();
+      std::map<std::string, float>
+      GetAcceptance() const;
+      void
+      ResetAcceptance();
+    private:
+      ublas::vector<float> calls_;
+      ublas::vector<float> accept_;
+      size_t reps_;
+      size_t ucalls_;
+      bool
+      AddI();
+      bool
+      DeleteI();
+    };
   }
 }
 #endif /* MCMCUPDATER_HPP_ */

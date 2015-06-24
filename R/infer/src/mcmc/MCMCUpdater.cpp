@@ -1112,5 +1112,281 @@ namespace EpiRisk
       std::fill(calls_.begin(), accept_.end(), 0.0f);
     }
 
+    
+    // Update infection times
+    InfectionTimeMove::InfectionTimeMove() :
+      reps_(1), ucalls_(0), updateTuning_(TUNEIN)
+    {
+    }
+
+    InfectionTimeMove::~InfectionTimeMove()
+    {
+    }
+
+    void
+    InfectionTimeMove::SetReps(const size_t reps)
+    {
+      reps_ = reps;
+    }
+
+    void
+    InfectionTimeMove::Update()
+    {
+      for (size_t infec = 0; infec < reps_; ++infec)
+	{
+	  acceptance_ += UpdateI();
+	  numUpdates_++;
+        }
+
+      // Recalculate full likelihood to
+      //   correct for arithmetic rounding errors
+      likelihood_->Propose();
+      likelihood_->Accept();
+      ucalls_++;
+    }
+
+    bool
+    InfectionTimeMove::UpdateI()
+    {
+      
+#ifndef NDEBUG
+      std::cout << "UPDATE" << std::endl;
+#endif
+      
+      Parameter& a_((*params_)[0].getParameter());
+      Parameter& b_((*params_)[1].getParameter());
+      
+      size_t index = random_->integer(likelihood_->GetNumInfecs());
+      //float newIN = random_->gamma(INFECPROP_A, INFECPROP_B); // Independence sampler
+      float oldIN = likelihood_->GetIN(index);
+      float newIN = oldIN * exp(random_->gaussian(0.0f, updateTuning_));
+      
+      if(newIN < 1.0e-9f)	return false;  // Reject if newIN is zero!
+      
+      float piCur = likelihood_->GetCurrentValue();
+      float piCan = likelihood_->UpdateI(index, newIN);
+      
+      if (index < likelihood_->GetNumKnownInfecs())
+        { // Known infection
+          piCan += log(gammapdf(newIN, a_, b_));
+          piCur += log(gammapdf(oldIN, a_, b_));
+        }
+      else
+        { // Occult
+          piCan += log(1 - gammacdf(newIN, a_, b_));
+          piCur += log(1 - gammacdf(oldIN, a_, b_));
+        }
+      
+      float qRatio = log(newIN / oldIN);
+      
+      //float qRatio = log(gammapdf(oldIN, INFECPROP_A, INFECPROP_B) / gammapdf(newIN, INFECPROP_A, INFECPROP_B));
+      
+      float accept = piCan - piCur + qRatio;
+      
+      if (log(random_->uniform()) < accept)
+        {
+#ifndef NDEBUG
+          cerr << "ACCEPT" << endl;
+#endif
+          // Update the infection
+          likelihood_->Accept();
+          return true;
+        }
+      else
+        {
+#ifndef NDEBUG
+          cerr << "REJECT" << endl;
+#endif
+          likelihood_->Reject();
+          return false;
+        }
+      
+    }
+
+
+    // Add/Del occult infections
+    OccultAddDel::OccultAddDel() :
+      reps_(1), ucalls_(0)
+    {
+      calls_.resize(2);
+      accept_.resize(2);
+      std::fill(calls_.begin(), calls_.end(), 0.0f);
+      std::fill(accept_.begin(), accept_.end(), 0.0f);
+    }      
+
+    OccultAddDel::~OccultAddDel()
+    {
+    }
+
+    void
+    OccultAddDel::SetReps(const size_t reps)
+    {
+      reps_ = reps;
+    }
+
+    void
+    OccultAddDel::Update()
+    {
+      for (size_t infec = 0; infec < reps_; ++infec)
+        {
+          float pickMove;
+	  pickMove = random_->uniform(0.0f, 1.0f);
+
+          if (pickMove < 0.5f)
+            {
+              accept_[0] += AddI();
+              calls_[0]++;
+            }
+          else
+            {
+              accept_[1] += DeleteI();
+              calls_[1]++;
+            }
+        }
+
+      // Recalculate full likelihood to
+      //   correct for arithmetic rounding errors
+      likelihood_->Propose();
+      likelihood_->Accept();
+      ucalls_++;
+
+    }
+
+
+    std::map<std::string, float>
+    OccultAddDel::GetAcceptance() const
+    {
+      std::map<std::string, float> rv;
+
+      float* accept = new float[3];
+      for (size_t i = 0; i < calls_.size(); ++i)
+        accept[i] = accept_[i] / calls_[i];
+
+      rv.insert(make_pair(tag_ + ":addInfec", accept[0]));
+      rv.insert(make_pair(tag_ + ":delInfec", accept[1]));
+      
+      delete[] accept;
+
+      return rv;
+    }
+
+    void
+    OccultAddDel::ResetAcceptance()
+    {
+      std::fill(accept_.begin(), accept_.end(), 0.0f);
+      std::fill(calls_.begin(), accept_.end(), 0.0f);
+    }
+
+    bool
+    OccultAddDel::AddI()
+    {
+
+#ifndef NDEBUG
+      std::cerr << "ADD" << std::endl;
+#endif
+
+      Parameter& a_((*params_)[0].getParameter());
+      Parameter& b_((*params_)[1].getParameter());
+
+      size_t numSusceptible = likelihood_->GetNumPossibleOccults();
+
+      if (numSusceptible == 0)
+        return false;
+
+      size_t index = random_->integer(numSusceptible);
+
+      float inProp = random_->gamma(INFECPROP_A, INFECPROP_B);
+
+      if(inProp < 1.0e-9f) return false; // Reject if I->N is zero.
+
+      float logPiCur = likelihood_->GetCurrentValue();
+
+      float logLikCan = likelihood_->AddI(index, inProp);
+
+      float logPiCan = logLikCan + log(1.0 - gammacdf(inProp, a_, b_));
+
+      float qRatio = log(
+          (1.0 / (likelihood_->GetNumOccults() + 1))
+              / ((1.0 / numSusceptible)
+                  * gammapdf(inProp, INFECPROP_A, INFECPROP_B)));
+
+      float accept = logPiCan - logPiCur + qRatio;
+
+      // Perform accept/reject step.
+      if (log(random_->uniform()) < accept)
+        {
+#ifndef NDEBUG
+          cerr << "ACCEPT" << endl;
+#endif
+          likelihood_->Accept();
+          return true;
+        }
+      else
+        {
+#ifndef NDEBUG
+          cerr << "REJECT" << endl;
+#endif
+          likelihood_->Reject();
+          return false;
+        }
+    }
+
+    bool
+    OccultAddDel::DeleteI()
+    {
+
+#ifndef NDEBUG
+      std::cerr << "DEL" << std::endl;
+#endif
+
+      Parameter& a_((*params_)[0].getParameter());
+      Parameter& b_((*params_)[1].getParameter());
+
+      if (likelihood_->GetNumOccults() == 0)
+        {
+#ifndef NDEBUG
+          cerr << __FUNCTION__ << endl;
+          cerr << "Occults empty. Not deleting" << endl;
+#endif
+          return false;
+        }
+
+      size_t numSusceptible = likelihood_->GetNumPossibleOccults();
+
+      size_t toRemove = random_->integer(likelihood_->GetNumOccults());
+
+      float inTime = likelihood_->GetIN(
+          likelihood_->GetNumKnownInfecs() + toRemove);
+      float logPiCur = likelihood_->GetCurrentValue()
+          + log(1 - gammacdf(inTime, a_, b_));
+
+      float logPiCan = likelihood_->DeleteI(toRemove);
+      float qRatio = log(
+          (1.0 / (numSusceptible + 1)
+              * gammapdf(inTime, INFECPROP_A, INFECPROP_B))
+              / (1.0 / likelihood_->GetNumOccults()));
+
+      // Perform accept/reject step.
+      float accept = logPiCan - logPiCur + qRatio;
+
+      if (log(random_->uniform()) < accept)
+        {
+#ifndef NDEBUG
+          cerr << "ACCEPT" << endl;
+#endif
+          likelihood_->Accept();
+          return true;
+        }
+      else
+        {
+#ifndef NDEBUG
+          cerr << "REJECT" << endl;
+#endif
+          likelihood_->Reject();
+          return false;
+        }
+    }
+
+
   }
 }

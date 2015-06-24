@@ -14,76 +14,101 @@ namespace EpiRisk
   namespace Mcmc
   {
     namespace
-     {
-       Mcmc*
-       CreateSingleSiteLogMRW()
-       {
-         return new SingleSiteLogMRW;
-       }
-       Mcmc*
-       CreateAdaptiveMultiMRW()
-       {
-         return new AdaptiveMultiMRW;
-       }
-       Mcmc*
-       CreateAdaptiveMultiLogMRW()
-       {
-         return new AdaptiveMultiLogMRW;
-       }
-       Mcmc*
-       CreateInfectivityMRW()
-       {
-         return new InfectivityMRW;
-       }
-       Mcmc*
-       CreateSusceptibilityMRW()
-       {
-         return new SusceptibilityMRW;
-       }
-       Mcmc*
-       CreateInfectionTimeGammaCentred()
-       {
-         return new InfectionTimeGammaCentred;
-       }
-       Mcmc*
-       CreateInfectionTimeGammaNC()
-       {
-         return new InfectionTimeGammaNC;
-       }
-       Mcmc*
-       CreateInfectionTimeUpdate()
-       {
-         return new InfectionTimeUpdate;
-       }
-     }
-
-      /////// Provided Updater registrations
-      void Initialize()
+    {
+      Mcmc*
+      CreateSingleSiteLogMRW()
       {
-      const bool singleSiteLogMRW = McmcFactory::Instance().RegisterUpdater(
-          "SingleSiteLogMRW", CreateSingleSiteLogMRW);
+	return new SingleSiteLogMRW;
+      }
+      Mcmc*
+      CreateAdaptiveMultiMRW()
+      {
+	return new AdaptiveMultiMRW;
+      }
+      Mcmc*
+      CreateAdaptiveMultiLogMRW()
+      {
+	return new AdaptiveMultiLogMRW;
+      }
+      Mcmc*
+      CreateInfectivityMRW()
+      {
+	return new InfectivityMRW;
+      }
+      Mcmc*
+      CreateSusceptibilityMRW()
+      {
+	return new SusceptibilityMRW;
+      }
+      Mcmc*
+      CreateInfectionTimeGammaCentred()
+      {
+	return new InfectionTimeGammaCentred;
+      }
+      Mcmc*
+      CreateInfectionTimeGammaNC()
+      {
+	return new InfectionTimeGammaNC;
+      }
+      Mcmc*
+      CreateInfectionTimeUpdate()
+      {
+	return new InfectionTimeUpdate;
+      }
+      Mcmc*
+      CreateInfectionTimeMove()
+      {
+	return new InfectionTimeMove;
+      }
+      Mcmc*
+      CreateOccultAddDel()
+      {
+	return new OccultAddDel;
+      }
+    }
 
-      const bool adaptiveMultiMRW = McmcFactory::Instance().RegisterUpdater(
-          "AdaptiveMultiMRW", CreateAdaptiveMultiMRW);
+    /////// Provided Updater registrations
+    void Initialize()
+    {
+      const bool singleSiteLogMRW = 
+	McmcFactory::Instance().RegisterUpdater(
+						"SingleSiteLogMRW", CreateSingleSiteLogMRW);
 
-      const bool adaptiveMultiLogMRW = McmcFactory::Instance().RegisterUpdater(
-          "AdaptiveMultiLogMRW", CreateAdaptiveMultiLogMRW);
+      const bool adaptiveMultiMRW = 
+	McmcFactory::Instance().RegisterUpdater(
+						"AdaptiveMultiMRW", CreateAdaptiveMultiMRW);
 
-      const bool infectivityMRW = McmcFactory::Instance().RegisterUpdater(
-          "InfectivityMRW", CreateInfectivityMRW);
+      const bool adaptiveMultiLogMRW = 
+	McmcFactory::Instance().RegisterUpdater(
+						"AdaptiveMultiLogMRW", CreateAdaptiveMultiLogMRW);
 
-      const bool susceptibilityMRW = McmcFactory::Instance().RegisterUpdater(
-          "SusceptibilityMRW", CreateSusceptibilityMRW);
+      const bool infectivityMRW = 
+	McmcFactory::Instance().RegisterUpdater(
+						"InfectivityMRW", CreateInfectivityMRW);
+
+      const bool susceptibilityMRW = 
+	McmcFactory::Instance().RegisterUpdater(
+						"SusceptibilityMRW", CreateSusceptibilityMRW);
 
       const bool infectionTimeGammaCentred =
-          McmcFactory::Instance().RegisterUpdater("InfectionTimeGammaCentred",
-              CreateInfectionTimeGammaCentred);
+	McmcFactory::Instance().RegisterUpdater("InfectionTimeGammaCentred",
+						CreateInfectionTimeGammaCentred);
 
-      const bool infectionTimeGammaNC = McmcFactory::Instance().RegisterUpdater(
-          "InfectionTimeGammaNC", CreateInfectionTimeGammaNC);
+      const bool infectionTimeGammaNC = 
+	McmcFactory::Instance().RegisterUpdater(
+						"InfectionTimeGammaNC", CreateInfectionTimeGammaNC);
 
-      const bool infectionTimeUpdate = McmcFactory::Instance().RegisterUpdater(
-          "InfectionTimeUpdate", CreateInfectionTimeUpdate);
+      const bool infectionTimeUpdate = 
+	McmcFactory::Instance().RegisterUpdater(
+						"InfectionTimeUpdate", CreateInfectionTimeUpdate);
+
+      const bool infectionTimeMove = 
+	McmcFactory::Instance().RegisterUpdater(
+					       "InfectionTimeMove", CreateInfectionTimeMove);
+
+      const bool occultAddDel = 
+	McmcFactory::Instance().RegisterUpdater(
+					       "OccultAddDel", CreateOccultAddDel);
     }
 
 
@@ -118,7 +143,7 @@ namespace EpiRisk
 
     bool
     McmcFactory::RegisterUpdater(const UpdaterType updaterId,
-        const CreateMcmcUpdater createFn)
+				 const CreateMcmcUpdater createFn)
     {
       return updaters_.insert(UpdaterMap::value_type(updaterId, createFn)).second;
     }
