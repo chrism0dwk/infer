@@ -38,7 +38,7 @@ set(LIBS ${LIBS} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
 
 configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h @ONLY)
 
-install(PROGRAMS ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmc ${CMAKE_BINARY_DIR}/src/unitTests/fmdSim DESTINATION bin)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmc ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmcVec ${CMAKE_BINARY_DIR}/src/unitTests/fmdMcmcGpu ${CMAKE_BINARY_DIR}/src/unitTests/testCpuLik ${CMAKE_BINARY_DIR}/src/unitTests/testCpuVecLik ${CMAKE_BINARY_DIR}/src/unitTests/testGpuLik DESTINATION bin)
 
 
 add_subdirectory(src)
