@@ -36,6 +36,7 @@
 #include "types.hpp"
 #include "Data.hpp"
 #include "PosteriorWriter.hpp"
+#include "DistanceMatrix.hpp"
 
 #ifndef __CUDACC__
 #include "Parameter.hpp"
@@ -53,23 +54,6 @@ namespace EpiRisk
   const float ZERO = 0.0;
 
 // Data structures
-
-  struct CsrMatrix
-  {
-    int* rowPtr;
-    int* colInd;
-    float* val;
-    int nnz;
-    int n;
-    int m;
-  };
-  
-  float
-  GetDistElement(const CsrMatrix* d, const int row, const int col);
-
-  bool
-  getDistMatrixElement(const int row, const int col, const CsrMatrix* csrMatrix,
-		       float* val);
 
   float
   timeinseconds(const timeval a, const timeval b);

@@ -4,15 +4,15 @@ NVCC = @NVCC@
 
 NVCC_CXXFLAGS = @NVCCFLAGS@ -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 --use_fast_math -O3 -Xcompiler "@PKG_CXXFLAGS@"
 
-OBJS = SmpSirMcmc.o Likelihood.o GpuLikelihood.o Mcmc.o McmcFactory.o MCMCUpdater.o McmcLikelihood.o PosteriorHDF5Writer.o PosteriorHDF5Reader.o PosteriorWriter.o 
+OBJS = SmpSirMcmc.o Likelihood.o GpuLikelihood.o GpuLikelihood_gpu.o Mcmc.o McmcFactory.o MCMCUpdater.o McmcLikelihood.o PosteriorHDF5Writer.o PosteriorHDF5Reader.o PosteriorWriter.o DistanceMatrix.o KernelUtils.o
 
 
-all: $(OBJS) GpuLikelihood_gpu.o
+all: $(OBJS)
 
-$(OBJS): %.o: %.cpp
+%.o: %.cpp
 	$(CXX) -c @PKG_CXXFLAGS@ $(AM_CPPFLAGS) $^ -o $@
 
-GpuLikelihood_gpu.o: %.o: %.cu
+%.o: %.cu
 	$(NVCC) -c $(AM_CPPFLAGS) $(NVCC_CXXFLAGS) -o $@ $^
 
 clean:

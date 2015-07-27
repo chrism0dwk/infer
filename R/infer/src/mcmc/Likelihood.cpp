@@ -8,37 +8,6 @@
 namespace EpiRisk
 {
 
-  float
-  GetDistElement(const CsrMatrix* d, const int row, const int col) {
-    assert(row < d->n);
-    assert(col < d->m);
-    
-    int start = d->rowPtr[row];
-    int end = d->rowPtr[row+1];
-    for(int j = start; j<end; ++j)
-      if (d->colInd[j] == col) return d->val[j];
-    return EpiRisk::POSINF;
-  }
-
-
-  bool
-  getDistMatrixElement(const int row, const int col, const CsrMatrix* csrMatrix,
-      float* val)
-  {
-    int* cols = csrMatrix->colInd + csrMatrix->rowPtr[row];
-    float* vals = csrMatrix->val + csrMatrix->rowPtr[row];
-    int rowlen = csrMatrix->rowPtr[row + 1] - csrMatrix->rowPtr[row];
-
-    for (int ptr = 0; ptr < rowlen; ++ptr)
-      {
-        if (cols[ptr] == col)
-          {
-            *val = vals[ptr];
-            return true;
-          }
-      }
-    return false;
-  }
 
 
   float

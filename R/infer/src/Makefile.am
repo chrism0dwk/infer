@@ -5,7 +5,7 @@ AM_CPPFLAGS = -I. -I@CUDA_HOME@/include @R_INCLUDE@ @RCPP_PKG_INCLUDE@
 CUEXT = cu 
 EXT = cpp
 
-MCMCOBJS =  mcmc/SmpSirMcmc.o mcmc/GpuLikelihood.o mcmc/GpuLikelihood_gpu.o mcmc/Likelihood.o mcmc/Mcmc.o mcmc/McmcFactory.o mcmc/MCMCUpdater.o mcmc/McmcLikelihood.o mcmc/PosteriorWriter.o mcmc/PosteriorHDF5Reader.o mcmc/PosteriorHDF5Writer.o
+MCMCOBJS =  mcmc/SmpSirMcmc.o mcmc/GpuLikelihood.o mcmc/GpuLikelihood_gpu.o mcmc/Likelihood.o mcmc/Mcmc.o mcmc/McmcFactory.o mcmc/MCMCUpdater.o mcmc/McmcLikelihood.o mcmc/PosteriorWriter.o mcmc/PosteriorHDF5Reader.o mcmc/PosteriorHDF5Writer.o mcmc/DistanceMatrix.o mcmc/KernelUtils.o
 
 FRAMEWORKOBJS = Framework/Random.o Framework/SpatMetaPop.o Framework/SmpIndividual.o Framework/stlStrTok.o
 

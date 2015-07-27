@@ -278,21 +278,8 @@ RcppExport SEXP SpSINRMcmc(const SEXP population,
       txSuscep.add(zeta[i]);
     EpiRisk::Mcmc::SusceptibilityMRW* updateSuscep =
       (EpiRisk::Mcmc::SusceptibilityMRW*) mcmc.Create("SusceptibilityMRW", "txSuscep");
-    //EpiRisk::Mcmc::AdaptiveMultiLogMRW* updateSuscep =
-    //(EpiRisk::Mcmc::AdaptiveMultiLogMRW*) mcmc.Create("AdaptiveMultiLogMRW", "txSuscep");
     updateSuscep->SetParameters(txSuscep);
   }
-
-  // EpiRisk::UpdateBlock infecPeriod;
-  // infecPeriod.add(a);
-  // infecPeriod.add(b);
-  // EpiRisk::Mcmc::InfectionTimeUpdate* updateInfecTime =
-  //   (EpiRisk::Mcmc::InfectionTimeUpdate*) mcmc.Create("InfectionTimeUpdate",
-  //         "infecTimes");
-  // updateInfecTime->SetParameters(infecPeriod);
-  // updateInfecTime->SetUpdateTuning(tuneI[0]);
-  // updateInfecTime->SetReps(repsI[0]);
-  // updateInfecTime->SetOccults(doOccults);
 
   EpiRisk::UpdateBlock infecPeriod;
   infecPeriod.add(a);
