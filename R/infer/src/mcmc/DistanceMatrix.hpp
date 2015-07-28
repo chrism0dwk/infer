@@ -14,6 +14,12 @@
 
 #include <vector_types.h>
 
+enum DM_PLATFORM
+  {
+    CPU,
+    GPU
+  };
+
 struct CsrMatrix
 {
   int* rowPtr;
@@ -22,19 +28,20 @@ struct CsrMatrix
   int nnz;
   int n;
   int m;
+  DM_PLATFORM platform;
 };
 
 unsigned long long
 distanceNumValid(const float2* devCoords, const unsigned long long n, const float dLimit);
 
 CsrMatrix*
-makeSparseDistance(const float2* coords, const size_t n, const float dLimit);
+makeSparseDistance(const float2* coords, const size_t n, const float dLimit, const size_t chunkSize = 128);
 
 float
 getDistElement(const CsrMatrix* d, const int row, const int col);
 
 CsrMatrix*
-allocCsrMatrix(const unsigned long long n, const unsigned long long m, const unsigned long long nnz);
+allocCsrMatrix(const size_t n, const size_t m, const size_t nnz, const DM_PLATFORM platform);
 
 void
 destroyCsrMatrix(CsrMatrix* const& csrMatrix);

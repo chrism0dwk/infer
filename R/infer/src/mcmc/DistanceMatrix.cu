@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 #include <cudpp.h>
 #include <cuda_runtime.h>
 #include <cassert>
@@ -63,6 +64,51 @@ _numDWithin(const float2* coords, int* output, size_t outputPitch,
   int* rowptr = (int*) ((char*) output + blockIdx.y * outputPitch);
   rowptr[blockIdx.x] = nnzbuff[0];
 }
+
+
+/*  \brief Calculates a distance matrix between 2D coords
+ *
+ *  Calculates a chunk of a distance matrix between 2D coords in \a coords.
+ * 
+ *  \param coords the 2D coordinates
+ *  \param n the number of coordinates
+ *  \param offset the row number at which to start calculating
+ *  \param the output buffer to hold the (partial) distance matrix.  Must be 
+ *         at least sizeof(float)*n*blockDim.x*gridDim.y.
+ *  \param pitch the pitch of the row-major matrix \a buff.
+ */
+__global__
+void
+_calcDistance(const float2* coords, const int n, const int offset,
+	      float* buff, const size_t pitch)
+{
+  int col = threadIdx.x + blockDim.x * blockIdx.x;
+  int row = offset + threadIdx.x + blockIdx.y * blockDim.x;
+
+  __shared__ float2 ybuff[DM_THREADSPERBLOCK]; //!< \todo make this dynamic
+  
+  if(row < n)
+    {
+      ybuff[threadIdx.x] = coords[row];
+    }
+  __syncthreads();
+
+  if(col < n)
+    {
+      float2 x = coords[col];
+      int rowlimit = min(blockDim.x, n - offset - blockIdx.y*blockDim.x);
+
+      for(int myrow = 0; myrow < rowlimit; myrow++)
+	{
+	  float2 y = ybuff[myrow];
+	  float dx = x.x - y.x;
+	  float dy = x.y - y.y;
+	  float d = hypotf(dx, dy);
+	  buff[row*pitch + col] = d;
+	}
+    }
+}
+
 
 
 __global__
@@ -142,123 +188,120 @@ numDWithin(const float2* devCoords, const size_t n, const float dLimit)
   return nnz;
 }
 
-
-CsrMatrix*
-makeSparseDistance(const float2* coords, const size_t n, const float dLimit)
+/*! \brief Compacts a dense matrix to a CSR network
+ *  
+ *  Compacts \a n x \a m dense matrix \a dense into a CSR representation 
+ *  of a distance-weighted network with edge presence determined by dLimit.
+ *
+ *  \param dense pointer to row-major dense matrix
+ *  \param n number of rows in \a dense
+ *  \param m numer of cols in \a dense
+ *  \param nnzoffset offset for the rowptr
+ *  \param dLimit distance limit
+ *  \param csr pointer to the CsrMatrix structure to fill
+ */
+static
+inline
+void
+compactMatrix(const float* dense, const size_t n, const size_t m, const size_t nnzoffset, const float dLimit, CsrMatrix* csr)
 {
-  // Constructs a sparse matrix
+  size_t rowptr = 0;
+  size_t nnz = nnzoffset;
+  csr->rowPtr[0] = nnz;
+  for(size_t i=0; i<n; ++i)
+    {
+      for(size_t j=0; j<m; ++j)
+	{
+	  float d = dense[i*n + j];
+	  if(d < dLimit)
+	    {
+	      csr->colInd[nnz] = j;
+	      csr->val[nnz] = d;
+	      ++nnz;
+	    }
+	}
+      ++rowptr;
+      csr->rowPtr[rowptr] = nnz;
+    }
+  csr->nnz = nnz - nnzoffset;
+  csr->n = n;
+  csr->m = m;
+}
 
-  float2* devCoords;
-  checkCudaError(cudaMalloc(&devCoords, n*sizeof(float2)));
-  checkCudaError(
-		 cudaMemcpy(devCoords, coords, n*sizeof(float2), cudaMemcpyHostToDevice));
-
-  // Get number of valid (ie 0 < d <= dLimit) entries
-  size_t nnz = numDWithin(devCoords, n, dLimit);
+/*! \brief Constructs a truncated distance-weighted network
+ *
+ *  Constructs a network of 2D spatial coordinates, with
+ *  edges present if the coordinates are within \a dLimit,
+ *  and weighted by the Euclidean distance.
+ *
+ *  The algorithm works by dividing the rows of the dense distance
+ *  matrix into chunks of size \a chunkSize, calculating the distances
+ *  on the GPU, and performing row compaction on the CPU.
+ *
+ *  \param coords an array of float2 with x and y coordinates
+ *  \param n the length of \a coords
+ *  \param dLimit the distance limit used to define an edge presence
+ *  \param chunkSize the number of rows of the matrix per chunk
+ *  \return a pointer to an object of type \a CsrMatrix containing a 
+ *          compressed row sparse matrix representation of the network.
+ */
+CsrMatrix*
+makeSparseDistance(const float2* coords, const size_t n, const float dLimit, const size_t chunkSize)
+{
+  // CUDA block dims and streams
+  assert(chunkSize % DM_THREADSPERBLOCK == 0);
+  dim3 blockDim(DM_THREADSPERBLOCK, 1);
+  dim3 gridDim((n + DM_THREADSPERBLOCK - 1)/DM_THREADSPERBLOCK,
+	       (chunkSize + DM_THREADSPERBLOCK -1)/DM_THREADSPERBLOCK);
   
-  // Allocate the sparse matrix -- may bomb out!
-  CsrMatrix* csrMatrix = allocCsrMatrix(n, n, nnz);
+  // Allocate memory on the device
+  float2* devCoords;
+  float* devBuff, *hostBuff;
+  size_t buffPitch;
+  checkCudaError(cudaMalloc(&devCoords, sizeof(float2)*n));
+  checkCudaError(cudaMallocPitch(&devBuff, &buffPitch, sizeof(float)*n, chunkSize));
+  hostBuff = new float[n*chunkSize];
 
-  float* devDrow = NULL;
-  int* devColNums = NULL;
-  unsigned int* devIsValid = NULL;
-  try
+  // Copy coords to device
+  checkCudaError(cudaMemcpy(devCoords, coords, n, cudaMemcpyHostToDevice));
+
+  // Vectors to hold CSR matrix (will require lots of allocations!)
+  std::vector<size_t> rowptr(n+1); rowptr[0] = 0;
+  std::vector<size_t> colind;
+  std::vector<size_t> value;
+
+  // Loop over row chunks
+  CsrMatrix* temp = allocCsrMatrix(chunkSize, n, n*chunkSize, CPU);
+  for(size_t offset=0; offset < n; offset += chunkSize)
     {
-      cudaMalloc(&devDrow, n * sizeof(float));
-      cudaMalloc(&devColNums, n * sizeof(int));
-      cudaMalloc(&devIsValid, n * sizeof(unsigned int));
+      _calcDistance<<<gridDim, blockDim>>>(devCoords, n, offset, devBuff, buffPitch);
+      checkCudaError(cudaMemcpy2D(hostBuff, n, devBuff, buffPitch, sizeof(float)*n, chunkSize, cudaMemcpyDeviceToHost));
+      compactMatrix(hostBuff, chunkSize, n, value.size(), dLimit, temp);
+
+      // Copy data from temp to overall CSR matrix
+      std::copy(temp->rowPtr, temp->rowPtr+chunkSize, &rowptr[offset]);
+      colind.insert(colind.end(), temp->colInd, temp->colInd+temp->nnz);
+      value.insert(value.end(), temp->val, temp->val+temp->nnz);
     }
-  catch (std::runtime_error& e)
-    {
-      if (devDrow)
-	cudaFree(devDrow);
-      if (devColNums)
-	cudaFree(devColNums);
-      if (devIsValid)
-	cudaFree(devIsValid);
-      throw e;
-    }
-
-  // For each row of the distance matrix
-  // 1) Calculate it, outputting valid flags, and indices in output array
-  // 2) Compact col and val into respective arrays
-  // 3) Enter the rowptr
-
-  // CUDPP bits
-  CUDPPHandle theCudpp;
-  CUDPPResult result = cudppCreate(&theCudpp);
-  if (result != CUDPP_SUCCESS)
-    {
-      throw std::runtime_error("Could not create the CUDPP instance");
-    }
-
-  // Compact plan
-  CUDPPConfiguration compactFloatConfig;
-  compactFloatConfig.algorithm = CUDPP_COMPACT;
-  compactFloatConfig.datatype = CUDPP_FLOAT;
-  compactFloatConfig.options = CUDPP_OPTION_FORWARD;
-  CUDPPConfiguration compactIntConfig;
-  compactIntConfig.algorithm = CUDPP_COMPACT;
-  compactIntConfig.datatype = CUDPP_INT;
-  compactIntConfig.options = CUDPP_OPTION_FORWARD;
-  CUDPPHandle compactFloatPlan;
-  result = cudppPlan(theCudpp, &compactFloatPlan, compactFloatConfig, n, 1,
-		     0);
-  if (result != CUDPP_SUCCESS)
-    std::cerr << "Help!  Could not create float plan!" << std::endl;
-  CUDPPHandle compactIntPlan;
-  result = cudppPlan(theCudpp, &compactIntPlan, compactIntConfig, n, 1, 0);
-  if (result != CUDPP_SUCCESS)
-    std::cerr << "Help! Could not create int plan!" << std::endl;
-  size_t *numValid, *devNumValid;
-  checkCudaError(
-		 cudaHostAlloc(&numValid, sizeof(size_t), cudaHostAllocMapped));
-  checkCudaError(cudaHostGetDevicePointer(&devNumValid, numValid, 0));
-  int* hostRowptr = new int[n + 1];
-  hostRowptr[0] = 0;
-
-  int numBlocks = (n + DM_THREADSPERBLOCK - 1) / DM_THREADSPERBLOCK;
-  _fillIndex<<<numBlocks, DM_THREADSPERBLOCK>>>(devColNums, n);
-
-  for (int row = 0; row < n; ++row)
-    {
-      // Compute distances, record valid entries
-      _computeDrow<<<numBlocks, DM_THREADSPERBLOCK>>>(devCoords, devDrow, devIsValid, n, row, dLimit);
-      checkCudaError(cudaGetLastError());
-
-      // Compact into col
-      cudppCompact(compactFloatPlan, csrMatrix->val + hostRowptr[row],
-		   devNumValid, devDrow, devIsValid, n);
-      cudppCompact(compactIntPlan, csrMatrix->colInd + hostRowptr[row],
-		   devNumValid, devColNums, devIsValid, n);
-      cudaDeviceSynchronize();
-
-      // Update rowptr
-      hostRowptr[row + 1] = hostRowptr[row] + (int) *numValid;
-    }
-
-  checkCudaError(
-		 cudaMemcpy(csrMatrix->rowPtr, hostRowptr, (n+1)*sizeof(int), cudaMemcpyHostToDevice));
+  rowptr[rowptr.size()-1] = colind.size(); // NNZ
 
   // Clean up
-  cudaFree(devDrow);
-  cudaFree(devIsValid);
-  cudaFree(devColNums);
-  cudaFreeHost(numValid);
-  delete[] hostRowptr;
+  destroyCsrMatrix(temp);
+  checkCudaError(cudaFree(devCoords));
+  checkCudaError(cudaFree(devBuff));
+  
+  // Package up into CsrMatrix, send to GPU
+  CsrMatrix* rv = allocCsrMatrix(n, n, colind.size(), GPU);
+  checkCudaError(cudaMemcpy(rv->rowPtr, rowptr.data(), sizeof(size_t)*(n+1), cudaMemcpyHostToDevice));
+  checkCudaError(cudaMemcpy(rv->colInd, colind.data(), sizeof(size_t)*colind.size(), cudaMemcpyHostToDevice));
+  checkCudaError(cudaMemcpy(rv->val, value.data(), sizeof(float)*value.size(), cudaMemcpyHostToDevice));
 
-  cudppDestroyPlan(compactFloatPlan);
-  cudppDestroyPlan(compactIntPlan);
-  cudppDestroy(theCudpp);
-
-  cudaFree(devCoords);
-
-  cudaDeviceSynchronize();
-  return csrMatrix;
+  return rv;
 }
 
 CsrMatrix*
-allocCsrMatrix(const unsigned long long n, const unsigned long long m, const unsigned long long nnz)
+allocCsrMatrix(const size_t n, const size_t m,
+	       const size_t nnz, const DM_PLATFORM platform=CPU)
 {
   CsrMatrix* csrMatrix = new CsrMatrix;
   csrMatrix->rowPtr = NULL;
@@ -267,16 +310,27 @@ allocCsrMatrix(const unsigned long long n, const unsigned long long m, const uns
   csrMatrix->n = n;
   csrMatrix->m = m;
   csrMatrix->nnz = nnz;
+  csrMatrix->platform = platform;
 
-  try {
-    checkCudaError(cudaMalloc(&csrMatrix->rowPtr, (n+1)*sizeof(size_t)));
-    checkCudaError(cudaMalloc(&csrMatrix->colInd, nnz*sizeof(int)));
-    checkCudaError(cudaMalloc(&csrMatrix->val, nnz*sizeof(int)));
-  }
-  catch (GpuRuntimeError& e)
+  switch(platform)
     {
-      destroyCsrMatrix(csrMatrix);
-      throw e;
+    case GPU:
+      try {
+	checkCudaError(cudaMalloc(&csrMatrix->rowPtr, (n+1)*sizeof(int)));
+	checkCudaError(cudaMalloc(&csrMatrix->colInd, nnz*sizeof(int)));
+	checkCudaError(cudaMalloc(&csrMatrix->val, nnz*sizeof(float)));
+      }
+      catch (GpuRuntimeError& e)
+	{
+	  destroyCsrMatrix(csrMatrix);
+	  throw e;
+	}
+      break;
+    case CPU:
+      csrMatrix->rowPtr = new int[n+1];
+      csrMatrix->colInd = new int[nnz];
+      csrMatrix->val    = new float[nnz];
+      break;
     }
 
   return csrMatrix;
@@ -285,13 +339,22 @@ allocCsrMatrix(const unsigned long long n, const unsigned long long m, const uns
 void
 destroyCsrMatrix(CsrMatrix* const& csrMatrix)
 {
-  if(csrMatrix->val)
-    checkCudaError(cudaFree(csrMatrix->val));
-  if(csrMatrix->colInd)
-    checkCudaError(cudaFree(csrMatrix->colInd));
-  if(csrMatrix->rowPtr)
-    checkCudaError(cudaFree(csrMatrix->rowPtr));
-
+  switch(csrMatrix->platform)
+    {
+    case GPU:
+      if(csrMatrix->val)
+	checkCudaError(cudaFree(csrMatrix->val));
+      if(csrMatrix->colInd)
+	checkCudaError(cudaFree(csrMatrix->colInd));
+      if(csrMatrix->rowPtr)
+	checkCudaError(cudaFree(csrMatrix->rowPtr));
+      break;
+    case CPU:
+      if(csrMatrix->val) delete[] csrMatrix->val;
+      if(csrMatrix->colInd) delete[] csrMatrix->colInd;
+      if(csrMatrix->rowPtr) delete[] csrMatrix->rowPtr;
+      break;
+    }
   delete csrMatrix;
 }
 
